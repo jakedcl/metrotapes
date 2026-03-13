@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
-import SubwayBubbles from '../components/SubwayBubbles'
+import { useSpring, animated } from '@react-spring/web'
 
 const Container = styled.div`
   padding: 2rem;
@@ -74,6 +74,8 @@ export const Machine = styled.div`
     z-index: -1;
   }
 `
+
+const AnimatedMachine = animated(Machine)
 
 const TopBar = styled.div`
   width: 100%;
@@ -234,38 +236,46 @@ const NavButton = styled(Link)`
 `
 
 export default function Home() {
+  const machineSpring = useSpring({
+    from: { opacity: 0, transform: 'scale(0.9) translateY(40px)' },
+    to: { opacity: 1, transform: 'scale(1) translateY(0px)' },
+    config: {
+      mass: 1,
+      tension: 210,
+      friction: 20
+    },
+    delay: 250
+  })
+
   return (
-    <>
-      <SubwayBubbles />
-      <Container>
-        <Machine>
-          <TopBar />
-          <MainSection>
-            <Screen>
-              <VideoContainer>
-                <Video
-                  src="https://www.youtube.com/embed/trA9owC00HI?autoplay=1&mute=1&controls=0&loop=1&playlist=trA9owC00HI&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&playsinline=1&start=8&enablejsapi=0&origin=metrotapes.com&widget_referrer=metrotapes.com&color=white&disablekb=1&fs=0&version=3&autohide=1"
-                  title="Machine Video"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  frameBorder="0"
-                />
-              </VideoContainer>
-            </Screen>
-            <ButtonSection>
-              <NavButton to="/photo" color="#0039A6">
-                photo
-              </NavButton>
-              <NavButton to="/video" color="#00933C">
-                video
-              </NavButton>
-              <NavButton to="/about" color="#996633">
-                about
-              </NavButton>
-            </ButtonSection>
-          </MainSection>
-        </Machine>
-      </Container>
-    </>
+    <Container>
+      <AnimatedMachine style={machineSpring}>
+        <TopBar />
+        <MainSection>
+          <Screen>
+            <VideoContainer>
+              <Video
+                src="https://www.youtube.com/embed/trA9owC00HI?autoplay=1&mute=1&controls=0&loop=1&playlist=trA9owC00HI&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&playsinline=1&start=8&enablejsapi=0&origin=metrotapes.com&widget_referrer=metrotapes.com&color=white&disablekb=1&fs=0&version=3&autohide=1"
+                title="Machine Video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                frameBorder="0"
+              />
+            </VideoContainer>
+          </Screen>
+          <ButtonSection>
+            <NavButton to="/photo" color="#0039A6">
+              photo
+            </NavButton>
+            <NavButton to="/video" color="#00933C">
+              video
+            </NavButton>
+            <NavButton to="/about" color="#996633">
+              about
+            </NavButton>
+          </ButtonSection>
+        </MainSection>
+      </AnimatedMachine>
+    </Container>
   )
 }

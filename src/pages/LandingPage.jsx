@@ -2,8 +2,8 @@ import styled from 'styled-components'
 import SwipeSection from '../components/SwipeSection'
 import SubwaySign from '../components/SubwaySign'
 import PropTypes from 'prop-types'
-import BackgroundVideo from '../components/BackgroundVideo'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import { useSpring, animated } from '@react-spring/web'
 
 const Container = styled.div`
   width: 100%;
@@ -22,7 +22,7 @@ const Container = styled.div`
   }
 `
 
-const TitleContainer = styled.div`
+const TitleContainer = styled(animated.div)`
   position: absolute;
   top: 0;
   right: 0;
@@ -38,25 +38,40 @@ const TitleContainer = styled.div`
 
 export default function LandingPage({ onUnlock }) {
   const metroCardRef = useRef(null)
+  const [isUnlocking, setIsUnlocking] = useState(false)
 
   const handleContainerClick = (e) => {
     if (e.target.closest('.metro-card')) return
     metroCardRef.current?.click()
   }
 
+  const handleSwipeComplete = () => {
+    setIsUnlocking(true)
+    onUnlock()
+  }
+
+  const signSpring = useSpring({
+    opacity: isUnlocking ? 0 : 1,
+    transform: isUnlocking 
+      ? 'translate(20px, -30px) scale(0.95) rotateY(5deg)' 
+      : 'translate(0px, 0px) scale(1) rotateY(0deg)',
+    config: {
+      mass: 0.8,
+      tension: 200,
+      friction: 25
+    }
+  })
+
   return (
-    <>
-      <BackgroundVideo />
-      <Container onClick={handleContainerClick}>
-        <TitleContainer>
-          <SubwaySign />
-        </TitleContainer>
-        <SwipeSection
-          onSwipeComplete={onUnlock}
-          ref={metroCardRef}
-        />
-      </Container>
-    </>
+    <Container onClick={handleContainerClick}>
+      <TitleContainer style={signSpring}>
+        <SubwaySign />
+      </TitleContainer>
+      <SwipeSection
+        onSwipeComplete={handleSwipeComplete}
+        ref={metroCardRef}
+      />
+    </Container>
   )
 }
 

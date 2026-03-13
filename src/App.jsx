@@ -5,6 +5,7 @@ import PhotoPage from './pages/PhotoPage'
 import VideoPage from './pages/VideoPage'
 import AboutPage from './pages/AboutPage'
 import Header from './components/Header'
+import SubwayBubbles from './components/SubwayBubbles'
 import { useState, useEffect } from 'react'
 import { useTransition, animated } from '@react-spring/web'
 import styled from 'styled-components'
@@ -55,6 +56,8 @@ const GlobalStyle = createGlobalStyle`
 
 const Layout = styled.div`
   padding-top: 64px; // Height of header
+  position: relative;
+  overflow: hidden;
 `
 
 const AnimatedHeaderArea = styled(animated.header)`
@@ -71,7 +74,6 @@ const AnimatedHeaderArea = styled(animated.header)`
 const ContentArea = styled.main`
   width: 100%;
   min-height: 90vh;
-  background: #1A1A1A;
 `
 
 const AnimatedContainer = styled(animated.div)`
@@ -82,7 +84,6 @@ const AnimatedContainer = styled(animated.div)`
   bottom: 0;
   width: 100%;
   z-index: 200;
-  background: #1A1A1A;
 `
 
 function AppContent() {
@@ -118,6 +119,7 @@ function AppContent() {
 
   return (
     <Layout>
+      <SubwayBubbles />
       {headerTransition((style, show) =>
         show && (
           <AnimatedHeaderArea style={style}>
@@ -125,16 +127,18 @@ function AppContent() {
           </AnimatedHeaderArea>
         )
       )}
-      <ContentArea>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/photo" element={<PhotoPage />} />
-          <Route path="/video" element={<VideoPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </ContentArea>
+      {(isUnlocked || !isHomePage) && (
+        <ContentArea>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/photo" element={<PhotoPage />} />
+            <Route path="/video" element={<VideoPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ContentArea>
+      )}
       {transitions((style, item) =>
         item && (
           <AnimatedContainer style={style}>

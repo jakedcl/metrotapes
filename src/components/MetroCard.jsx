@@ -68,7 +68,7 @@ const Card = styled.img`
   }
 `
 
-const MetroCard = forwardRef(({ onSwipeComplete }, ref) => {
+const MetroCard = forwardRef(({ onSwipeComplete, className }, ref) => {
   const [isAnimating, setIsAnimating] = useState(false)
 
   const [{ x }, api] = useSpring(() => ({
@@ -107,6 +107,7 @@ const MetroCard = forwardRef(({ onSwipeComplete }, ref) => {
           x,
           rotateZ: -2 // Constant slight tilt
         }}
+        className={className}
         ref={ref}
       >
         <Card
@@ -120,7 +121,8 @@ const MetroCard = forwardRef(({ onSwipeComplete }, ref) => {
 })
 
 MetroCard.propTypes = {
-  onSwipeComplete: PropTypes.func.isRequired
+  onSwipeComplete: PropTypes.func.isRequired,
+  className: PropTypes.string
 }
 
 MetroCard.displayName = 'MetroCard'
