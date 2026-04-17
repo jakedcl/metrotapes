@@ -8,6 +8,8 @@ const Container = styled.div`
 `
 
 const MasonryGrid = styled.div`
+  position: relative;
+  z-index: 1;
   columns: 1;
   column-gap: 16px;
   width: 100%;
