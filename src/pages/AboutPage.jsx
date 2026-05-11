@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { client, urlFor } from '../lib/sanity'
 import { PortableText } from '@portabletext/react'
+import { frostedPanel, frostedPanelShadow } from '../styles/frostedPanel'
 
 const Container = styled.div`
   padding: 2rem;
@@ -15,12 +16,9 @@ const Container = styled.div`
 `
 
 const Content = styled.div`
-  background: rgba(0, 0, 0, 0.3);
+  ${frostedPanel}
+  ${frostedPanelShadow}
   border-radius: 12px;
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.5),
-    0 4px 16px rgba(0, 0, 0, 0.3),
-    0 2px 8px rgba(0, 0, 0, 0.2);
   padding: 2rem;
 `
 

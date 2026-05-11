@@ -19,9 +19,8 @@ const GlobalStyle = createGlobalStyle`
     box-sizing: border-box;
   }
 
-  html, body, #root {
+  html {
     min-height: 100%;
-    height: 100%;
   }
 
   body {
@@ -39,6 +38,7 @@ const GlobalStyle = createGlobalStyle`
     display: flex;
     flex-direction: column;
     background: #1A1A1A;
+    min-height: 100vh;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -57,7 +57,9 @@ const GlobalStyle = createGlobalStyle`
 const Layout = styled.div`
   padding-top: 64px; // Height of header
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
+  min-height: 100vh;
 `
 
 const AnimatedHeaderArea = styled(animated.header)`
