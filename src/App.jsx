@@ -11,6 +11,7 @@ import { useTransition, animated } from '@react-spring/web'
 import styled from 'styled-components'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Blog from './pages/Blog'
+import { font, station } from './styles/theme'
 
 const GlobalStyle = createGlobalStyle`
   * {
@@ -24,9 +25,9 @@ const GlobalStyle = createGlobalStyle`
   }
 
   body {
-    background: #1A1A1A;
+    background: ${station};
     color: white;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: ${font};
     font-weight: 500;
     min-height: 90vh;
     -webkit-font-smoothing: antialiased;
@@ -37,18 +38,18 @@ const GlobalStyle = createGlobalStyle`
   #root {
     display: flex;
     flex-direction: column;
-    background: #1A1A1A;
+    background: ${station};
     min-height: 100vh;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: ${font};
     font-weight: 600;
     letter-spacing: -0.02em;
   }
 
   p, span, a, button, input, textarea {
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: ${font};
     font-weight: 500;
     letter-spacing: -0.02em;
   }
@@ -69,13 +70,15 @@ const AnimatedHeaderArea = styled(animated.header)`
   left: 0;
   right: 0;
   z-index: 100;
-  background: #1A1A1A;
+  background: ${station};
   transform-origin: top;
 `
 
 const ContentArea = styled.main`
   width: 100%;
   min-height: 90vh;
+  position: relative;
+  z-index: 1;
 `
 
 const AnimatedContainer = styled(animated.div)`

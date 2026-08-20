@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { useSpring, animated } from '@react-spring/web'
+import { route } from '../styles/theme'
 
 const Container = styled.div`
   padding: 2rem;
@@ -264,13 +265,13 @@ export default function Home() {
             </VideoContainer>
           </Screen>
           <ButtonSection>
-            <NavButton to="/photo" color="#0039A6">
+            <NavButton to="/photo" color={route.photo}>
               photo
             </NavButton>
-            <NavButton to="/video" color="#00933C">
+            <NavButton to="/video" color={route.video}>
               video
             </NavButton>
-            <NavButton to="/about" color="#996633">
+            <NavButton to="/about" color={route.about}>
               about
             </NavButton>
           </ButtonSection>

@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react'
 import styled from 'styled-components'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCamera, faVideo, faBook, faBars, faRotateLeft } from '@fortawesome/free-solid-svg-icons'
+import { faCamera, faVideo, faBook, faBars } from '@fortawesome/free-solid-svg-icons'
+import { route, station } from '../styles/theme'
 
 const HeaderContainer = styled.header`
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  background: #1A1A1A;
+  background: ${station};
   z-index: 100;
 `
 
@@ -300,19 +301,19 @@ export default function Header() {
   const renderNavItems = () => (
     <>
       <NavItem to="/photo" onClick={handleNavClick}>
-        <Circle color="#0039A6">
+        <Circle color={route.photo}>
           <FontAwesomeIcon icon={faCamera} />
         </Circle>
         <NavText>photo</NavText>
       </NavItem>
       <NavItem to="/video" onClick={handleNavClick}>
-        <Circle color="#00933C">
+        <Circle color={route.video}>
           <FontAwesomeIcon icon={faVideo} />
         </Circle>
         <NavText>video</NavText>
       </NavItem>
       <NavItem to="/about" onClick={handleNavClick}>
-        <Circle color="#996633">
+        <Circle color={route.about}>
           <FontAwesomeIcon icon={faBook} />
         </Circle>
         <NavText>about</NavText>
@@ -336,9 +337,7 @@ export default function Header() {
               </TitleGroup>
             </TitleWrapper>
           </TitleSection>
-          <ResetButton onClick={handleReset} $isHomePage={isHomePage}>
-            <FontAwesomeIcon icon={faRotateLeft} />
-          </ResetButton>
+          <ResetButton onClick={handleReset} $isHomePage={isHomePage} aria-label="Reset to entrance" />
           {!isHomePage && !isMobile && (
             <NavList $isOpen={isOpen}>
               {renderNavItems()}

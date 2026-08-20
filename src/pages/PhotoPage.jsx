@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { client, urlFor } from '../lib/sanity'
 import styled from 'styled-components'
 import ImageModal from '../components/ImageModal'
+import FrostNote from '../components/FrostNote'
 
 const Container = styled.div`
   padding: 32px 16px;
@@ -51,6 +52,7 @@ const PhotoItem = styled.div`
 
 export default function PhotoPage() {
     const [photos, setPhotos] = useState([])
+    const [status, setStatus] = useState('loading')
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [selectedImage, setSelectedImage] = useState(null)
 
@@ -58,9 +60,15 @@ export default function PhotoPage() {
         const fetchPhotos = async () => {
             try {
                 const data = await client.fetch(`*[_type == "photos"][0].images`)
-                if (data) setPhotos(data)
+                if (data?.length) {
+                    setPhotos(data)
+                    setStatus('ready')
+                } else {
+                    setStatus('empty')
+                }
             } catch (error) {
                 console.error('Error fetching photos:', error)
+                setStatus('error')
             }
         }
 
@@ -89,6 +97,10 @@ export default function PhotoPage() {
 
     return (
         <Container>
+            {status === 'loading' && <FrostNote>Loading photos…</FrostNote>}
+            {status === 'empty' && <FrostNote>No photos yet.</FrostNote>}
+            {status === 'error' && <FrostNote>Could not load photos.</FrostNote>}
+            {status === 'ready' && (
             <MasonryGrid>
                 {photos.map((photo, index) => (
                     <PhotoItem
@@ -103,6 +115,7 @@ export default function PhotoPage() {
                     </PhotoItem>
                 ))}
             </MasonryGrid>
+            )}
             <ImageModal
                 isOpen={isModalOpen}
                 onClose={handleModalClose}
