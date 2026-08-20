@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { signFont } from '../styles/theme'
 
 const SignContainer = styled.div`
   background-color: #000;
@@ -77,16 +78,15 @@ const WhiteLine = styled.div`
 const StationText = styled.h1`
   position: relative;
   color: white;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: ${signFont};
   font-size: 2.2rem;
   font-weight: 700;
   width: 100%;
   margin-top: .6rem;
   margin-bottom: .75rem;
-  letter-spacing: -0.02em;
-  text-shadow: 
-    2px 2px 4px rgba(0, 0, 0, 0.3),
-    0 0 20px rgba(255, 255, 255, 0.1);
+  letter-spacing: 0.01em;
+  font-kerning: normal;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.35);
 
   @media (min-width: 768px) {
     font-size: 4.5rem;
@@ -113,8 +113,8 @@ const SubwayLine = styled.div`
   align-items: center;
   justify-content: center;
   color: ${props => props.color === '#FCCC0A' ? '#000' : 'white'};
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-weight: bold;
+  font-family: ${signFont};
+  font-weight: 700;
   font-size: 1.3rem;
   background-color: ${props => props.color};
   box-shadow: 
