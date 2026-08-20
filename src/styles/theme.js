@@ -16,6 +16,3 @@ export const route = {
 }
 
 export const font = '"Helvetica Neue", Helvetica, Arial, sans-serif'
-
-// MTA signs are Helvetica, not Neue. Neue first is the Apple/UI cut.
-export const signFont = 'Helvetica, "Helvetica Neue", Arial, sans-serif'

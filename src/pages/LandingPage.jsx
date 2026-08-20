@@ -55,7 +55,7 @@ export default function LandingPage({ onUnlock }) {
 
     const timeout = setTimeout(() => {
       metroCardRef.current?.click()
-    }, 3000)
+    }, 6000)
 
     return () => clearTimeout(timeout)
   }, [isUnlocking])
