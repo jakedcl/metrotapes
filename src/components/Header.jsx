@@ -72,7 +72,7 @@ const ResetButton = styled.button`
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, filter 0.2s ease;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 
   @media (min-width: 768px) {
@@ -85,25 +85,22 @@ const ResetButton = styled.button`
     height: 42px;
   }
 
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    display: block;
+  }
+
   &:hover {
-    transform: translateY(-2px);
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4))
-             brightness(1.1);
+    transform: translateY(-2px) scale(1.06);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4)) brightness(1.15);
   }
 
   &:active {
-    transform: translateY(0);
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3))
-             brightness(0.95);
-  }
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: url('/lamp.png') no-repeat center center;
-    background-size: contain;
-    transition: all 0.2s ease;
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3)) brightness(0.95);
   }
 `
 
@@ -141,6 +138,7 @@ const NavItem = styled(NavLink)`
   align-items: center;
   text-decoration: none;
   height: 32px;
+  cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
@@ -318,7 +316,7 @@ export default function Header() {
         <TopSection>
           <TitleSection>
             {isMobile && (
-              <MenuButton onClick={handleMenuToggle} $isHomePage={isHomePage} aria-label="Open menu">
+              <MenuButton onClick={handleMenuToggle} aria-label="Open menu">
                 <FontAwesomeIcon icon={faBars} size="lg" />
               </MenuButton>
             )}
@@ -334,7 +332,9 @@ export default function Header() {
                 {renderNavItems()}
               </NavList>
             )}
-            <ResetButton onClick={handleReset} $isHomePage={isHomePage} aria-label="Reset to entrance" />
+            <ResetButton type="button" onClick={handleReset} aria-label="Reset to entrance">
+              <img src="/lamp.png" alt="" />
+            </ResetButton>
           </RightCluster>
         </TopSection>
         {isMobile && (

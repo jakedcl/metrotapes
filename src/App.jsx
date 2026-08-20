@@ -53,6 +53,10 @@ const GlobalStyle = createGlobalStyle`
     font-weight: 500;
     letter-spacing: -0.02em;
   }
+
+  a, button {
+    cursor: pointer;
+  }
 `
 
 const Layout = styled.div`
