@@ -4,17 +4,17 @@ import { useState, forwardRef } from 'react'
 import PropTypes from 'prop-types'
 
 const float = keyframes`
-  0% { 
+  0% {
     transform: translate(0, 0) scale(1) rotate(-2deg);
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
+    filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
   }
   50% {
-    transform: translate(15px, -30px) scale(1.08) rotate(-2deg);
-    filter: drop-shadow(0 24px 32px rgba(0, 0, 0, 0.3));
+    transform: translate(10px, -18px) scale(1.04) rotate(-2deg);
+    filter: drop-shadow(0 22px 28px rgba(0, 0, 0, 0.32));
   }
-  100% { 
+  100% {
     transform: translate(0, 0) scale(1) rotate(-2deg);
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
+    filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
   }
 `
 
@@ -36,13 +36,17 @@ const glow = keyframes`
 const CardWrapper = styled.div`
   position: relative;
   z-index: 10;
-  animation: ${float} 3s ease-in-out infinite;
+  animation: ${float} 4.2s ease-in-out infinite;
   transform-origin: center;
 
   &:hover {
-    filter: drop-shadow(0 32px 64px rgba(0, 0, 0, 0.25));
-    transform: scale(1.12) translateY(-15px);
+    filter: drop-shadow(0 28px 40px rgba(0, 0, 0, 0.28));
+    transform: scale(1.06) translateY(-8px);
     animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
   }
 `
 
@@ -52,6 +56,11 @@ const CardContainer = styled(animated.div)`
   transform-origin: center;
   will-change: transform;
   -webkit-tap-highlight-color: transparent;
+  outline: none;
+
+  &:focus-visible {
+    filter: drop-shadow(0 0 12px rgba(252, 204, 10, 0.7));
+  }
 `
 
 const Card = styled.img`
@@ -65,6 +74,10 @@ const Card = styled.img`
 
   @media (min-width: 768px) {
     height: 180px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
   }
 `
 
@@ -103,6 +116,15 @@ const MetroCard = forwardRef(({ onSwipeComplete, className }, ref) => {
     <CardWrapper>
       <CardContainer
         onClick={triggerSwipe}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            triggerSwipe()
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label="Swipe MetroCard to enter"
         style={{
           x,
           rotateZ: -2 // Constant slight tilt

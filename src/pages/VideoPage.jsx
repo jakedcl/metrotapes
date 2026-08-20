@@ -2,35 +2,42 @@ import { useEffect, useState } from 'react'
 import { client } from '../lib/sanity'
 import styled from 'styled-components'
 import { frostedPanel, frostedPanelShadow } from '../styles/frostedPanel'
+import StationMark from '../components/StationMark'
+import { theme } from '../styles/theme'
 
 const Container = styled.div`
   min-height: 100vh;
   width: 100%;
-  background: #1a1a1a;
-  padding: 32px 16px;
+  padding: 28px 16px 64px;
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 1;
+`
+
+const Inner = styled.div`
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 `
 
 const VideoGrid = styled.div`
   columns: 1;
   column-gap: 16px;
   width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
   flex: 1;
-  
+
   @media (min-width: 640px) {
     columns: 2;
   }
-  
+
   @media (min-width: 1024px) {
     columns: 3;
   }
-  
+
   @media (min-width: 1280px) {
     columns: 4;
-    padding: 0 32px;
+    padding: 0 8px;
   }
 `
 
@@ -43,7 +50,7 @@ const VideoItem = styled.div`
   border-radius: 8px;
   overflow: hidden;
   ${frostedPanelShadow}
-  transition: transform 0.2s ease;
+  transition: transform 0.28s ease, box-shadow 0.28s ease;
 
   &::before {
     content: '';
@@ -56,14 +63,17 @@ const VideoItem = styled.div`
   }
 
   &:hover {
-    transform: translateY(-4px);
+    transform: translateY(-5px);
+    box-shadow:
+      0 18px 36px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.08);
   }
 `
 
 const VideoEmbed = styled.div`
   position: relative;
   z-index: 1;
-  padding-top: 56.25%; // 16:9 aspect ratio
+  padding-top: 56.25%;
   background: #000;
   overflow: hidden;
 `
@@ -84,10 +94,10 @@ const StatusBlock = styled.div`
   border-radius: 12px;
   padding: 2rem 1.5rem;
   max-width: 28rem;
-  margin: 2rem auto 0;
+  margin: 1rem auto 0;
   text-align: center;
   color: rgba(255, 255, 255, 0.88);
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: ${theme.font};
   letter-spacing: -0.02em;
   line-height: 1.5;
 `
@@ -163,38 +173,43 @@ export default function VideoPage() {
 
   return (
     <Container>
-      {status === 'loading' && (
-        <StatusBlock>Loading playlist…</StatusBlock>
-      )}
-      {(status === 'empty' || status === 'error') && (
-        <StatusBlock>
-          {status === 'error' ? 'Could not load videos.' : 'No videos to show.'}
-          {statusDetail ? (
-            <>
-              {' '}
-              <span style={{ display: 'block', marginTop: '0.75rem', opacity: 0.8, fontSize: '0.95rem' }}>
-                {statusDetail}
-              </span>
-            </>
-          ) : null}
-        </StatusBlock>
-      )}
-      {status === 'ready' && (
-        <VideoGrid>
-          {videos.map(video => (
-            <VideoItem key={video.id}>
-              <VideoEmbed>
-                <VideoIframe
-                  src={`https://www.youtube.com/embed/${video.videoId}`}
-                  title={video.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </VideoEmbed>
-            </VideoItem>
-          ))}
-        </VideoGrid>
-      )}
+      <Inner>
+        <StationMark letter={theme.route.video.letter} color={theme.route.video.color}>
+          video
+        </StationMark>
+        {status === 'loading' && (
+          <StatusBlock>Loading playlist…</StatusBlock>
+        )}
+        {(status === 'empty' || status === 'error') && (
+          <StatusBlock>
+            {status === 'error' ? 'Could not load videos.' : 'No videos to show.'}
+            {statusDetail ? (
+              <>
+                {' '}
+                <span style={{ display: 'block', marginTop: '0.75rem', opacity: 0.8, fontSize: '0.95rem' }}>
+                  {statusDetail}
+                </span>
+              </>
+            ) : null}
+          </StatusBlock>
+        )}
+        {status === 'ready' && (
+          <VideoGrid>
+            {videos.map(video => (
+              <VideoItem key={video.id}>
+                <VideoEmbed>
+                  <VideoIframe
+                    src={`https://www.youtube.com/embed/${video.videoId}`}
+                    title={video.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </VideoEmbed>
+              </VideoItem>
+            ))}
+          </VideoGrid>
+        )}
+      </Inner>
     </Container>
   )
 }

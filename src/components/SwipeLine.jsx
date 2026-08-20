@@ -1,25 +1,32 @@
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
+import { theme } from '../styles/theme'
 
 const LineContainer = styled.div`
   width: 100%;
   height: 16rem;
   pointer-events: none;
+  position: relative;
 
   @media (min-width: 768px) {
     height: 17.5rem;
   }
 `
 
+const slotPulse = keyframes`
+  0%, 100% { opacity: 0.55; box-shadow: 0 0 10px rgba(252, 204, 10, 0.35); }
+  50% { opacity: 1; box-shadow: 0 0 22px rgba(252, 204, 10, 0.7); }
+`
+
 const Line = styled.div`
   position: relative;
   width: 100%;
   height: 100%;
-  background: 
+  background:
     linear-gradient(
       to bottom,
-      rgba(255, 255, 255, 0.15) 0%,
+      rgba(255, 255, 255, 0.18) 0%,
       rgba(255, 255, 255, 0) 50%,
-      rgba(0, 0, 0, 0.15) 100%
+      rgba(0, 0, 0, 0.18) 100%
     ),
     url('/metal.jpg') repeat,
     linear-gradient(
@@ -30,11 +37,9 @@ const Line = styled.div`
       #888 100%
     );
   background-blend-mode: overlay, multiply, normal;
-  box-shadow: 
-    /* Inner shadows for depth */
+  box-shadow:
     inset 0 2px 5px rgba(255, 255, 255, 0.3),
     inset 0 -2px 5px rgba(0, 0, 0, 0.5),
-    /* Outer shadows for depth */
     0 -1px 2px rgba(0, 0, 0, 0.2),
     0 1px 2px rgba(0, 0, 0, 0.3);
   border-top: 1px solid rgba(255, 255, 255, 0.4);
@@ -55,15 +60,33 @@ const Line = styled.div`
     left: 0;
     right: 0;
     bottom: 0;
-    background: 
+    background:
       linear-gradient(
         45deg,
         rgba(255, 255, 255, 0) 30%,
-        rgba(255, 255, 255, 0.1) 45%,
-        rgba(255, 255, 255, 0.1) 55%,
+        rgba(255, 255, 255, 0.12) 45%,
+        rgba(255, 255, 255, 0.12) 55%,
         rgba(255, 255, 255, 0) 70%
       );
     pointer-events: none;
+  }
+`
+
+const Slot = styled.div`
+  position: absolute;
+  left: 62%;
+  top: 38%;
+  width: 6px;
+  height: 22%;
+  border-radius: 2px;
+  background: ${theme.color.yellow};
+  transform: rotate(-28deg);
+  animation: ${slotPulse} 1.8s ease-in-out infinite;
+  pointer-events: none;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    opacity: 0.85;
   }
 `
 
@@ -71,6 +94,7 @@ export default function SwipeLine() {
   return (
     <LineContainer>
       <Line />
+      <Slot aria-hidden="true" />
     </LineContainer>
   )
-} 
+}

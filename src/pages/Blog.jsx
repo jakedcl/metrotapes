@@ -4,22 +4,24 @@ import { client, urlFor } from '../lib/sanity'
 import { frostedPanel, frostedPanelShadow } from '../styles/frostedPanel'
 
 const Container = styled.div`
-  padding: 2rem;
+  padding: 28px 2rem 64px;
   color: white;
-  max-width: 1200px;
+  max-width: 1100px;
   margin: 0 auto;
+  position: relative;
+  z-index: 1;
 
   @media (max-width: 768px) {
-    padding: 1.5rem;
+    padding: 24px 1.15rem 48px;
   }
 `
 
 const ArticleContainer = styled.div`
   ${frostedPanel}
   ${frostedPanelShadow}
-  border-radius: 12px;
-  padding: 2rem;
-  margin-bottom: 3rem;
+  border-radius: 14px;
+  padding: 2rem 1.75rem;
+  margin-bottom: 2rem;
 
   &:last-child {
     margin-bottom: 0;
@@ -28,22 +30,24 @@ const ArticleContainer = styled.div`
 
 const ArticleTitle = styled.h2`
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 1.8rem;
-  margin-bottom: 1rem;
+  font-size: 1.7rem;
+  margin-bottom: 0.85rem;
   color: white;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  font-weight: 700;
 
   @media (min-width: 768px) {
-    font-size: 2.2rem;
+    font-size: 2.1rem;
   }
 `
 
 const ArticleDescription = styled.div`
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 1.1rem;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 2rem;
+  font-size: 1.08rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.88);
+  margin-bottom: 1.75rem;
+  letter-spacing: -0.018em;
 
   @media (max-width: 768px) {
     font-size: 1rem;

@@ -2,24 +2,23 @@ import { useState, useEffect } from 'react'
 import styled from 'styled-components'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCamera, faVideo, faBook, faBars, faRotateLeft } from '@fortawesome/free-solid-svg-icons'
+import { faCamera, faVideo, faBook, faBars } from '@fortawesome/free-solid-svg-icons'
+import { theme } from '../styles/theme'
 
 const HeaderContainer = styled.header`
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  background: #1A1A1A;
-  z-index: 100;
+  background: rgba(12, 12, 12, 0.72);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+  z-index: ${theme.z.header};
 `
 
 const HeaderContent = styled.div`
-  padding: 0.75rem 1rem;
+  padding: 0.7rem 1rem 0.65rem;
   position: relative;
-
-  @media (min-width: 768px) {
-    padding: 0.75rem 1rem 0.75rem 1rem;
-  }
 
   &::after {
     content: '';
@@ -27,9 +26,9 @@ const HeaderContent = styled.div`
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 4px;
-    background: white;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    height: 3px;
+    background: ${theme.color.white};
+    box-shadow: 0 0 16px rgba(255, 255, 255, 0.18);
   }
 `
 
@@ -48,17 +47,17 @@ const TitleWrapper = styled.div`
 `
 
 const Title = styled.div`
-  color: white;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 1.8rem;
+  color: ${theme.color.white};
+  font-family: ${theme.font};
+  font-size: 1.7rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.04em;
   margin: 0;
   text-decoration: none;
   transition: opacity 0.3s ease;
 
   &:hover {
-    opacity: 0.9;
+    opacity: 0.88;
   }
 `
 
@@ -70,45 +69,30 @@ const ResetButton = styled.button`
   padding: 0;
   cursor: pointer;
   position: absolute;
-  transition: all 0.2s ease;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
   right: 0;
   transform: none;
+  filter: drop-shadow(0 0 10px rgba(80, 200, 120, 0.35));
+  transition: transform 0.2s ease, filter 0.2s ease;
 
   @media (min-width: 768px) {
     width: 52px;
     height: 52px;
     display: ${props => props.$isHomePage ? 'block' : 'none'};
-
-    &:hover {
-      transform: translateY(-2px);
-      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4))
-               brightness(1.1);
-    }
-
-    &:active {
-      transform: translateY(0);
-      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3))
-               brightness(0.95);
-    }
   }
 
   @media (max-width: 767px) {
     width: 42px;
     height: 42px;
-    right: 0;
+  }
 
-    &:hover {
-      transform: translateY(-2px);
-      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4))
-               brightness(1.1);
-    }
+  &:hover {
+    transform: translateY(-2px);
+    filter: drop-shadow(0 0 16px rgba(80, 200, 120, 0.55)) brightness(1.08);
+  }
 
-    &:active {
-      transform: translateY(0);
-      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3))
-               brightness(0.95);
-    }
+  &:active {
+    transform: translateY(0);
+    filter: drop-shadow(0 0 8px rgba(80, 200, 120, 0.3)) brightness(0.96);
   }
 
   &::before {
@@ -117,14 +101,13 @@ const ResetButton = styled.button`
     inset: 0;
     background: url('/lamp.png') no-repeat center center;
     background-size: contain;
-    transition: all 0.2s ease;
   }
 `
 
 const NavList = styled.nav`
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.85rem;
   overflow: hidden;
   max-height: ${props => props.$isOpen ? '300px' : '0'};
   opacity: ${props => props.$isOpen ? 1 : 0};
@@ -134,7 +117,7 @@ const NavList = styled.nav`
 
   @media (min-width: 768px) {
     flex-direction: row;
-    gap: 1rem;
+    gap: 0.75rem;
     max-height: none;
     opacity: 1;
     overflow: visible;
@@ -166,11 +149,13 @@ const Circle = styled.div`
   align-items: center;
   justify-content: center;
   color: white;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-weight: bold;
+  font-family: ${theme.font};
+  font-weight: 700;
   font-size: 0.9rem;
   background-color: ${props => props.color};
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.25),
+    0 0 12px ${props => props.color}40;
   transition: all 0.3s ease;
   flex-shrink: 0;
 
@@ -200,9 +185,10 @@ const Circle = styled.div`
 
 const NavText = styled.span`
   color: white;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: ${theme.font};
   font-size: 1.1rem;
   font-weight: 500;
+  letter-spacing: -0.02em;
   opacity: 0;
   position: absolute;
   left: 44px;
@@ -216,8 +202,8 @@ const NavText = styled.span`
   @media (min-width: 768px) {
     left: 50px;
     opacity: 0;
-    font-size: 1.2rem;
-    
+    font-size: 1.15rem;
+
     ${NavItem}:hover &, ${NavItem}.active & {
       opacity: 1;
     }
@@ -300,19 +286,19 @@ export default function Header() {
   const renderNavItems = () => (
     <>
       <NavItem to="/photo" onClick={handleNavClick}>
-        <Circle color="#0039A6">
+        <Circle color={theme.route.photo.color}>
           <FontAwesomeIcon icon={faCamera} />
         </Circle>
         <NavText>photo</NavText>
       </NavItem>
       <NavItem to="/video" onClick={handleNavClick}>
-        <Circle color="#00933C">
+        <Circle color={theme.route.video.color}>
           <FontAwesomeIcon icon={faVideo} />
         </Circle>
         <NavText>video</NavText>
       </NavItem>
       <NavItem to="/about" onClick={handleNavClick}>
-        <Circle color="#996633">
+        <Circle color={theme.route.about.color}>
           <FontAwesomeIcon icon={faBook} />
         </Circle>
         <NavText>about</NavText>
@@ -326,7 +312,7 @@ export default function Header() {
         <TopSection>
           <TitleSection>
             {!isHomePage && isMobile && (
-              <MenuButton onClick={handleMenuToggle} $isHomePage={isHomePage}>
+              <MenuButton onClick={handleMenuToggle} $isHomePage={isHomePage} aria-label="Open menu">
                 <FontAwesomeIcon icon={faBars} size="lg" />
               </MenuButton>
             )}
@@ -336,8 +322,8 @@ export default function Header() {
               </TitleGroup>
             </TitleWrapper>
           </TitleSection>
-          <ResetButton onClick={handleReset} $isHomePage={isHomePage}>
-            <FontAwesomeIcon icon={faRotateLeft} />
+          <ResetButton onClick={handleReset} $isHomePage={isHomePage} aria-label="Reset to station entrance">
+            <span className="sr-only">reset</span>
           </ResetButton>
           {!isHomePage && !isMobile && (
             <NavList $isOpen={isOpen}>
@@ -353,4 +339,4 @@ export default function Header() {
       </HeaderContent>
     </HeaderContainer>
   )
-} 
+}

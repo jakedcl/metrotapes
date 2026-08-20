@@ -3,34 +3,30 @@ import styled from 'styled-components'
 import { client, urlFor } from '../lib/sanity'
 import { PortableText } from '@portabletext/react'
 import { frostedPanel, frostedPanelShadow } from '../styles/frostedPanel'
+import StationMark from '../components/StationMark'
+import { theme } from '../styles/theme'
 
 const Container = styled.div`
-  padding: 2rem;
+  padding: 28px 1.5rem 64px;
   color: white;
-  max-width: 1000px;
+  max-width: 1040px;
   margin: 0 auto;
+  position: relative;
+  z-index: 1;
 
   @media (max-width: 768px) {
-    padding: 1.5rem;
+    padding: 24px 1.15rem 48px;
   }
 `
 
 const Content = styled.div`
   ${frostedPanel}
   ${frostedPanelShadow}
-  border-radius: 12px;
-  padding: 2rem;
-`
-
-const Title = styled.h1`
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 2rem;
-  margin-bottom: 1.5rem;
-  color: white;
-  letter-spacing: -0.02em;
+  border-radius: 14px;
+  padding: 2rem 1.75rem 2.25rem;
 
   @media (min-width: 768px) {
-    font-size: 2.5rem;
+    padding: 2.4rem 2.2rem 2.6rem;
   }
 `
 
@@ -55,30 +51,30 @@ const PhotoContainer = styled.div`
   img {
     width: 100%;
     height: auto;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.32);
   }
 `
 
 const LandscapePhotoContainer = styled.div`
   width: 100%;
-  margin-top: 2rem;
+  margin-top: 0.5rem;
 
   img {
     width: 100%;
     height: auto;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.32);
   }
 `
 
 const Description = styled.div`
   flex: 1;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 1.1rem;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.9);
-  letter-spacing: -0.02em;
+  font-family: ${theme.font};
+  font-size: 1.08rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.88);
+  letter-spacing: -0.018em;
 
   p {
     margin-bottom: 1rem;
@@ -108,12 +104,12 @@ const InstagramLink = styled.a`
   gap: 0.75rem;
   color: white;
   text-decoration: none;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 1.1rem;
+  font-family: ${theme.font};
+  font-size: 1.05rem;
   letter-spacing: -0.02em;
-  transition: transform 0.2s ease;
-  margin: 2rem 0;
-  opacity: 0.9;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  margin: 1.75rem 0 0;
+  opacity: 0.88;
 
   &:hover {
     transform: translateY(-1px);
@@ -121,8 +117,8 @@ const InstagramLink = styled.a`
   }
 
   svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     fill: currentColor;
   }
 `
@@ -160,7 +156,9 @@ export default function AboutPage() {
   return (
     <Container>
       <Content>
-        <Title>{aboutContent.title}</Title>
+        <StationMark letter={theme.route.about.letter} color={theme.route.about.color}>
+          {aboutContent.title}
+        </StationMark>
         <TopSection>
           <PhotoContainer>
             <img
@@ -191,4 +189,4 @@ export default function AboutPage() {
       </Content>
     </Container>
   )
-} 
+}

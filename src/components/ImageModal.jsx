@@ -11,14 +11,16 @@ const Overlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.9);
+  background-color: rgba(6, 6, 6, 0.92);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
   opacity: ${props => props.$isOpen ? 1 : 0};
   visibility: ${props => props.$isOpen ? 'visible' : 'hidden'};
-  transition: opacity 0.3s ease, visibility 0.3s ease;
+  transition: opacity 0.35s ease, visibility 0.35s ease;
 `
 
 const ModalContent = styled.div`
@@ -34,6 +36,7 @@ const ModalImage = styled.img`
   max-width: 90vw;
   max-height: 90vh;
   object-fit: contain;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 `
 
 const Button = styled.button`
