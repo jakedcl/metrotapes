@@ -17,20 +17,33 @@ const SignFrame = styled.div`
 const Rod = styled.span`
   position: absolute;
   top: 0;
-  width: 7px;
-  height: 28px;
-  background: linear-gradient(to bottom, #9a9a9a, #4a4a4a);
+  width: 6px;
+  height: 40px;
+  background: linear-gradient(to bottom, #c5c5c5, #5a5a5a);
   box-shadow:
-    inset 1px 0 0 rgba(255, 255, 255, 0.35),
-    0 2px 6px rgba(0, 0, 0, 0.4);
+    inset 1px 0 0 rgba(255, 255, 255, 0.4),
+    0 4px 10px rgba(0, 0, 0, 0.45);
   z-index: 2;
 
+  &::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #ddd, #666);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
   &:first-of-type {
-    right: 92px;
+    right: 108px;
   }
 
   &:last-of-type {
-    right: 36px;
+    right: 44px;
   }
 `
 
@@ -52,7 +65,7 @@ const SignContainer = styled.div`
   max-width: 700px;
   height: 100%;
   border-radius: 16px 0 0 16px;
-  margin-top: 1.75rem;
+  margin-top: 2.4rem;
   position: relative;
   isolation: isolate;
   transform: perspective(1200px) rotateY(-3deg);
@@ -86,7 +99,7 @@ const SignContainer = styled.div`
 
   @media (min-width: 768px) {
     max-width: 920px;
-    margin-top: 2rem;
+    margin-top: 2.55rem;
   }
 
   @media (prefers-reduced-motion: reduce) {

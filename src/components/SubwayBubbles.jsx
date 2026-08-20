@@ -8,8 +8,8 @@ const Container = styled.div`
   overflow: hidden;
   pointer-events: none;
   z-index: ${theme.z.bubbles};
-  opacity: 0.13;
-  filter: blur(0.4px);
+  opacity: 0.2;
+  filter: blur(0.6px);
 `
 
 const drift = keyframes`
