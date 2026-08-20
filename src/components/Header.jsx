@@ -70,46 +70,31 @@ const ResetButton = styled.button`
   border: none;
   padding: 0;
   cursor: pointer;
-  position: absolute;
+  position: relative;
+  flex-shrink: 0;
   transition: all 0.2s ease;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-  right: 0;
-  transform: none;
 
   @media (min-width: 768px) {
     width: 52px;
     height: 52px;
-    display: ${props => props.$isHomePage ? 'block' : 'none'};
-
-    &:hover {
-      transform: translateY(-2px);
-      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4))
-               brightness(1.1);
-    }
-
-    &:active {
-      transform: translateY(0);
-      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3))
-               brightness(0.95);
-    }
   }
 
   @media (max-width: 767px) {
     width: 42px;
     height: 42px;
-    right: 0;
+  }
 
-    &:hover {
-      transform: translateY(-2px);
-      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4))
-               brightness(1.1);
-    }
+  &:hover {
+    transform: translateY(-2px);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4))
+             brightness(1.1);
+  }
 
-    &:active {
-      transform: translateY(0);
-      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3))
-               brightness(0.95);
-    }
+  &:active {
+    transform: translateY(0);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3))
+             brightness(0.95);
   }
 
   &::before {
@@ -120,6 +105,13 @@ const ResetButton = styled.button`
     background-size: contain;
     transition: all 0.2s ease;
   }
+`
+
+const RightCluster = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
 `
 
 const NavList = styled.nav`
@@ -141,7 +133,6 @@ const NavList = styled.nav`
     overflow: visible;
     padding: 0;
     margin: 0;
-    margin-left: auto;
   }
 `
 
@@ -240,7 +231,7 @@ const MenuButton = styled.button`
   }
 
   @media (max-width: 767px) {
-    display: ${props => props.$isHomePage ? 'none' : 'block'};
+    display: block;
   }
 `
 
@@ -326,8 +317,8 @@ export default function Header() {
       <HeaderContent>
         <TopSection>
           <TitleSection>
-            {!isHomePage && isMobile && (
-              <MenuButton onClick={handleMenuToggle} $isHomePage={isHomePage}>
+            {isMobile && (
+              <MenuButton onClick={handleMenuToggle} $isHomePage={isHomePage} aria-label="Open menu">
                 <FontAwesomeIcon icon={faBars} size="lg" />
               </MenuButton>
             )}
@@ -337,14 +328,16 @@ export default function Header() {
               </TitleGroup>
             </TitleWrapper>
           </TitleSection>
-          <ResetButton onClick={handleReset} $isHomePage={isHomePage} aria-label="Reset to entrance" />
-          {!isHomePage && !isMobile && (
-            <NavList $isOpen={isOpen}>
-              {renderNavItems()}
-            </NavList>
-          )}
+          <RightCluster>
+            {!isMobile && (
+              <NavList $isOpen={isOpen}>
+                {renderNavItems()}
+              </NavList>
+            )}
+            <ResetButton onClick={handleReset} $isHomePage={isHomePage} aria-label="Reset to entrance" />
+          </RightCluster>
         </TopSection>
-        {!isHomePage && isMobile && (
+        {isMobile && (
           <NavList $isOpen={isOpen}>
             {renderNavItems()}
           </NavList>
