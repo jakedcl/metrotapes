@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { client } from '../lib/sanity'
 import styled from 'styled-components'
 import { frostedPanel, frostedPanelShadow } from '../styles/frostedPanel'
+import FrostNote from '../components/FrostNote'
+import { station } from '../styles/theme'
 
 const Container = styled.div`
   min-height: 100vh;
   width: 100%;
-  background: #1a1a1a;
+  background: ${station};
   padding: 32px 16px;
   display: flex;
   flex-direction: column;
@@ -76,20 +78,6 @@ const VideoIframe = styled.iframe`
   height: 100%;
   border: 0;
   z-index: 1;
-`
-
-const StatusBlock = styled.div`
-  ${frostedPanel}
-  ${frostedPanelShadow}
-  border-radius: 12px;
-  padding: 2rem 1.5rem;
-  max-width: 28rem;
-  margin: 2rem auto 0;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.88);
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  letter-spacing: -0.02em;
-  line-height: 1.5;
 `
 
 export default function VideoPage() {
@@ -164,10 +152,10 @@ export default function VideoPage() {
   return (
     <Container>
       {status === 'loading' && (
-        <StatusBlock>Loading playlist…</StatusBlock>
+        <FrostNote>Loading playlist…</FrostNote>
       )}
       {(status === 'empty' || status === 'error') && (
-        <StatusBlock>
+        <FrostNote>
           {status === 'error' ? 'Could not load videos.' : 'No videos to show.'}
           {statusDetail ? (
             <>
@@ -177,7 +165,7 @@ export default function VideoPage() {
               </span>
             </>
           ) : null}
-        </StatusBlock>
+        </FrostNote>
       )}
       {status === 'ready' && (
         <VideoGrid>

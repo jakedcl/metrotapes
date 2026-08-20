@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { client, urlFor } from '../lib/sanity'
 import { PortableText } from '@portabletext/react'
 import { frostedPanel, frostedPanelShadow } from '../styles/frostedPanel'
+import FrostNote from '../components/FrostNote'
 
 const Container = styled.div`
   padding: 2rem;
@@ -155,7 +156,13 @@ export default function AboutPage() {
     fetchAboutContent()
   }, [])
 
-  if (!aboutContent) return null
+  if (!aboutContent) {
+    return (
+      <Container>
+        <FrostNote>Loading…</FrostNote>
+      </Container>
+    )
+  }
 
   return (
     <Container>
