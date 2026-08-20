@@ -1,19 +1,21 @@
 import { useMemo } from 'react'
 import styled, { keyframes } from 'styled-components'
+import { theme } from '../styles/theme'
 
 const Container = styled.div`
   position: fixed;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  z-index: 0;
-  opacity: 0.22;
+  z-index: ${theme.z.bubbles};
+  opacity: 0.13;
+  filter: blur(0.4px);
 `
 
 const drift = keyframes`
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(var(--dx), var(--dy), 0) scale(1.04); }
-  100% { transform: translate3d(0, 0, 0) scale(1); }
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(var(--dx), var(--dy), 0); }
+  100% { transform: translate3d(0, 0, 0); }
 `
 
 const Circle = styled.div`
@@ -26,10 +28,7 @@ const Circle = styled.div`
   font-weight: 700;
   color: ${props => props.$textColor || 'white'};
   letter-spacing: -0.04em;
-  box-shadow:
-    0 0 18px ${props => props.$glow || 'transparent'},
-    0 4px 10px rgba(0, 0, 0, 0.25);
-  mix-blend-mode: screen;
+  box-shadow: 0 0 22px ${props => props.$glow || 'transparent'};
   animation: ${drift} var(--duration) ease-in-out var(--delay) infinite;
   will-change: transform;
 
@@ -70,18 +69,18 @@ function seeded(index, salt) {
 export default function SubwayBubbles() {
   const bubbles = useMemo(() => (
     SUBWAY_LINES.map((line, index) => {
-      const size = 36 + Math.round(seeded(index, 1) * 18)
+      const size = 34 + Math.round(seeded(index, 1) * 16)
       return {
         ...line,
         id: index,
         size,
         left: seeded(index, 2) * 92,
         top: seeded(index, 3) * 88,
-        dx: `${(seeded(index, 4) - 0.5) * 70}px`,
-        dy: `${(seeded(index, 5) - 0.5) * 80}px`,
-        duration: `${16 + seeded(index, 6) * 18}s`,
-        delay: `${-seeded(index, 7) * 20}s`,
-        fontSize: size > 46 ? '1.35rem' : '1.1rem',
+        dx: `${(seeded(index, 4) - 0.5) * 48}px`,
+        dy: `${(seeded(index, 5) - 0.5) * 56}px`,
+        duration: `${22 + seeded(index, 6) * 20}s`,
+        delay: `${-seeded(index, 7) * 24}s`,
+        fontSize: size > 44 ? '1.2rem' : '1rem',
       }
     })
   ), [])
@@ -92,7 +91,7 @@ export default function SubwayBubbles() {
         <Circle
           key={bubble.id}
           $textColor={bubble.textColor}
-          $glow={`${bubble.color}66`}
+          $glow={`${bubble.color}44`}
           style={{
             backgroundColor: bubble.color,
             width: bubble.size,

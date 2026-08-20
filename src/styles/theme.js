@@ -28,11 +28,12 @@ export const theme = {
     about: { color: '#996633', letter: 'J' },
   },
   z: {
-    atmosphere: 0,
-    content: 1,
+    bubbles: 0,
+    atmosphere: 1,
+    content: 2,
     header: 100,
-    grain: 250,
     landing: 200,
+    grain: 250,
     modal: 1000,
   },
 }

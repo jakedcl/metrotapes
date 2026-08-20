@@ -13,8 +13,8 @@ const LineContainer = styled.div`
 `
 
 const slotPulse = keyframes`
-  0%, 100% { opacity: 0.55; box-shadow: 0 0 10px rgba(252, 204, 10, 0.35); }
-  50% { opacity: 1; box-shadow: 0 0 22px rgba(252, 204, 10, 0.7); }
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
 `
 
 const Line = styled.div`
@@ -70,23 +70,25 @@ const Line = styled.div`
       );
     pointer-events: none;
   }
-`
 
-const Slot = styled.div`
-  position: absolute;
-  left: 62%;
-  top: 38%;
-  width: 6px;
-  height: 22%;
-  border-radius: 2px;
-  background: ${theme.color.yellow};
-  transform: rotate(-28deg);
-  animation: ${slotPulse} 1.8s ease-in-out infinite;
-  pointer-events: none;
+  &::after {
+    content: '';
+    position: absolute;
+    left: 63%;
+    top: 35%;
+    width: 120px;
+    height: 3px;
+    background: linear-gradient(to right, transparent, ${theme.color.yellow}, transparent);
+    box-shadow: 0 0 18px ${theme.color.yellow};
+    animation: ${slotPulse} 1.8s ease-in-out infinite;
+    pointer-events: none;
+  }
 
   @media (prefers-reduced-motion: reduce) {
-    animation: none;
-    opacity: 0.85;
+    &::after {
+      animation: none;
+      opacity: 0.6;
+    }
   }
 `
 
@@ -94,7 +96,6 @@ export default function SwipeLine() {
   return (
     <LineContainer>
       <Line />
-      <Slot aria-hidden="true" />
     </LineContainer>
   )
 }

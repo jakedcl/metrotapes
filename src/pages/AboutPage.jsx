@@ -4,6 +4,7 @@ import { client, urlFor } from '../lib/sanity'
 import { PortableText } from '@portabletext/react'
 import { frostedPanel, frostedPanelShadow } from '../styles/frostedPanel'
 import StationMark from '../components/StationMark'
+import StatusPanel from '../components/StatusPanel'
 import { theme } from '../styles/theme'
 
 const Container = styled.div`
@@ -131,6 +132,7 @@ const InstagramIcon = () => (
 
 export default function AboutPage() {
   const [aboutContent, setAboutContent] = useState(null)
+  const [status, setStatus] = useState('loading')
 
   useEffect(() => {
     const fetchAboutContent = async () => {
@@ -142,23 +144,38 @@ export default function AboutPage() {
                     photo2,
                     instagramUrl
                 }`)
-        setAboutContent(data)
+        if (data) {
+          setAboutContent(data)
+          setStatus('ready')
+        } else {
+          setStatus('empty')
+        }
       } catch (error) {
         console.error('Error fetching about content:', error)
+        setStatus('error')
       }
     }
 
     fetchAboutContent()
   }, [])
 
-  if (!aboutContent) return null
-
   return (
     <Container>
       <Content>
         <StationMark letter={theme.route.about.letter} color={theme.route.about.color}>
-          {aboutContent.title}
+          {aboutContent?.title || 'about'}
         </StationMark>
+        {status === 'loading' && (
+          <StatusPanel pulsing>Loading…</StatusPanel>
+        )}
+        {status === 'empty' && (
+          <StatusPanel>No about content yet.</StatusPanel>
+        )}
+        {status === 'error' && (
+          <StatusPanel>Could not load about.</StatusPanel>
+        )}
+        {status === 'ready' && aboutContent && (
+          <>
         <TopSection>
           <PhotoContainer>
             <img
@@ -186,6 +203,8 @@ export default function AboutPage() {
             alt="Landscape"
           />
         </LandscapePhotoContainer>
+          </>
+        )}
       </Content>
     </Container>
   )

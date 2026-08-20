@@ -9,6 +9,31 @@ const flicker = `
   53% { filter: brightness(1); }
 `
 
+const SignFrame = styled.div`
+  position: relative;
+  width: 100%;
+`
+
+const Rod = styled.span`
+  position: absolute;
+  top: 0;
+  width: 7px;
+  height: 28px;
+  background: linear-gradient(to bottom, #9a9a9a, #4a4a4a);
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+
+  &:first-of-type {
+    right: 92px;
+  }
+
+  &:last-of-type {
+    right: 36px;
+  }
+`
+
 const SignContainer = styled.div`
   background-color: #000;
   background-image:
@@ -27,7 +52,7 @@ const SignContainer = styled.div`
   max-width: 700px;
   height: 100%;
   border-radius: 16px 0 0 16px;
-  margin-top: 1.5rem;
+  margin-top: 1.75rem;
   position: relative;
   isolation: isolate;
   transform: perspective(1200px) rotateY(-3deg);
@@ -154,15 +179,19 @@ const SubwayLine = styled.div`
 
 export default function SubwaySign() {
   return (
-    <SignContainer>
-      <WhiteLine />
-      <ContentWrapper>
-        <StationText>metrotapes</StationText>
-        <SubwayLines>
-          <SubwayLine color="#FCCC0A">R</SubwayLine>
-          <SubwayLine color="#FF6319">F</SubwayLine>
-        </SubwayLines>
-      </ContentWrapper>
-    </SignContainer>
+    <SignFrame>
+      <Rod aria-hidden="true" />
+      <Rod aria-hidden="true" />
+      <SignContainer>
+        <WhiteLine />
+        <ContentWrapper>
+          <StationText>metrotapes</StationText>
+          <SubwayLines>
+            <SubwayLine color="#FCCC0A">R</SubwayLine>
+            <SubwayLine color="#FF6319">F</SubwayLine>
+          </SubwayLines>
+        </ContentWrapper>
+      </SignContainer>
+    </SignFrame>
   )
 }

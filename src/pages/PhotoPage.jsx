@@ -3,6 +3,7 @@ import { client, urlFor } from '../lib/sanity'
 import styled, { keyframes } from 'styled-components'
 import ImageModal from '../components/ImageModal'
 import StationMark from '../components/StationMark'
+import StatusPanel from '../components/StatusPanel'
 import { theme } from '../styles/theme'
 
 const fadeUp = keyframes`
@@ -94,6 +95,7 @@ const PhotoItem = styled.button`
 
 export default function PhotoPage() {
     const [photos, setPhotos] = useState([])
+    const [status, setStatus] = useState('loading')
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [selectedImage, setSelectedImage] = useState(null)
 
@@ -101,9 +103,16 @@ export default function PhotoPage() {
         const fetchPhotos = async () => {
             try {
                 const data = await client.fetch(`*[_type == "photos"][0].images`)
-                if (data) setPhotos(data)
+                if (data?.length) {
+                    setPhotos(data)
+                    setStatus('ready')
+                } else {
+                    setPhotos([])
+                    setStatus('empty')
+                }
             } catch (error) {
                 console.error('Error fetching photos:', error)
+                setStatus('error')
             }
         }
 
@@ -135,6 +144,16 @@ export default function PhotoPage() {
                 <StationMark letter={theme.route.photo.letter} color={theme.route.photo.color}>
                     photo
                 </StationMark>
+                {status === 'loading' && (
+                    <StatusPanel pulsing>Loading stills…</StatusPanel>
+                )}
+                {status === 'empty' && (
+                    <StatusPanel>No photos in this station yet.</StatusPanel>
+                )}
+                {status === 'error' && (
+                    <StatusPanel>Could not load photos.</StatusPanel>
+                )}
+                {status === 'ready' && (
                 <MasonryGrid>
                     {photos.map((photo, index) => (
                         <PhotoItem
@@ -152,6 +171,7 @@ export default function PhotoPage() {
                         </PhotoItem>
                     ))}
                 </MasonryGrid>
+                )}
             </Inner>
             <ImageModal
                 isOpen={isModalOpen}

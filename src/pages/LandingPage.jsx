@@ -50,22 +50,24 @@ const Hint = styled.div`
   z-index: 3;
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.6rem;
   color: ${theme.color.white};
   font-family: ${theme.font};
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: lowercase;
   opacity: ${props => props.$hidden ? 0 : 1};
   transition: opacity 0.4s ease;
   pointer-events: none;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.85),
+    0 4px 18px rgba(0, 0, 0, 0.8);
 
   @media (min-width: 768px) {
-    bottom: 7.5rem;
-    right: 12%;
-    font-size: 0.95rem;
+    bottom: 7.35rem;
+    right: 11%;
+    font-size: 1.05rem;
   }
 `
 

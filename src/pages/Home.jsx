@@ -67,13 +67,12 @@ export const Machine = styled.div`
   &::after {
     content: '';
     position: absolute;
-    left: -4px;
-    right: -4px;
-    bottom: -4px;
-    height: 10px;
-    background: rgba(0, 0, 0, 0.45);
-    filter: blur(6px);
-    border-radius: 50%;
+    left: 6%;
+    right: 6%;
+    bottom: -36px;
+    height: 40px;
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.72), transparent 70%);
+    filter: blur(10px);
     z-index: -1;
   }
 `
@@ -96,14 +95,15 @@ const TopBar = styled.div`
 
   &::before {
     content: '';
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
     background: #0f0;
     border-radius: 50%;
-    margin-right: 4px;
+    margin-right: 6px;
     box-shadow:
-      0 0 4px #0f0,
-      0 0 10px #0f0;
+      0 0 6px #0f0,
+      0 0 14px #0f0,
+      0 0 22px rgba(0, 255, 0, 0.5);
     animation: blink 2s infinite;
   }
 
@@ -151,7 +151,7 @@ const powerOn = keyframes`
 `
 
 const Screen = styled.div`
-  background: #000;
+  background: #000 url('https://i.ytimg.com/vi/trA9owC00HI/hqdefault.jpg') center / cover;
   border-radius: 4px;
   overflow: hidden;
   position: relative;
