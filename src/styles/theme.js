@@ -31,7 +31,7 @@ export const theme = {
     atmosphere: 0,
     content: 1,
     header: 100,
-    grain: 160,
+    grain: 250,
     landing: 200,
     modal: 1000,
   },
