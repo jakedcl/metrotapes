@@ -41,10 +41,21 @@ const TopSection = styled.div`
   padding-bottom: 4px;
 `
 
-const TitleWrapper = styled.div`
+const TitleWrapper = styled.button`
   cursor: pointer;
-  @media (min-width: 768px) {
-    cursor: default;
+  background: none;
+  border: none;
+  padding: 0;
+  display: inline-block;
+  transform-origin: left center;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(1);
   }
 `
 
@@ -55,12 +66,7 @@ const Title = styled.div`
   font-weight: 700;
   letter-spacing: 0.02em;
   margin: 0;
-  text-decoration: none;
-  transition: opacity 0.3s ease;
-
-  &:hover {
-    opacity: 0.9;
-  }
+  line-height: 1;
 `
 
 const ResetButton = styled.button`
@@ -320,7 +326,7 @@ export default function Header() {
                 <FontAwesomeIcon icon={faBars} size="lg" />
               </MenuButton>
             )}
-            <TitleWrapper onClick={handleTitleClick}>
+            <TitleWrapper type="button" onClick={handleTitleClick} aria-label="Home">
               <TitleGroup>
                 <Title>metrotapes</Title>
               </TitleGroup>
