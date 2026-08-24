@@ -3,7 +3,7 @@ import styled from 'styled-components'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCamera, faVideo, faBook, faBars } from '@fortawesome/free-solid-svg-icons'
-import { route, station } from '../styles/theme'
+import { route, station, cushy } from '../styles/theme'
 
 const HeaderContainer = styled.header`
   position: fixed;
@@ -42,21 +42,12 @@ const TopSection = styled.div`
 `
 
 const TitleWrapper = styled.button`
-  cursor: pointer;
+  ${cushy}
   background: none;
   border: none;
   padding: 0;
   display: inline-block;
   transform-origin: left center;
-  transition: transform 0.2s ease;
-
-  &:hover {
-    transform: scale(1.05);
-  }
-
-  &:active {
-    transform: scale(1);
-  }
 `
 
 const Title = styled.div`
@@ -70,15 +61,14 @@ const Title = styled.div`
 `
 
 const ResetButton = styled.button`
+  ${cushy}
   width: 48px;
   height: 48px;
   background: none;
   border: none;
   padding: 0;
-  cursor: pointer;
   position: relative;
   flex-shrink: 0;
-  transition: transform 0.2s ease, filter 0.2s ease;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 
   @media (min-width: 768px) {
@@ -97,16 +87,6 @@ const ResetButton = styled.button`
     object-fit: contain;
     pointer-events: none;
     display: block;
-  }
-
-  &:hover {
-    transform: translateY(-2px) scale(1.06);
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4)) brightness(1.15);
-  }
-
-  &:active {
-    transform: translateY(0) scale(1);
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3)) brightness(0.95);
   }
 `
 
@@ -140,12 +120,11 @@ const NavList = styled.nav`
 `
 
 const NavItem = styled(NavLink)`
+  ${cushy}
   display: flex;
   align-items: center;
   text-decoration: none;
   height: 32px;
-  cursor: pointer;
-  transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
 
@@ -221,14 +200,14 @@ const NavText = styled.span`
 `
 
 const MenuButton = styled.button`
+  ${cushy}
   display: none;
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.8);
   padding: 8px;
-  cursor: pointer;
   margin-right: 12px;
-  transition: color 0.3s ease;
+  transition: transform 0.2s ease, color 0.2s ease;
 
   &:hover {
     color: white;

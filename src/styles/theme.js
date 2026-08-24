@@ -1,3 +1,5 @@
+import { css } from 'styled-components'
+
 /**
  * What already exists — not a new look.
  *
@@ -16,3 +18,20 @@ export const route = {
 }
 
 export const font = '"Helvetica Neue", Helvetica, Arial, sans-serif'
+
+/**
+ * Same press as the metrotapes home title:
+ * a little bigger on hover, back to normal on click.
+ */
+export const cushy = css`
+  cursor: pointer;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(1);
+  }
+`

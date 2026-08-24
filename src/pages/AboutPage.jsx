@@ -4,6 +4,7 @@ import { client, urlFor } from '../lib/sanity'
 import { PortableText } from '@portabletext/react'
 import { frostedPanel, frostedPanelShadow } from '../styles/frostedPanel'
 import FrostNote from '../components/FrostNote'
+import { cushy } from '../styles/theme'
 
 const Container = styled.div`
   padding: 2rem;
@@ -104,6 +105,7 @@ const Description = styled.div`
 `
 
 const InstagramLink = styled.a`
+  ${cushy}
   display: inline-flex;
   align-items: center;
   gap: 0.75rem;
@@ -112,12 +114,10 @@ const InstagramLink = styled.a`
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 1.1rem;
   letter-spacing: -0.02em;
-  transition: transform 0.2s ease;
   margin: 2rem 0;
   opacity: 0.9;
 
   &:hover {
-    transform: translateY(-1px);
     opacity: 1;
   }
 
