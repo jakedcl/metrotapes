@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { useSpring, animated } from '@react-spring/web'
-import { route } from '../styles/theme'
+import { route, cushy } from '../styles/theme'
 
 const Container = styled.div`
   padding: 2rem;
@@ -187,6 +187,7 @@ const ButtonSection = styled.div`
 `
 
 const NavButton = styled(Link)`
+  ${cushy}
   flex: 1;
   min-width: 0;
   height: 52px;
@@ -203,7 +204,6 @@ const NavButton = styled(Link)`
   letter-spacing: -0.02em;
   text-transform: lowercase;
   position: relative;
-  transition: all 0.2s ease;
   box-shadow: 
     0 2px 4px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -211,24 +211,6 @@ const NavButton = styled(Link)`
   @media (max-width: 480px) {
     height: 44px;
     font-size: 1.2rem;
-  }
-
-  &:hover {
-    filter: brightness(1.1);
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 
-      0 4px 8px rgba(0, 0, 0, 0.4),
-      inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  }
-
-  &:active {
-    filter: brightness(0.9);
-    transform: translateY(1px);
-    color: white;
-    box-shadow: 
-      0 1px 2px rgba(0, 0, 0, 0.2),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
 
   &:visited {

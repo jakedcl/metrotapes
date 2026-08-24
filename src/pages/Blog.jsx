@@ -87,10 +87,16 @@ const MediaItem = styled.div`
     background: rgba(255, 255, 255, 0.1);
     min-height: 200px;
     padding: 1rem;
-    transition: background-color 0.2s;
-    
+    cursor: pointer;
+    transition: transform 0.2s ease, background-color 0.2s;
+
     &:hover {
       background: rgba(255, 255, 255, 0.15);
+      transform: scale(1.05);
+    }
+
+    &:active {
+      transform: scale(1);
     }
   }
 `

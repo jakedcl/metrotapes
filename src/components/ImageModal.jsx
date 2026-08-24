@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react'
 import PropTypes from 'prop-types'
 import styled from 'styled-components'
 import { urlFor } from '../lib/sanity'
+import { cushy } from '../styles/theme'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChevronLeft, faChevronRight, faTimes } from '@fortawesome/free-solid-svg-icons'
 
@@ -37,6 +38,7 @@ const ModalImage = styled.img`
 `
 
 const Button = styled.button`
+  ${cushy}
   position: fixed;
   background: rgba(0, 0, 0, 0.5);
   color: white;
@@ -47,13 +49,10 @@ const Button = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
   z-index: 1001;
 
   &:hover {
     background: rgba(0, 0, 0, 0.8);
-    transform: scale(1.1);
   }
 
   &:focus {
@@ -79,7 +78,11 @@ const NavButton = styled(Button)`
   ${props => props.$direction === 'prev' ? 'left: 20px;' : 'right: 20px;'}
 
   &:hover {
-    transform: translateY(-50%) scale(1.1);
+    transform: translateY(-50%) scale(1.05);
+  }
+
+  &:active {
+    transform: translateY(-50%) scale(1);
   }
 
   @media (max-width: 768px) {

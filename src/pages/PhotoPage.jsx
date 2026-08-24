@@ -36,17 +36,21 @@ const PhotoItem = styled.div`
   break-inside: avoid;
   margin-bottom: 16px;
   cursor: pointer;
-  
+
   img {
     width: 100%;
     height: auto;
     display: block;
     border-radius: 4px;
     transition: transform 0.2s ease;
-    
-    &:hover {
-      transform: scale(1.02);
-    }
+  }
+
+  &:hover img {
+    transform: scale(1.05);
+  }
+
+  &:active img {
+    transform: scale(1);
   }
 `
 
