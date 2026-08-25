@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /blog
+Disallow: /api/
+
+Sitemap: https://metrotapes.com/sitemap.xml

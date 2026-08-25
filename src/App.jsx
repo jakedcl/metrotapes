@@ -12,6 +12,7 @@ import styled from 'styled-components'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Blog from './pages/Blog'
 import { font, station } from './styles/theme'
+import usePageMeta from './hooks/usePageMeta'
 
 const GlobalStyle = createGlobalStyle`
   * {
@@ -99,6 +100,7 @@ function AppContent() {
   const [isUnlocked, setIsUnlocked] = useState(false)
   const location = useLocation()
   const isHomePage = location.pathname === '/'
+  usePageMeta()
 
   const transitions = useTransition(!isUnlocked && isHomePage ? true : null, {
     from: { opacity: 1 },
