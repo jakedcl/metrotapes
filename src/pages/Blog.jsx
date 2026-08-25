@@ -139,10 +139,18 @@ function extractYouTubeId(url) {
   }
 }
 
-function reloadInstagramEmbed() {
+function loadInstagramEmbed() {
   if (window.instgrm) {
     window.instgrm.Embeds.process()
+    return
   }
+
+  if (document.querySelector('script[src*="instagram.com/embed.js"]')) return
+
+  const script = document.createElement('script')
+  script.async = true
+  script.src = 'https://www.instagram.com/embed.js'
+  document.body.appendChild(script)
 }
 
 function getInstagramUrl(url) {
@@ -238,7 +246,7 @@ export default function Blog() {
   // Reload Instagram embeds when posts change
   useEffect(() => {
     if (posts.length > 0) {
-      reloadInstagramEmbed()
+      loadInstagramEmbed()
     }
   }, [posts])
 

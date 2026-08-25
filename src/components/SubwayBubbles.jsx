@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
-import { animated } from '@react-spring/web'
+
+const SIZE = 48
 
 const Container = styled.div`
   position: fixed;
@@ -11,21 +12,25 @@ const Container = styled.div`
   opacity: 0.25;
 `
 
-const Circle = styled(animated.div)`
+const Circle = styled.div`
   position: absolute;
+  top: 0;
+  left: 0;
+  width: ${SIZE}px;
+  height: ${SIZE}px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-weight: bold;
-  color: ${props => props.$textColor || 'white'};
   font-size: 1.5rem;
+  color: ${props => props.$textColor || 'white'};
+  background-color: ${props => props.$color};
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   will-change: transform;
 `
 
-// NYC Subway lines with their colors
 const SUBWAY_LINES = [
     { line: '1', color: '#EE352E', textColor: 'white' },
     { line: '2', color: '#EE352E', textColor: 'white' },
@@ -50,74 +55,96 @@ const SUBWAY_LINES = [
     { line: 'R', color: '#FCCC0A', textColor: 'black' },
 ]
 
-const getRandomPosition = (size) => {
-    const windowWidth = window.innerWidth - size
-    const windowHeight = window.innerHeight - size
+function randomStart() {
+    const maxX = Math.max(0, window.innerWidth - SIZE)
+    const maxY = Math.max(0, window.innerHeight - SIZE)
     return {
-        x: Math.random() * windowWidth,
-        y: Math.random() * windowHeight,
+        x: Math.random() * maxX,
+        y: Math.random() * maxY,
         vx: (Math.random() - 0.5) * 2,
         vy: (Math.random() - 0.5) * 2,
     }
 }
 
-export default function SubwayBubbles() {
-    const [bubbles, setBubbles] = useState([])
-    const size = 48 // Size of each circle
+function usePrefersReducedMotion() {
+    const [reduced, setReduced] = useState(() =>
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    )
 
     useEffect(() => {
-        // Initialize bubbles with random positions and velocities
-        const initialBubbles = SUBWAY_LINES.map((line, index) => ({
+        const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+        const onChange = () => setReduced(media.matches)
+        media.addEventListener('change', onChange)
+        return () => media.removeEventListener('change', onChange)
+    }, [])
+
+    return reduced
+}
+
+export default function SubwayBubbles() {
+    const reducedMotion = usePrefersReducedMotion()
+    const nodeRefs = useRef([])
+    const motionRef = useRef(null)
+    const [placed] = useState(() =>
+        SUBWAY_LINES.map((line, id) => ({
             ...line,
-            ...getRandomPosition(size),
-            id: index,
+            id,
+            ...randomStart(),
         }))
-        setBubbles(initialBubbles)
+    )
 
-        const updatePositions = () => {
-            setBubbles(prevBubbles =>
-                prevBubbles.map(bubble => {
-                    let { x, y, vx, vy } = bubble
+    if (!motionRef.current) {
+        motionRef.current = placed.map(({ x, y, vx, vy }) => ({ x, y, vx, vy }))
+    }
 
-                    // Update position
-                    x += vx * 2
-                    y += vy * 2
+    useEffect(() => {
+        if (reducedMotion) return undefined
 
-                    // Bounce off walls
-                    if (x <= 0 || x >= window.innerWidth - size) {
-                        vx = -vx * 0.9
-                        x = x <= 0 ? 0 : window.innerWidth - size
-                    }
-                    if (y <= 0 || y >= window.innerHeight - size) {
-                        vy = -vy * 0.9
-                        y = y <= 0 ? 0 : window.innerHeight - size
-                    }
+        let frame = 0
+        const tick = () => {
+            const maxX = Math.max(0, window.innerWidth - SIZE)
+            const maxY = Math.max(0, window.innerHeight - SIZE)
+            const motion = motionRef.current
 
-                    return { ...bubble, x, y, vx, vy }
-                })
-            )
+            for (let i = 0; i < motion.length; i += 1) {
+                let { x, y, vx, vy } = motion[i]
+                x += vx * 2
+                y += vy * 2
+
+                if (x <= 0 || x >= maxX) {
+                    vx = -vx * 0.9
+                    x = x <= 0 ? 0 : maxX
+                }
+                if (y <= 0 || y >= maxY) {
+                    vy = -vy * 0.9
+                    y = y <= 0 ? 0 : maxY
+                }
+
+                motion[i] = { x, y, vx, vy }
+                const node = nodeRefs.current[i]
+                if (node) node.style.transform = `translate(${x}px, ${y}px)`
+            }
+
+            frame = requestAnimationFrame(tick)
         }
 
-        const animationFrame = setInterval(updatePositions, 1000 / 60)
-        return () => clearInterval(animationFrame)
-    }, [])
+        frame = requestAnimationFrame(tick)
+        return () => cancelAnimationFrame(frame)
+    }, [reducedMotion])
 
     return (
         <Container>
-            {bubbles.map(bubble => (
+            {placed.map((bubble, index) => (
                 <Circle
                     key={bubble.id}
-                    style={{
-                        backgroundColor: bubble.color,
-                        width: size,
-                        height: size,
-                        transform: `translate(${bubble.x}px, ${bubble.y}px)`,
-                    }}
+                    ref={el => { nodeRefs.current[index] = el }}
+                    $color={bubble.color}
                     $textColor={bubble.textColor}
+                    style={{ transform: `translate(${bubble.x}px, ${bubble.y}px)` }}
                 >
                     {bubble.line}
                 </Circle>
             ))}
         </Container>
     )
-} 
+}
