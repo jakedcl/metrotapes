@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
-import { client } from '../lib/sanity'
 import styled from 'styled-components'
 import { frostedPanel, frostedPanelShadow } from '../styles/frostedPanel'
 import FrostNote from '../components/FrostNote'
-import { station } from '../styles/theme'
+import { cushy, station } from '../styles/theme'
 
 const Container = styled.div`
   min-height: 100vh;
@@ -38,6 +37,7 @@ const VideoGrid = styled.div`
 
 /* Frost lives on ::before so backdrop-filter does not flatten embeds (WebKit/Chromium iframe bug). */
 const VideoItem = styled.div`
+  ${props => (props.$playing ? '' : cushy)}
   break-inside: avoid;
   margin-bottom: 16px;
   position: relative;
@@ -45,7 +45,6 @@ const VideoItem = styled.div`
   border-radius: 8px;
   overflow: hidden;
   ${frostedPanelShadow}
-  transition: transform 0.2s ease;
 
   &::before {
     content: '';
@@ -56,16 +55,12 @@ const VideoItem = styled.div`
     border-radius: inherit;
     ${frostedPanel}
   }
-
-  &:hover {
-    transform: translateY(-4px);
-  }
 `
 
 const VideoEmbed = styled.div`
   position: relative;
   z-index: 1;
-  padding-top: 56.25%; // 16:9 aspect ratio
+  padding-top: 56.25%;
   background: #000;
   overflow: hidden;
 `
@@ -80,63 +75,76 @@ const VideoIframe = styled.iframe`
   z-index: 1;
 `
 
+const PlayButton = styled.button`
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: #000;
+  cursor: pointer;
+`
+
+const Thumbnail = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+`
+
+const Scrim = styled.span`
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+`
+
+const PlayMark = styled.span`
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 16px 0 16px 26px;
+  border-color: transparent transparent transparent #fff;
+  transform: translate(-35%, -50%);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  pointer-events: none;
+`
+
 export default function VideoPage() {
   const [videos, setVideos] = useState([])
   const [status, setStatus] = useState('loading')
   const [statusDetail, setStatusDetail] = useState('')
-  const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY
+  const [playingId, setPlayingId] = useState(null)
 
   useEffect(() => {
     const fetchVideos = async () => {
       setStatus('loading')
       setStatusDetail('')
-
-      if (!YOUTUBE_API_KEY) {
-        setVideos([])
-        setStatus('error')
-        setStatusDetail(
-          'Missing VITE_YOUTUBE_API_KEY. Add it to your .env file for local dev or in Vercel env vars for production.'
-        )
-        return
-      }
+      setPlayingId(null)
 
       try {
-        const playlistId = await client.fetch(`*[_type == "videos"][0].playlistId`)
-        if (!playlistId) {
-          setVideos([])
-          setStatus('empty')
-          setStatusDetail('No YouTube playlist is set in Sanity yet.')
-          return
-        }
-
-        const response = await fetch(
-          `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}&key=${YOUTUBE_API_KEY}`
-        )
-        const data = await response.json()
+        const response = await fetch('/api/videos')
+        const data = await response.json().catch(() => ({}))
 
         if (!response.ok) {
           setVideos([])
           setStatus('error')
-          setStatusDetail(
-            data?.error?.message ||
-              `YouTube API error (${response.status}). Check the API key and quota.`
-          )
+          setStatusDetail(data.detail || `Could not load videos (${response.status}).`)
           return
         }
 
-        if (!data.items?.length) {
+        if (!data.videos?.length) {
           setVideos([])
           setStatus('empty')
-          setStatusDetail('Playlist loaded but has no videos (or API returned no items).')
+          setStatusDetail(data.detail || 'No videos to show.')
           return
         }
 
-        const formattedVideos = data.items.map(item => ({
-          id: item.id,
-          title: item.snippet.title,
-          videoId: item.snippet.resourceId.videoId
-        }))
-        setVideos(formattedVideos)
+        setVideos(data.videos)
         setStatus('ready')
       } catch (error) {
         console.error('Error fetching videos:', error)
@@ -147,7 +155,7 @@ export default function VideoPage() {
     }
 
     fetchVideos()
-  }, [YOUTUBE_API_KEY])
+  }, [])
 
   return (
     <Container>
@@ -169,18 +177,37 @@ export default function VideoPage() {
       )}
       {status === 'ready' && (
         <VideoGrid>
-          {videos.map(video => (
-            <VideoItem key={video.id}>
-              <VideoEmbed>
-                <VideoIframe
-                  src={`https://www.youtube.com/embed/${video.videoId}`}
-                  title={video.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </VideoEmbed>
-            </VideoItem>
-          ))}
+          {videos.map(video => {
+            const isPlaying = playingId === video.videoId
+
+            return (
+              <VideoItem key={video.id} $playing={isPlaying}>
+                <VideoEmbed>
+                  {isPlaying ? (
+                    <VideoIframe
+                      src={`https://www.youtube-nocookie.com/embed/${video.videoId}?autoplay=1&rel=0`}
+                      title={video.title}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <PlayButton
+                      type="button"
+                      onClick={() => setPlayingId(video.videoId)}
+                      aria-label={`Play ${video.title}`}
+                    >
+                      <Thumbnail
+                        src={`https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`}
+                        alt=""
+                      />
+                      <Scrim />
+                      <PlayMark aria-hidden="true" />
+                    </PlayButton>
+                  )}
+                </VideoEmbed>
+              </VideoItem>
+            )
+          })}
         </VideoGrid>
       )}
     </Container>
