@@ -15,6 +15,7 @@ const Container = styled.div`
   position: relative;
   padding: 1rem;
   cursor: pointer;
+  overflow: visible;
   
   @media (max-width: 768px) {
     justify-content: flex-start;
