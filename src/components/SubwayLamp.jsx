@@ -15,34 +15,47 @@ const IRON_DARK = { color: '#102926', roughness: 0.62, metalness: 0.18 }
 const BAND = { color: '#1a1a1a', roughness: 0.35, metalness: 0.58 }
 
 const glow = keyframes`
-  0%, 100% {
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.45))
-            drop-shadow(0 0 14px rgba(61, 220, 90, 0.28));
-  }
-  50% {
-    filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.28))
-            drop-shadow(0 0 26px rgba(61, 220, 90, 0.48));
-  }
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.95; }
 `
 
 const Slot = styled.div`
-  width: 200px;
-  height: 320px;
+  position: relative;
+  width: 240px;
+  height: 360px;
   pointer-events: none;
   overflow: visible;
-  animation: ${glow} 3.6s ease-in-out infinite;
 
   @media (min-width: 768px) {
-    width: 280px;
-    height: 460px;
+    width: 340px;
+    height: 500px;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.45));
+  &::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 18%;
+    width: 160%;
+    height: 70%;
+    transform: translate(-50%, -30%);
+    background: radial-gradient(
+      circle,
+      rgba(61, 220, 90, 0.42) 0%,
+      rgba(61, 220, 90, 0.12) 38%,
+      transparent 70%
+    );
+    pointer-events: none;
+    animation: ${glow} 3.6s ease-in-out infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+      opacity: 0.7;
+    }
   }
 
   canvas {
+    position: relative;
     display: block;
     overflow: visible;
   }
@@ -253,6 +266,7 @@ export default function SubwayLamp() {
             camera={{ position: [1.25, 0.05, 7.6], fov: 24 }}
             style={{ background: 'transparent', overflow: 'visible' }}
             onCreated={({ gl }) => {
+              gl.setClearColor(0x000000, 0)
               gl.domElement.addEventListener('webglcontextlost', (event) => {
                 event.preventDefault()
                 setUse3d(false)
