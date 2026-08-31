@@ -4,6 +4,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCamera, faVideo, faBook, faBars } from '@fortawesome/free-solid-svg-icons'
 import { route, station, cushy } from '../styles/theme'
+import PropTypes from 'prop-types'
 
 const HeaderContainer = styled.header`
   position: fixed;
@@ -228,7 +229,7 @@ const TitleSection = styled.div`
   align-items: center;
 `
 
-export default function Header() {
+export default function Header({ onShowLanding }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const navigate = useNavigate()
@@ -250,9 +251,11 @@ export default function Header() {
 
   const handleTitleClick = (e) => {
     e.preventDefault()
-    if (!isHomePage) {
-      navigate('/')
+    if (isHomePage) {
+      onShowLanding?.()
+      return
     }
+    navigate('/')
   }
 
   const handleMenuToggle = (e) => {
@@ -305,7 +308,7 @@ export default function Header() {
                 <FontAwesomeIcon icon={faBars} size="lg" />
               </MenuButton>
             )}
-            <TitleWrapper type="button" onClick={handleTitleClick} aria-label="Home">
+            <TitleWrapper type="button" onClick={handleTitleClick} aria-label={isHomePage ? 'Back to entrance' : 'Home'}>
               <TitleGroup>
                 <Title>metrotapes</Title>
               </TitleGroup>
@@ -330,4 +333,8 @@ export default function Header() {
       </HeaderContent>
     </HeaderContainer>
   )
+}
+
+Header.propTypes = {
+  onShowLanding: PropTypes.func,
 } 
