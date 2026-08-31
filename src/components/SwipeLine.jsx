@@ -1,9 +1,15 @@
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
+
+const gleam = keyframes`
+  0% { transform: translateX(-80%) skewX(-18deg); }
+  100% { transform: translateX(180%) skewX(-18deg); }
+`
 
 const LineContainer = styled.div`
   width: 100%;
   height: 16rem;
   pointer-events: none;
+  overflow: visible;
 
   @media (min-width: 768px) {
     height: 17.5rem;
@@ -14,6 +20,7 @@ const Line = styled.div`
   position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
   background: 
     linear-gradient(
       to bottom,
@@ -31,10 +38,8 @@ const Line = styled.div`
     );
   background-blend-mode: overlay, multiply, normal;
   box-shadow: 
-    /* Inner shadows for depth */
     inset 0 2px 5px rgba(255, 255, 255, 0.3),
     inset 0 -2px 5px rgba(0, 0, 0, 0.5),
-    /* Outer shadows for depth */
     0 -1px 2px rgba(0, 0, 0, 0.2),
     0 1px 2px rgba(0, 0, 0, 0.3);
   border-top: 1px solid rgba(255, 255, 255, 0.4);
@@ -52,18 +57,21 @@ const Line = styled.div`
     content: '';
     position: absolute;
     top: 0;
-    left: 0;
-    right: 0;
     bottom: 0;
-    background: 
-      linear-gradient(
-        45deg,
-        rgba(255, 255, 255, 0) 30%,
-        rgba(255, 255, 255, 0.1) 45%,
-        rgba(255, 255, 255, 0.1) 55%,
-        rgba(255, 255, 255, 0) 70%
-      );
+    left: 0;
+    width: 38%;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.18) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
     pointer-events: none;
+    animation: ${gleam} 5.5s ease-in-out infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
   }
 `
 
@@ -73,4 +81,4 @@ export default function SwipeLine() {
       <Line />
     </LineContainer>
   )
-} 
+}

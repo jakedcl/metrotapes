@@ -1,4 +1,13 @@
-import styled from 'styled-components'
+import styled, { keyframes } from 'styled-components'
+
+const breathe = keyframes`
+  0%, 100% {
+    transform: perspective(1000px) rotateY(-2deg);
+  }
+  50% {
+    transform: perspective(1000px) rotateY(-6deg) translateY(-3px);
+  }
+`
 
 const SignContainer = styled.div`
   background-color: #000;
@@ -23,6 +32,11 @@ const SignContainer = styled.div`
   isolation: isolate;
   transform: perspective(1000px) rotateY(-2deg);
   transform-origin: right center;
+  animation: ${breathe} 7s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 
   box-shadow: 
     0 4px 6px rgba(0, 0, 0, 0.2),

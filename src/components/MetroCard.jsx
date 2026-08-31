@@ -14,35 +14,28 @@ const CARD_CLIP = 0.34
 const CARD_DEPTH = 0.07
 const GOLD = '#d4a017'
 const BACK = '#1a1a1a'
+const REST_TILT = { x: -0.1, y: 0.22 }
+const REST_Z = THREE.MathUtils.degToRad(-8)
 
-const float = keyframes`
-  0% { 
-    transform: translate(0, 0) scale(1);
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
+const glow = keyframes`
+  0%, 100% {
+    filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.4))
+            drop-shadow(0 0 12px rgba(252, 204, 10, 0.22));
   }
   50% {
-    transform: translate(15px, -30px) scale(1.08);
-    filter: drop-shadow(0 24px 32px rgba(0, 0, 0, 0.3));
-  }
-  100% { 
-    transform: translate(0, 0) scale(1);
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
+    filter: drop-shadow(0 22px 28px rgba(0, 0, 0, 0.28))
+            drop-shadow(0 0 22px rgba(252, 204, 10, 0.38));
   }
 `
 
 const CardWrapper = styled.div`
   position: relative;
   z-index: 10;
-  animation: ${float} 3s ease-in-out infinite;
-  transform-origin: center;
+  overflow: visible;
+  animation: ${glow} 3.4s ease-in-out infinite;
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
-  }
-
-  &:hover {
-    filter: drop-shadow(0 32px 64px rgba(0, 0, 0, 0.25));
-    animation-play-state: paused;
   }
 `
 
@@ -51,20 +44,23 @@ const CardContainer = styled(animated.div)`
   touch-action: none;
   transform-origin: center;
   will-change: transform;
+  overflow: visible;
   -webkit-tap-highlight-color: transparent;
 `
 
 const Stage = styled.div`
-  width: 240px;
-  height: 170px;
+  width: 320px;
+  height: 260px;
+  overflow: visible;
 
   @media (min-width: 768px) {
-    width: 310px;
-    height: 220px;
+    width: 420px;
+    height: 340px;
   }
 
   canvas {
     display: block;
+    overflow: visible;
   }
 `
 
@@ -100,7 +96,7 @@ function createMetroCardShape() {
   return s
 }
 
-function CardMesh({ tiltRef }) {
+function CardMesh({ tiltRef, reducedMotion }) {
   const group = useRef()
   const texture = useLoader(THREE.TextureLoader, '/metrocard.png')
   const shape = useMemo(() => createMetroCardShape(), [])
@@ -112,15 +108,25 @@ function CardMesh({ tiltRef }) {
   texture.colorSpace = THREE.SRGBColorSpace
   texture.anisotropy = 8
 
-  useFrame(() => {
+  useFrame(({ clock }) => {
     if (!group.current) return
-    const { x, y } = tiltRef.current
-    group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, x, 0.12)
-    group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, y, 0.12)
+    const t = clock.elapsedTime
+    const pointer = tiltRef.current
+    const idleX = reducedMotion ? REST_TILT.x : REST_TILT.x + Math.sin(t * 0.7) * 0.1
+    const idleY = reducedMotion ? REST_TILT.y : REST_TILT.y + Math.sin(t * 0.52) * 0.16
+    const idleZ = reducedMotion ? REST_Z : REST_Z + Math.sin(t * 0.4) * 0.05
+    const bobY = reducedMotion ? 0 : Math.sin(t * 0.85) * 0.16
+    const bobX = reducedMotion ? 0 : Math.sin(t * 0.43) * 0.07
+
+    group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, idleX + pointer.x, 0.1)
+    group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, idleY + pointer.y, 0.1)
+    group.current.rotation.z = THREE.MathUtils.lerp(group.current.rotation.z, idleZ, 0.1)
+    group.current.position.x = THREE.MathUtils.lerp(group.current.position.x, bobX, 0.08)
+    group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, bobY, 0.08)
   })
 
   return (
-    <group ref={group} rotation={[0, 0, THREE.MathUtils.degToRad(-8)]}>
+    <group ref={group}>
       <mesh position={[0, 0, -CARD_DEPTH / 2]}>
         <extrudeGeometry args={[shape, extrude]} />
         <meshStandardMaterial color={GOLD} roughness={0.45} metalness={0.15} />
@@ -145,6 +151,25 @@ function CardMesh({ tiltRef }) {
 
 CardMesh.propTypes = {
   tiltRef: PropTypes.shape({ current: PropTypes.object }).isRequired,
+  reducedMotion: PropTypes.bool,
+}
+
+function LivingLight({ reducedMotion }) {
+  const light = useRef()
+
+  useFrame(({ clock }) => {
+    if (!light.current || reducedMotion) return
+    const t = clock.elapsedTime
+    light.current.position.x = Math.cos(t * 0.55) * 2.8
+    light.current.position.y = 1.4 + Math.sin(t * 0.4) * 1.1
+    light.current.position.z = 3.2
+  })
+
+  return <pointLight ref={light} intensity={0.7} color="#fff3c4" distance={12} />
+}
+
+LivingLight.propTypes = {
+  reducedMotion: PropTypes.bool,
 }
 
 function hasWebGL() {
@@ -156,27 +181,29 @@ function hasWebGL() {
   }
 }
 
-function CardScene({ tiltRef }) {
+function CardScene({ tiltRef, reducedMotion }) {
   return (
     <>
       <ambientLight intensity={1.05} />
-      <directionalLight position={[2.4, 2.8, 4]} intensity={1.35} />
-      <directionalLight position={[-2, -1, 2]} intensity={0.35} />
-      <CardMesh tiltRef={tiltRef} />
+      <directionalLight position={[2.4, 2.8, 4]} intensity={1.2} />
+      <directionalLight position={[-2, -1, 2]} intensity={0.3} />
+      <LivingLight reducedMotion={reducedMotion} />
+      <CardMesh tiltRef={tiltRef} reducedMotion={reducedMotion} />
     </>
   )
 }
 
 CardScene.propTypes = {
   tiltRef: PropTypes.shape({ current: PropTypes.object }).isRequired,
+  reducedMotion: PropTypes.bool,
 }
-
-const REST_TILT = { x: -0.12, y: 0.28 }
 
 const MetroCard = forwardRef(({ onSwipeComplete, className }, ref) => {
   const [isAnimating, setIsAnimating] = useState(false)
   const [use3d, setUse3d] = useState(() => hasWebGL())
-  const tiltRef = useRef({ ...REST_TILT })
+  const tiltRef = useRef({ x: 0, y: 0 })
+  const reducedMotion = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   const [{ x }, api] = useSpring(() => ({
     x: 0,
@@ -207,18 +234,18 @@ const MetroCard = forwardRef(({ onSwipeComplete, className }, ref) => {
   }
 
   const handlePointerMove = (event) => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (reducedMotion) return
     const rect = event.currentTarget.getBoundingClientRect()
     const nx = ((event.clientX - rect.left) / rect.width) * 2 - 1
     const ny = ((event.clientY - rect.top) / rect.height) * 2 - 1
     tiltRef.current = {
-      x: REST_TILT.x - ny * 0.22,
-      y: REST_TILT.y + nx * 0.32,
+      x: -ny * 0.18,
+      y: nx * 0.24,
     }
   }
 
   const handlePointerLeave = () => {
-    tiltRef.current = { ...REST_TILT }
+    tiltRef.current = { x: 0, y: 0 }
   }
 
   return (
@@ -239,7 +266,7 @@ const MetroCard = forwardRef(({ onSwipeComplete, className }, ref) => {
               <Canvas
                 gl={{ alpha: true, antialias: true }}
                 dpr={[1, 2]}
-                camera={{ position: [0, 0, 5.4], fov: 28 }}
+                camera={{ position: [0, 0, 7.2], fov: 26 }}
                 style={{ background: 'transparent' }}
                 onCreated={({ gl }) => {
                   gl.domElement.addEventListener('webglcontextlost', (event) => {
@@ -248,7 +275,7 @@ const MetroCard = forwardRef(({ onSwipeComplete, className }, ref) => {
                   })
                 }}
               >
-                <CardScene tiltRef={tiltRef} />
+                <CardScene tiltRef={tiltRef} reducedMotion={reducedMotion} />
               </Canvas>
             </Suspense>
           ) : (

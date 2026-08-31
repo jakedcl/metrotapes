@@ -9,27 +9,30 @@ const SwipeContainer = styled.div`
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 12rem;
+  height: 16rem;
   display: flex;
   align-items: flex-end;
   pointer-events: none;
+  overflow: visible;
 
   @media (min-width: 768px) {
-    height: 22rem;
+    height: 26rem;
   }
 `
 
 const CardWrapper = styled.div`
   position: absolute;
-  left: -10px;
-  bottom: 5rem; // Higher position for mobile
+  left: 12px;
+  bottom: 4.5rem;
   z-index: 2;
   pointer-events: auto;
-  transform: scale(0.85); // Slightly smaller on mobile
+  overflow: visible;
+  transform: scale(0.85);
   transform-origin: bottom left;
   transition: transform 0.3s ease;
 
   @media (min-width: 768px) {
+    left: 20px;
     bottom: 5rem;
     transform: scale(1);
   }
