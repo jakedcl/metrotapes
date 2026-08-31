@@ -26,14 +26,15 @@ const glow = keyframes`
 `
 
 const Slot = styled.div`
-  width: 118px;
-  height: 210px;
+  width: 200px;
+  height: 320px;
   pointer-events: none;
+  overflow: visible;
   animation: ${glow} 3.6s ease-in-out infinite;
 
   @media (min-width: 768px) {
-    width: 168px;
-    height: 300px;
+    width: 280px;
+    height: 460px;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -43,6 +44,7 @@ const Slot = styled.div`
 
   canvas {
     display: block;
+    overflow: visible;
   }
 `
 
@@ -248,8 +250,8 @@ export default function SubwayLamp() {
           <Canvas
             gl={{ alpha: true, antialias: true }}
             dpr={[1, 2]}
-            camera={{ position: [1.55, 0.2, 4.5], fov: 26 }}
-            style={{ background: 'transparent' }}
+            camera={{ position: [1.25, 0.05, 7.6], fov: 24 }}
+            style={{ background: 'transparent', overflow: 'visible' }}
             onCreated={({ gl }) => {
               gl.domElement.addEventListener('webglcontextlost', (event) => {
                 event.preventDefault()
