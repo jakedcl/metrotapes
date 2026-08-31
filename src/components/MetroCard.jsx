@@ -73,6 +73,7 @@ const FallbackCard = styled.img`
   width: auto;
   user-select: none;
   -webkit-user-drag: none;
+  transform: rotate(-2deg);
 
   @media (min-width: 768px) {
     height: 180px;
@@ -105,10 +106,7 @@ function CardMesh({ tiltRef }) {
   const shape = useMemo(() => createMetroCardShape(), [])
   const extrude = useMemo(() => ({
     depth: CARD_DEPTH,
-    bevelEnabled: true,
-    bevelThickness: 0.008,
-    bevelSize: 0.008,
-    bevelSegments: 1,
+    bevelEnabled: false,
   }), [])
 
   texture.colorSpace = THREE.SRGBColorSpace
@@ -127,20 +125,19 @@ function CardMesh({ tiltRef }) {
         <extrudeGeometry args={[shape, extrude]} />
         <meshStandardMaterial color={GOLD} roughness={0.45} metalness={0.15} />
       </mesh>
-      <mesh position={[0, 0, CARD_DEPTH / 2 + 0.002]}>
-        <shapeGeometry args={[shape]} />
+      <mesh position={[0, 0, CARD_DEPTH / 2 + 0.012]}>
+        <planeGeometry args={[CARD_W, CARD_H]} />
         <meshStandardMaterial
           map={texture}
           transparent
+          depthWrite={false}
           roughness={0.35}
           metalness={0.05}
-          polygonOffset
-          polygonOffsetFactor={-1}
         />
       </mesh>
       <mesh position={[0, 0, -CARD_DEPTH / 2 - 0.002]} rotation={[0, Math.PI, 0]}>
-        <shapeGeometry args={[shape]} />
-        <meshStandardMaterial color={BACK} roughness={0.8} metalness={0} />
+        <planeGeometry args={[CARD_W, CARD_H]} />
+        <meshStandardMaterial color={BACK} roughness={0.8} metalness={0} transparent depthWrite={false} />
       </mesh>
     </group>
   )
@@ -148,6 +145,15 @@ function CardMesh({ tiltRef }) {
 
 CardMesh.propTypes = {
   tiltRef: PropTypes.shape({ current: PropTypes.object }).isRequired,
+}
+
+function hasWebGL() {
+  try {
+    const canvas = document.createElement('canvas')
+    return Boolean(canvas.getContext('webgl2') || canvas.getContext('webgl'))
+  } catch {
+    return false
+  }
 }
 
 function CardScene({ tiltRef }) {
@@ -169,6 +175,7 @@ const REST_TILT = { x: -0.12, y: 0.28 }
 
 const MetroCard = forwardRef(({ onSwipeComplete, className }, ref) => {
   const [isAnimating, setIsAnimating] = useState(false)
+  const [use3d, setUse3d] = useState(() => hasWebGL())
   const tiltRef = useRef({ ...REST_TILT })
 
   const [{ x }, api] = useSpring(() => ({
@@ -227,16 +234,26 @@ const MetroCard = forwardRef(({ onSwipeComplete, className }, ref) => {
         aria-label="Swipe MetroCard to enter"
       >
         <Stage>
-          <Suspense fallback={<FallbackCard src="/metrocard.png" alt="" />}>
-            <Canvas
-              gl={{ alpha: true, antialias: true }}
-              dpr={[1, 2]}
-              camera={{ position: [0, 0, 5.4], fov: 28 }}
-              style={{ background: 'transparent' }}
-            >
-              <CardScene tiltRef={tiltRef} />
-            </Canvas>
-          </Suspense>
+          {use3d ? (
+            <Suspense fallback={<FallbackCard src="/metrocard.png" alt="" />}>
+              <Canvas
+                gl={{ alpha: true, antialias: true }}
+                dpr={[1, 2]}
+                camera={{ position: [0, 0, 5.4], fov: 28 }}
+                style={{ background: 'transparent' }}
+                onCreated={({ gl }) => {
+                  gl.domElement.addEventListener('webglcontextlost', (event) => {
+                    event.preventDefault()
+                    setUse3d(false)
+                  })
+                }}
+              >
+                <CardScene tiltRef={tiltRef} />
+              </Canvas>
+            </Suspense>
+          ) : (
+            <FallbackCard src="/metrocard.png" alt="" />
+          )}
         </Stage>
       </CardContainer>
     </CardWrapper>
