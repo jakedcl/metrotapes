@@ -134,7 +134,7 @@ function AppContent() {
       {headerTransition((style, show) =>
         show && (
           <AnimatedHeaderArea style={style}>
-            <Header />
+            <Header onShowLanding={() => setIsUnlocked(false)} />
           </AnimatedHeaderArea>
         )
       )}
