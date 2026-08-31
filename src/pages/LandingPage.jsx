@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import SwipeSection from '../components/SwipeSection'
 import SubwaySign from '../components/SubwaySign'
+import SubwayLamp from '../components/SubwayLamp'
 import PropTypes from 'prop-types'
 import { useRef, useState, useEffect } from 'react'
 import { useSpring, animated } from '@react-spring/web'
@@ -34,6 +35,21 @@ const TitleContainer = styled(animated.div)`
 
   @media (min-width: 768px) {
     width: auto;
+  }
+`
+
+const LampSlot = styled(animated.div)`
+  position: absolute;
+  left: 1.5%;
+  top: 6%;
+  z-index: 3;
+  pointer-events: none;
+
+  @media (max-width: 767px) {
+    left: 0;
+    top: 4%;
+    transform: scale(0.72);
+    transform-origin: top left;
   }
 `
 
@@ -75,6 +91,9 @@ export default function LandingPage({ onUnlock }) {
 
   return (
     <Container onClick={handleContainerClick}>
+      <LampSlot style={{ opacity: signSpring.opacity }}>
+        <SubwayLamp />
+      </LampSlot>
       <TitleContainer style={signSpring}>
         <SubwaySign />
       </TitleContainer>
