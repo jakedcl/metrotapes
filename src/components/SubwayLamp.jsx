@@ -35,18 +35,23 @@ const Slot = styled.div`
     content: '';
     position: absolute;
     left: 50%;
-    top: 18%;
-    width: 160%;
-    height: 70%;
-    transform: translate(-50%, -30%);
+    top: 28%;
+    width: 200px;
+    height: 200px;
+    transform: translate(-50%, -50%);
     background: radial-gradient(
       circle,
-      rgba(61, 220, 90, 0.42) 0%,
-      rgba(61, 220, 90, 0.12) 38%,
-      transparent 70%
+      rgba(61, 220, 90, 0.45) 0%,
+      rgba(61, 220, 90, 0.14) 32%,
+      transparent 66%
     );
     pointer-events: none;
     animation: ${glow} 3.6s ease-in-out infinite;
+
+    @media (min-width: 768px) {
+      width: 260px;
+      height: 260px;
+    }
 
     @media (prefers-reduced-motion: reduce) {
       animation: none;
