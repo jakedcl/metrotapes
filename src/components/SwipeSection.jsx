@@ -14,6 +14,7 @@ const SwipeContainer = styled.div`
   align-items: flex-end;
   pointer-events: none;
   overflow: visible;
+  z-index: 1;
 
   @media (min-width: 768px) {
     height: 26rem;

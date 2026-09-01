@@ -53,6 +53,17 @@ const Line = styled.div`
     100% 100%
   );
 
+  @media (max-width: 767px) {
+    clip-path: polygon(
+      0 100%,
+      0 54%,
+      42% 54%,
+      92% 44%,
+      100% 44%,
+      100% 100%
+    );
+  }
+
   &::before {
     content: '';
     position: absolute;
