@@ -40,17 +40,17 @@ const TitleContainer = styled(animated.div)`
 
 const LampSlot = styled(animated.div)`
   position: absolute;
-  right: -1.75rem;
+  right: -1.25rem;
   left: auto;
   bottom: -1.25rem;
   z-index: 0;
   pointer-events: none;
   overflow: visible;
   transform-origin: bottom right;
-  transform: scale(0.5);
+  transform: scale(0.9);
 
   @media (min-width: 768px) {
-    right: -4.75rem;
+    right: -3.25rem;
     bottom: -2.5rem;
     z-index: 1;
     transform: none;
@@ -76,7 +76,7 @@ export default function LandingPage({ onUnlock }) {
 
     const timeout = setTimeout(() => {
       metroCardRef.current?.click()
-    }, 6000)
+    }, 10000)
 
     return () => clearTimeout(timeout)
   }, [isUnlocking])
