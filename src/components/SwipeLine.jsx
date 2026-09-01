@@ -229,47 +229,50 @@ Metal.propTypes = {
 function ReaderHousing({ isMobile }) {
   const { viewport } = useThree()
   const source = useLoader(THREE.TextureLoader, '/metal.jpg')
-  const housingMap = useMemo(() => cloneMetal(source, 1.8, 0.7), [source])
-  const deckMap = useMemo(() => cloneMetal(source, 3.2, 1.35), [source])
-  const wedgeMap = useMemo(() => cloneMetal(source, 1.1, 0.55), [source])
+  const housingMap = useMemo(() => cloneMetal(source, 1.6, 0.55), [source])
+  const deckMap = useMemo(() => cloneMetal(source, 2.6, 0.8), [source])
+  const wedgeMap = useMemo(() => cloneMetal(source, 0.9, 0.45), [source])
 
-  const deckW = viewport.width * 1.18
-  const deckH = 0.42
-  const deckD = Math.max(2.6, viewport.height * 0.72)
-  const len = isMobile ? 6.4 : 7.8
-  const railW = isMobile ? 0.7 : 0.82
-  const railH = isMobile ? 1.12 : 1.28
-  const slot = isMobile ? 0.24 : 0.28
-  const railR = 0.2
-  const yaw = isMobile ? 0.34 : 0.42
-  const xShift = isMobile ? -0.55 : -1.35
+  const vh = viewport.height
+  const vw = viewport.width
+  const deckW = vw * 1.16
+  const deckH = vh * 0.2
+  const deckD = vh * 0.42
+  const len = isMobile ? vw * 0.62 : vw * 0.58
+  const railH = vh * 0.62
+  const railW = vh * 0.28
+  const slot = vh * 0.11
+  const railR = Math.min(railW, railH) * 0.22
+  const yaw = isMobile ? 0.52 : 0.58
+  const xShift = isMobile ? -vw * 0.06 : -vw * 0.12
 
-  const deckGeo = useRoundedBox(deckW, deckH, deckD, 0.07, 3)
+  const deckGeo = useRoundedBox(deckW, deckH, deckD, 0.08, 3)
   const railGeo = useRoundedBox(len, railH, railW, railR, 4)
   const arrow = useMemo(() => createArrowShape(), [])
   const wedge = useMemo(() => createWedgeShape(), [])
   const arrowExtrude = useMemo(() => ({
-    depth: 0.045,
+    depth: 0.05,
     bevelEnabled: false,
   }), [])
   const wedgeExtrude = useMemo(() => ({
-    depth: 0.2,
+    depth: 0.22,
     bevelEnabled: true,
-    bevelThickness: 0.03,
-    bevelSize: 0.03,
+    bevelThickness: 0.035,
+    bevelSize: 0.035,
     bevelSegments: 1,
   }), [])
 
   const railZ = (railW + slot) / 2
-  const housingY = deckH / 2 + railH / 2 - 0.02
+  const housingY = deckH / 2 + railH / 2 - 0.01
+  const wedgeScale = Math.max(0.7, railH * 0.55)
 
   return (
-    <group position={[0, -viewport.height * 0.22, 0]}>
-      <mesh geometry={deckGeo} position={[0, 0, -0.15]} rotation={[-0.1, 0.04, 0]}>
-        <Metal map={deckMap} roughness={0.5} metalness={0.62} />
+    <group position={[0, -vh * 0.18, 0.15]}>
+      <mesh geometry={deckGeo} position={[vw * 0.04, 0, -0.05]} rotation={[-0.08, 0.02, 0]}>
+        <Metal map={deckMap} roughness={0.48} metalness={0.64} />
       </mesh>
 
-      <group position={[xShift, housingY, 0.22]} rotation={[0, yaw, 0]}>
+      <group position={[xShift, housingY, 0.18]} rotation={[-0.04, yaw, 0]}>
         <mesh geometry={railGeo} position={[0, 0, railZ]}>
           <Metal map={housingMap} />
         </mesh>
@@ -277,44 +280,49 @@ function ReaderHousing({ isMobile }) {
           <Metal map={housingMap} />
         </mesh>
 
-        <mesh position={[0, -railH * 0.28, 0]}>
-          <boxGeometry args={[len - 0.12, 0.1, slot]} />
+        <mesh position={[0, -railH * 0.22, 0]}>
+          <boxGeometry args={[len - 0.08, railH * 0.18, slot]} />
           <meshStandardMaterial
             color={SLOT_DARK}
             roughness={0.92}
             metalness={0.18}
           />
         </mesh>
-        <mesh position={[0, 0.06, slot / 2 + 0.01]}>
-          <boxGeometry args={[len - 0.16, railH * 0.72, 0.02]} />
-          <meshStandardMaterial color="#1a1a1a" roughness={0.78} metalness={0.35} />
+        <mesh position={[0, 0.04, slot / 2 + 0.012]}>
+          <boxGeometry args={[len - 0.12, railH * 0.78, 0.025]} />
+          <meshStandardMaterial color="#171717" roughness={0.8} metalness={0.3} />
         </mesh>
-        <mesh position={[0, 0.06, -(slot / 2 + 0.01)]}>
-          <boxGeometry args={[len - 0.16, railH * 0.72, 0.02]} />
-          <meshStandardMaterial color="#1a1a1a" roughness={0.78} metalness={0.35} />
-        </mesh>
-
-        <mesh
-          position={[len / 2 - 0.08, railH / 2 - 0.02, -railZ]}
-          rotation={[-Math.PI / 2, 0, 0]}
-        >
-          <extrudeGeometry args={[wedge, wedgeExtrude]} />
-          <Metal map={wedgeMap} />
-        </mesh>
-        <mesh
-          position={[len / 2 - 0.08, railH / 2 - 0.02, railZ]}
-          rotation={[-Math.PI / 2, 0, Math.PI]}
-        >
-          <extrudeGeometry args={[wedge, wedgeExtrude]} />
-          <Metal map={wedgeMap} />
+        <mesh position={[0, 0.04, -(slot / 2 + 0.012)]}>
+          <boxGeometry args={[len - 0.12, railH * 0.78, 0.025]} />
+          <meshStandardMaterial color="#171717" roughness={0.8} metalness={0.3} />
         </mesh>
 
+        <group
+          position={[len / 2 - 0.06, railH / 2 - 0.02, 0]}
+          scale={wedgeScale}
+        >
+          <mesh
+            position={[0, 0, -railZ / wedgeScale]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <extrudeGeometry args={[wedge, wedgeExtrude]} />
+            <Metal map={wedgeMap} />
+          </mesh>
+          <mesh
+            position={[0, 0, railZ / wedgeScale]}
+            rotation={[-Math.PI / 2, 0, Math.PI]}
+          >
+            <extrudeGeometry args={[wedge, wedgeExtrude]} />
+            <Metal map={wedgeMap} />
+          </mesh>
+        </group>
+
         <mesh
-          position={[0.15, 0.08, railZ + railW / 2 + 0.01]}
-          rotation={[0, 0, 0]}
+          position={[-len * 0.08, railH * 0.02, railZ + railW / 2 + 0.012]}
+          scale={railH * 0.7}
         >
           <extrudeGeometry args={[arrow, arrowExtrude]} />
-          <meshStandardMaterial color="#161616" roughness={0.55} metalness={0.25} />
+          <meshStandardMaterial color="#141414" roughness={0.55} metalness={0.25} />
         </mesh>
       </group>
     </group>
@@ -334,16 +342,16 @@ function GleamLight({ reducedMotion, isMobile }) {
     const span = viewport.width * 0.85
     const start = isMobile ? -span * 0.42 : -span * 0.48
     light.current.position.x = start + u * span
-    light.current.position.y = 1.7
-    light.current.position.z = 2.2
+    light.current.position.y = 1.35
+    light.current.position.z = 2.6
   })
 
   return (
     <pointLight
       ref={light}
-      intensity={2.05}
+      intensity={2.35}
       color={GOLDEN}
-      distance={11}
+      distance={10}
     />
   )
 }
@@ -357,7 +365,7 @@ function AimCamera({ isMobile }) {
   const { camera } = useThree()
 
   useEffect(() => {
-    camera.lookAt(isMobile ? -0.15 : -0.55, 0.22, 0)
+    camera.lookAt(isMobile ? -0.2 : -0.7, 0.12, 0.2)
   }, [camera, isMobile])
 
   return null
@@ -371,10 +379,11 @@ function ReaderScene({ isMobile, reducedMotion }) {
   return (
     <>
       <AimCamera isMobile={isMobile} />
-      <ambientLight intensity={0.52} />
-      <directionalLight position={[-3.4, 4.6, 5.2]} intensity={1.45} />
-      <directionalLight position={[3.2, 1.6, 2.4]} intensity={0.32} />
-      <directionalLight position={[-1.2, 0.4, -2.8]} intensity={0.18} />
+      <ambientLight intensity={0.48} />
+      <directionalLight position={[-4.2, 2.1, 6.4]} intensity={1.85} />
+      <directionalLight position={[2.4, 4.2, 1.6]} intensity={0.55} />
+      <directionalLight position={[3.6, 1.2, 3.2]} intensity={0.38} />
+      <directionalLight position={[-2.2, 0.2, -3.4]} intensity={0.22} />
       <GleamLight reducedMotion={reducedMotion} isMobile={isMobile} />
       <ReaderHousing isMobile={isMobile} />
     </>
@@ -411,8 +420,8 @@ export default function SwipeLine() {
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [-1.7, 2.45, 5.4] : [-2.35, 2.65, 5.85],
-                fov: 32,
+                position: isMobile ? [-2.15, 1.55, 4.35] : [-2.9, 1.62, 4.7],
+                fov: 30,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'none' }}
               onCreated={({ gl }) => {
