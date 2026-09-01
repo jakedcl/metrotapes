@@ -21,23 +21,23 @@ const glow = keyframes`
 
 const Slot = styled.div`
   position: relative;
-  width: 240px;
-  height: 360px;
+  width: 200px;
+  height: 520px;
   pointer-events: none;
   overflow: visible;
 
   @media (min-width: 768px) {
-    width: 340px;
-    height: 500px;
+    width: 280px;
+    height: 720px;
   }
 
   &::before {
     content: '';
     position: absolute;
     left: 50%;
-    top: 28%;
-    width: 200px;
-    height: 200px;
+    top: 18%;
+    width: 180px;
+    height: 180px;
     transform: translate(-50%, -50%);
     background: radial-gradient(
       circle,
@@ -49,8 +49,8 @@ const Slot = styled.div`
     animation: ${glow} 3.6s ease-in-out infinite;
 
     @media (min-width: 768px) {
-      width: 260px;
-      height: 260px;
+      width: 230px;
+      height: 230px;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -136,8 +136,8 @@ function LampMesh({ reducedMotion }) {
   })
 
   return (
-    <group ref={group} position={[0, -0.35, 0]}>
-      <group ref={globe} position={[0, 1.22, 0]}>
+    <group ref={group} position={[0, -0.12, 0]}>
+      <group ref={globe} position={[0, 1.55, 0]}>
         <mesh>
           <sphereGeometry args={[0.12, 16, 16]} />
           <meshBasicMaterial color="#fff4c4" />
@@ -184,21 +184,21 @@ function LampMesh({ reducedMotion }) {
         />
       </group>
 
-      <mesh position={[0, 0.74, 0]}>
+      <mesh position={[0, 1.07, 0]}>
         <cylinderGeometry args={[0.22, 0.16, 0.16, 20]} />
         <meshStandardMaterial {...IRON} />
       </mesh>
-      <mesh position={[0, 0.6, 0]}>
+      <mesh position={[0, 0.93, 0]}>
         <cylinderGeometry args={[0.14, 0.17, 0.16, 12]} />
         <meshStandardMaterial {...IRON} />
       </mesh>
-      <mesh position={[0, 0.46, 0]} rotation={[0, Math.PI / 4, 0]}>
+      <mesh position={[0, 0.79, 0]} rotation={[0, Math.PI / 4, 0]}>
         <cylinderGeometry args={[0.4, 0.16, 0.18, 4]} />
         <meshStandardMaterial {...IRON} />
       </mesh>
 
       {[0, 1, 2, 3].map((i) => (
-        <group key={i} position={[0, 0.4, 0]} rotation={[0, (i * Math.PI) / 2, 0]}>
+        <group key={i} position={[0, 0.73, 0]} rotation={[0, (i * Math.PI) / 2, 0]}>
           <mesh position={[0, 0, -0.025]}>
             <extrudeGeometry args={[finShape, finExtrude]} />
             <meshStandardMaterial {...IRON} />
@@ -206,8 +206,8 @@ function LampMesh({ reducedMotion }) {
         </group>
       ))}
 
-      <mesh position={[0, -0.28, 0]}>
-        <boxGeometry args={[0.32, 1.18, 0.32]} />
+      <mesh position={[0, -0.55, 0]}>
+        <boxGeometry args={[0.3, 2.55, 0.3]} />
         <meshStandardMaterial {...IRON} />
       </mesh>
 
@@ -216,20 +216,20 @@ function LampMesh({ reducedMotion }) {
         return (
           <mesh
             key={`panel-${i}`}
-            position={[Math.cos(a) * 0.165, -0.38, Math.sin(a) * 0.165]}
+            position={[Math.cos(a) * 0.155, -0.62, Math.sin(a) * 0.155]}
             rotation={[0, a, 0]}
           >
-            <boxGeometry args={[0.03, 0.88, 0.2]} />
+            <boxGeometry args={[0.03, 2.2, 0.18]} />
             <meshStandardMaterial {...IRON_DARK} />
           </mesh>
         )
       })}
 
-      <mesh position={[0, 0.145, 0.15]}>
+      <mesh position={[0, 0.48, 0.15]}>
         <extrudeGeometry args={[triangleShape, markExtrude]} />
         <meshStandardMaterial color="#071210" />
       </mesh>
-      <mesh position={[0, 0.04, 0.17]}>
+      <mesh position={[0, 0.38, 0.17]}>
         <boxGeometry args={[0.1, 0.18, 0.04]} />
         <meshStandardMaterial color="#071210" />
       </mesh>
@@ -268,7 +268,7 @@ export default function SubwayLamp() {
           <Canvas
             gl={{ alpha: true, antialias: true }}
             dpr={[1, 2]}
-            camera={{ position: [1.25, 0.05, 7.6], fov: 24 }}
+            camera={{ position: [1.5, -0.05, 10.2], fov: 24 }}
             style={{ background: 'transparent', overflow: 'visible' }}
             onCreated={({ gl }) => {
               gl.setClearColor(0x000000, 0)
