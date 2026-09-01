@@ -186,6 +186,41 @@ function useRoundedBox(width, height, depth, radius, segments = 4) {
   return geometry
 }
 
+function roundedRect(path, x, y, w, h, r, clockwise = false) {
+  const rad = Math.min(r, w / 2, h / 2)
+  if (clockwise) {
+    path.moveTo(x + rad, y)
+    path.quadraticCurveTo(x, y, x, y + rad)
+    path.lineTo(x, y + h - rad)
+    path.quadraticCurveTo(x, y + h, x + rad, y + h)
+    path.lineTo(x + w - rad, y + h)
+    path.quadraticCurveTo(x + w, y + h, x + w, y + h - rad)
+    path.lineTo(x + w, y + rad)
+    path.quadraticCurveTo(x + w, y, x + w - rad, y)
+    path.closePath()
+    return
+  }
+  path.moveTo(x + rad, y)
+  path.lineTo(x + w - rad, y)
+  path.quadraticCurveTo(x + w, y, x + w, y + rad)
+  path.lineTo(x + w, y + h - rad)
+  path.quadraticCurveTo(x + w, y + h, x + w - rad, y + h)
+  path.lineTo(x + rad, y + h)
+  path.quadraticCurveTo(x, y + h, x, y + h - rad)
+  path.lineTo(x, y + rad)
+  path.quadraticCurveTo(x, y, x + rad, y)
+  path.closePath()
+}
+
+function createHousingShape(width, height, slotW, slotH, slotY) {
+  const s = new THREE.Shape()
+  roundedRect(s, -width / 2, -height / 2, width, height, Math.min(0.16, height * 0.12), false)
+  const hole = new THREE.Path()
+  roundedRect(hole, -slotW / 2, slotY - slotH / 2, slotW, slotH, Math.min(0.06, slotH * 0.35), true)
+  s.holes.push(hole)
+  return s
+}
+
 function createArrowShape() {
   const s = new THREE.Shape()
   s.moveTo(-0.38, -0.16)
@@ -202,8 +237,8 @@ function createArrowShape() {
 function createWedgeShape() {
   const s = new THREE.Shape()
   s.moveTo(0, 0)
-  s.lineTo(1.15, 0.42)
-  s.lineTo(1.15, -0.42)
+  s.lineTo(0.7, 0.28)
+  s.lineTo(0.7, -0.28)
   s.closePath()
   return s
 }
@@ -236,82 +271,77 @@ function ReaderHousing({ isMobile }) {
   const vh = viewport.height
   const vw = viewport.width
   const deckW = vw * 1.16
-  const deckH = vh * 0.18
-  const deckD = vh * 0.4
-  const bodyW = isMobile ? vw * 0.7 : vw * 0.6
-  const bodyH = vh * 0.7
-  const bodyD = vh * 0.48
-  const slotH = bodyH * 0.26
-  const bottomH = bodyH * 0.38
-  const topH = bodyH - bottomH - slotH
-  const yaw = isMobile ? 0.32 : 0.36
-  const xShift = isMobile ? -vw * 0.04 : -vw * 0.1
+  const deckH = vh * 0.16
+  const deckD = vh * 0.38
+  const bodyW = isMobile ? vw * 0.68 : vw * 0.56
+  const bodyH = vh * 0.72
+  const bodyD = vh * 0.42
+  const slotW = bodyW * 0.84
+  const slotH = bodyH * 0.28
+  const slotY = bodyH * 0.02
+  const yaw = isMobile ? 0.28 : 0.32
+  const xShift = isMobile ? -vw * 0.03 : -vw * 0.09
 
   const deckGeo = useRoundedBox(deckW, deckH, deckD, 0.07, 3)
-  const bottomGeo = useRoundedBox(bodyW, bottomH, bodyD, 0.12, 4)
-  const topGeo = useRoundedBox(bodyW, topH, bodyD, 0.12, 4)
+  const housingShape = useMemo(
+    () => createHousingShape(bodyW, bodyH, slotW, slotH, slotY),
+    [bodyW, bodyH, slotW, slotH, slotY],
+  )
+  const housingExtrude = useMemo(() => ({
+    depth: bodyD,
+    bevelEnabled: true,
+    bevelThickness: 0.07,
+    bevelSize: 0.07,
+    bevelSegments: 2,
+  }), [bodyD])
   const arrow = useMemo(() => createArrowShape(), [])
   const wedge = useMemo(() => createWedgeShape(), [])
   const arrowExtrude = useMemo(() => ({
-    depth: 0.05,
+    depth: 0.045,
     bevelEnabled: false,
   }), [])
   const wedgeExtrude = useMemo(() => ({
-    depth: 0.28,
+    depth: 0.22,
     bevelEnabled: true,
-    bevelThickness: 0.04,
-    bevelSize: 0.04,
+    bevelThickness: 0.03,
+    bevelSize: 0.03,
     bevelSegments: 1,
   }), [])
 
   const housingY = deckH / 2 + bodyH / 2
-  const bottomY = -bodyH / 2 + bottomH / 2
-  const topY = bodyH / 2 - topH / 2
-  const slotY = bottomY + bottomH / 2 + slotH / 2
-  const wedgeScale = Math.max(0.35, bodyH * 0.28)
 
   return (
-    <group position={[0, -vh * 0.16, 0.2]}>
-      <mesh geometry={deckGeo} position={[vw * 0.05, 0, -0.04]} rotation={[-0.07, 0.02, 0]}>
+    <group position={[0, -vh * 0.14, 0.18]}>
+      <mesh geometry={deckGeo} position={[vw * 0.05, 0, -0.02]} rotation={[-0.08, 0.02, 0]}>
         <Metal map={deckMap} roughness={0.48} metalness={0.64} />
       </mesh>
 
-      <group position={[xShift, housingY, 0.12]} rotation={[-0.18, yaw, 0]}>
-        <mesh geometry={bottomGeo} position={[0, bottomY, 0]}>
-          <Metal map={housingMap} />
-        </mesh>
-        <mesh geometry={topGeo} position={[0, topY, 0]}>
+      <group position={[xShift, housingY, 0.08]} rotation={[-0.2, yaw, 0]}>
+        <mesh position={[0, 0, -bodyD / 2]}>
+          <extrudeGeometry args={[housingShape, housingExtrude]} />
           <Metal map={housingMap} />
         </mesh>
 
-        <mesh position={[0, slotY, 0.02]}>
-          <boxGeometry args={[bodyW - 0.06, slotH * 0.92, bodyD * 0.78]} />
+        <mesh position={[0, slotY, 0]}>
+          <boxGeometry args={[slotW * 0.98, slotH * 0.92, bodyD * 0.72]} />
           <meshStandardMaterial
             color={SLOT_DARK}
-            roughness={0.9}
-            metalness={0.2}
+            roughness={0.92}
+            metalness={0.16}
           />
-        </mesh>
-        <mesh position={[0, slotY + slotH * 0.38, 0]}>
-          <boxGeometry args={[bodyW - 0.1, 0.02, bodyD * 0.86]} />
-          <meshStandardMaterial color="#0e0e0e" roughness={0.85} metalness={0.25} />
-        </mesh>
-        <mesh position={[0, slotY - slotH * 0.38, 0]}>
-          <boxGeometry args={[bodyW - 0.1, 0.02, bodyD * 0.86]} />
-          <meshStandardMaterial color="#0e0e0e" roughness={0.85} metalness={0.25} />
         </mesh>
 
         <mesh
-          position={[bodyW * 0.28, slotY, bodyD / 2 + 0.02]}
-          scale={wedgeScale}
+          position={[slotW * 0.28, slotY, bodyD / 2 + 0.01]}
+          scale={Math.max(0.28, bodyH * 0.22)}
         >
           <extrudeGeometry args={[wedge, wedgeExtrude]} />
           <Metal map={wedgeMap} />
         </mesh>
 
         <mesh
-          position={[-bodyW * 0.18, bottomY + bottomH * 0.12, bodyD / 2 + 0.012]}
-          scale={Math.max(0.22, bodyH * 0.22)}
+          position={[-bodyW * 0.22, -bodyH * 0.28, bodyD / 2 + 0.01]}
+          scale={Math.max(0.2, bodyH * 0.2)}
         >
           <extrudeGeometry args={[arrow, arrowExtrude]} />
           <meshStandardMaterial color="#141414" roughness={0.55} metalness={0.25} />
