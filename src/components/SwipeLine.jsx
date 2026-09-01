@@ -464,20 +464,20 @@ Tripod.propTypes = {
 }
 
 function SwipeHead({ map, position }) {
-  const wellL = 1.14
-  const wellW = 0.50
-  const wellH = 0.02
-  const plateL = 1.04
-  const plateW = 0.44
-  const plateH = 0.022
-  const railL = 0.94
-  const railW = 0.178
-  const railBodyH = 0.072
-  const grooveW = 0.046
-  const chamferLen = 0.16
-  const chamferWidth = 0.074
-  const domeR = railW * 0.49
-  const domeL = railL - chamferLen * 0.62
+  const wellL = 1.28
+  const wellW = 0.52
+  const wellH = 0.022
+  const plateL = 1.16
+  const plateW = 0.46
+  const plateH = 0.024
+  const railL = 1.06
+  const railW = 0.188
+  const railBodyH = 0.11
+  const grooveW = 0.072
+  const chamferLen = 0.2
+  const chamferWidth = 0.09
+  const domeR = railW * 0.52
+  const domeL = railL - chamferLen * 0.45
   const railZ = grooveW / 2
 
   const wellGeo = useRoundedBox(wellL, wellH, wellW, 0.03)
@@ -523,13 +523,20 @@ function SwipeHead({ map, position }) {
         <Metal map={map} roughness={0.24} metalness={0.9} color="#f6f6f6" />
       </mesh>
 
-      <mesh position={[chamferLen * 0.12, plateTop + 0.012, 0]}>
-        <boxGeometry args={[railL * 0.9, 0.028, grooveW * 0.92]} />
+      <mesh position={[chamferLen * 0.42, plateTop + railBodyH * 0.46, 0]}>
+        <boxGeometry args={[railL - chamferLen * 0.55, railBodyH * 0.92, grooveW * 0.7]} />
         <meshStandardMaterial
           color={SLOT_DARK}
-          roughness={0.92}
-          metalness={0.12}
+          roughness={0.95}
+          metalness={0.08}
         />
+      </mesh>
+      <mesh
+        position={[-railL / 2 + 0.008, plateTop + railBodyH * 0.42, 0]}
+        rotation={[0, Math.PI / 2, 0]}
+      >
+        <planeGeometry args={[grooveW + chamferWidth * 0.65, railBodyH * 0.9]} />
+        <meshBasicMaterial color={SLOT_DARK} />
       </mesh>
 
       <pointLight
@@ -644,13 +651,13 @@ function AimCamera({ isMobile }) {
 
   useEffect(() => {
     if (isMobile) {
-      camera.position.set(-0.2, 2.62, 8.4)
+      camera.position.set(-0.35, 3.05, 7.6)
       camera.fov = 34
-      camera.lookAt(-0.5, 1.18, 0)
+      camera.lookAt(-0.55, 1.28, 0)
     } else {
-      camera.position.set(-0.35, 2.95, 8.9)
-      camera.fov = 27
-      camera.lookAt(-0.55, 1.22, 0)
+      camera.position.set(-0.55, 3.45, 7.9)
+      camera.fov = 26
+      camera.lookAt(-0.62, 1.32, 0)
     }
     camera.updateProjectionMatrix()
   }, [camera, isMobile])
@@ -711,7 +718,7 @@ export default function SwipeLine() {
   )
   const reducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const orbit = useRef({ yaw: 0.26, pitch: 0.16 })
+  const orbit = useRef({ yaw: 0.52, pitch: 0.24 })
   const drag = useRef({
     pointerId: null,
     x: 0,
@@ -778,8 +785,8 @@ export default function SwipeLine() {
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [-0.2, 2.62, 8.4] : [-0.35, 2.95, 8.9],
-                fov: isMobile ? 34 : 27,
+                position: isMobile ? [-0.35, 3.05, 7.6] : [-0.55, 3.45, 7.9],
+                fov: isMobile ? 34 : 26,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'auto' }}
               onCreated={({ gl }) => {
