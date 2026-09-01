@@ -5,7 +5,7 @@ import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import PropTypes from 'prop-types'
 
-const DEPTH = 0.26
+const DEPTH = 0.82
 const TILE = 3.4
 const GOLDEN = '#fff4d4'
 
@@ -211,8 +211,8 @@ function createBarShape(w, h, isMobile) {
 function MetalMesh({ isMobile }) {
   const { viewport } = useThree()
   const texture = useLoader(THREE.TextureLoader, '/metal.jpg')
-  const w = viewport.width * 1.06
-  const h = viewport.height * 1.08
+  const w = viewport.width * 1.14
+  const h = viewport.height * 1.22
   const shape = useMemo(
     () => createBarShape(w, h, isMobile),
     [w, h, isMobile],
@@ -229,13 +229,13 @@ function MetalMesh({ isMobile }) {
   texture.anisotropy = 8
 
   return (
-    <group rotation={[-0.22, 0.03, 0]} position={[0, -0.04, 0]}>
+    <group rotation={[-0.52, 0.05, 0]} position={[0, -0.22, 0.12]}>
       <mesh position={[0, 0, -DEPTH / 2]}>
         <extrudeGeometry args={[shape, extrude]} />
         <meshStandardMaterial
           map={texture}
-          roughness={0.38}
-          metalness={0.78}
+          roughness={0.48}
+          metalness={0.62}
         />
       </mesh>
     </group>
@@ -252,18 +252,18 @@ function GleamLight({ reducedMotion }) {
   useFrame(({ clock, viewport }) => {
     if (!light.current || reducedMotion) return
     const u = (clock.elapsedTime % 5.5) / 5.5
-    const span = viewport.width * 1.4
-    light.current.position.x = -span * 0.45 + u * span
-    light.current.position.y = 0.55
-    light.current.position.z = 2.4
+    const span = viewport.width * 1.35
+    light.current.position.x = -span * 0.42 + u * span
+    light.current.position.y = 1.15
+    light.current.position.z = 2.8
   })
 
   return (
     <pointLight
       ref={light}
-      intensity={1.35}
+      intensity={1.55}
       color={GOLDEN}
-      distance={10}
+      distance={12}
     />
   )
 }
@@ -275,9 +275,9 @@ GleamLight.propTypes = {
 function BarScene({ isMobile, reducedMotion }) {
   return (
     <>
-      <ambientLight intensity={0.72} />
-      <directionalLight position={[2.6, 3.4, 5]} intensity={1.15} />
-      <directionalLight position={[-3.2, 0.6, 2.4]} intensity={0.32} />
+      <ambientLight intensity={0.58} />
+      <directionalLight position={[3.2, 5.4, 4.2]} intensity={1.35} />
+      <directionalLight position={[-2.8, 1.8, 3]} intensity={0.28} />
       <GleamLight reducedMotion={reducedMotion} />
       <MetalMesh isMobile={isMobile} />
     </>
@@ -313,10 +313,10 @@ export default function SwipeLine() {
             <Canvas
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
-              camera={{ position: [0, 0.85, 7.2], fov: 26 }}
+              camera={{ position: [0, 1.85, 6.4], fov: 30 }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'none' }}
               onCreated={({ gl, camera }) => {
-                camera.lookAt(0, -0.15, 0)
+                camera.lookAt(0, -0.45, 0)
                 gl.domElement.addEventListener('webglcontextlost', (event) => {
                   event.preventDefault()
                   setUse3d(false)
