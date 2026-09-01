@@ -9,11 +9,6 @@ import PropTypes from 'prop-types'
 const GOLDEN = '#fff4d4'
 const SLOT_DARK = '#141414'
 
-// NYC tripod rotor — real-world proportions in meters
-const ARM_LEN = 0.5
-const ARM_R = 0.019
-const HUB_R = 0.044
-
 const gleam = keyframes`
   0% { transform: translateX(-80%) skewX(-18deg); }
   100% { transform: translateX(180%) skewX(-18deg); }
@@ -87,34 +82,19 @@ const Pillar = styled.div`
   }
 `
 
-const FarBlock = styled.div`
-  ${metalFill}
-  position: absolute;
-  left: 14%;
-  bottom: 2%;
-  width: 4.8%;
-  height: 58%;
-  border-radius: 3px 3px 2px 2px;
-
-  @media (max-width: 767px) {
-    left: 8%;
-    width: 6.5%;
-  }
-`
-
 const Beam = styled.div`
   ${metalFill}
   position: absolute;
-  left: 16%;
-  right: 25%;
+  left: 6%;
+  right: 22%;
   bottom: 52%;
   height: 4.2%;
   border-radius: 3px;
   overflow: visible;
 
   @media (max-width: 767px) {
-    left: 10%;
-    right: 20%;
+    left: 4%;
+    right: 18%;
     bottom: 50%;
     height: 4.8%;
   }
@@ -123,9 +103,9 @@ const Beam = styled.div`
 const CssSwipeHead = styled.div`
   ${metalFill}
   position: absolute;
-  left: 14%;
+  left: 10%;
   top: -22%;
-  width: 44%;
+  width: 52%;
   height: 48%;
   border-radius: 4px;
   display: flex;
@@ -154,23 +134,6 @@ const CssGroove = styled.div`
   background: ${SLOT_DARK};
   clip-path: polygon(0 0, 14% 22%, 100% 22%, 100% 78%, 14% 78%, 0 100%);
   box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.85);
-`
-
-const Arm = styled.div`
-  ${metalFill}
-  position: absolute;
-  width: 6px;
-  height: 40%;
-  left: 40%;
-  bottom: 16%;
-  border-radius: 4px;
-  transform-origin: top center;
-  transform: rotateX(72deg) rotateZ(${(p) => p.$rot}deg);
-
-  @media (max-width: 767px) {
-    left: 34%;
-    width: 5px;
-  }
 `
 
 const GleamSweep = styled.div`
@@ -491,106 +454,6 @@ EntryLamp.propTypes = {
   rotation: PropTypes.arrayOf(PropTypes.number),
 }
 
-function rotorArmDirection(thetaDeg) {
-  const t = THREE.MathUtils.degToRad(thetaDeg)
-  return new THREE.Vector3(0, -Math.sin(t), Math.cos(t))
-}
-
-function TripodArm({ map, direction }) {
-  const dir = useMemo(() => direction.clone().normalize(), [direction])
-  const mid = useMemo(() => dir.clone().multiplyScalar(ARM_LEN / 2), [dir])
-  const tip = useMemo(() => dir.clone().multiplyScalar(ARM_LEN - 0.014), [dir])
-  const orient = useMemo(() => {
-    const q = new THREE.Quaternion()
-    q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
-    return q
-  }, [dir])
-
-  return (
-    <group>
-      <mesh position={mid.toArray()} quaternion={orient}>
-        <cylinderGeometry args={[ARM_R, ARM_R, ARM_LEN, 20]} />
-        <Metal map={map} roughness={0.36} metalness={0.8} />
-      </mesh>
-      <mesh position={tip.toArray()} quaternion={orient}>
-        <cylinderGeometry args={[ARM_R * 1.14, ARM_R * 1.14, 0.024, 14]} />
-        <meshStandardMaterial color="#141414" roughness={0.9} metalness={0.04} />
-      </mesh>
-    </group>
-  )
-}
-
-TripodArm.propTypes = {
-  map: PropTypes.object,
-  direction: PropTypes.instanceOf(THREE.Vector3).isRequired,
-}
-
-// Hub + mount plate + 3 arms at 120° in one plane (axle along local X).
-function TripodAssembly({ map }) {
-  const armDirs = useMemo(
-    () => [0, 120, 240].map((deg) => rotorArmDirection(deg)),
-    [],
-  )
-
-  return (
-    <group>
-      {/* Mount plate flush on mechanism +X face (local YZ plane) */}
-      <mesh position={[0.003, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <boxGeometry args={[0.006, 0.076, 0.052]} />
-        <Metal map={map} roughness={0.4} metalness={0.78} />
-      </mesh>
-
-      {/* Hub drum — axle along -X, protruding into throat */}
-      <group position={[-0.03, 0, 0]}>
-        <mesh rotation={[0, Math.PI / 2, 0]}>
-          <cylinderGeometry args={[HUB_R * 0.82, HUB_R, 0.056, 24]} />
-          <Metal map={map} roughness={0.34} metalness={0.84} />
-        </mesh>
-        <mesh position={[-0.028, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
-          <cylinderGeometry args={[HUB_R, HUB_R * 0.88, 0.018, 24]} />
-          <Metal map={map} roughness={0.36} metalness={0.82} />
-        </mesh>
-        <mesh position={[-0.038, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
-          <cylinderGeometry args={[0.03, 0.036, 0.05, 20]} />
-          <Metal map={map} roughness={0.4} metalness={0.78} />
-        </mesh>
-
-        {armDirs.map((dir, i) => (
-          <TripodArm key={i} map={map} direction={dir} />
-        ))}
-      </group>
-    </group>
-  )
-}
-
-TripodAssembly.propTypes = {
-  map: PropTypes.object,
-}
-
-function Tripod({ map }) {
-  const beamY = 1.68
-  const beamW = 3.12
-  const beamX = -0.16
-  const beamFaceX = beamX + beamW / 2
-  const plateTilt = THREE.MathUtils.degToRad(45)
-
-  // Inner +X face of beam (pillar side) — plate flush, hub/arms protrude toward +X
-  return (
-    <group
-      position={[beamFaceX, beamY, 0]}
-      rotation={[0, Math.PI, 0]}
-    >
-      <group rotation={[0, 0, plateTilt]}>
-        <TripodAssembly map={map} />
-      </group>
-    </group>
-  )
-}
-
-Tripod.propTypes = {
-  map: PropTypes.object,
-}
-
 function SwipeHead({ map, position }) {
   const wellL = 1.14
   const wellW = 0.34
@@ -685,55 +548,31 @@ SwipeHead.propTypes = {
 function Turnstile({ isMobile, orbit, reducedMotion }) {
   const source = useLoader(THREE.TextureLoader, '/metal.jpg')
   const pillarMap = useMemo(() => cloneMetal(source, 0.55, 2.1), [source])
-  const beamMap = useMemo(() => cloneMetal(source, 2.4, 0.32), [source])
+  const beamMap = useMemo(() => cloneMetal(source, 3.2, 0.32), [source])
   const readerMap = useMemo(() => cloneMetal(source, 0.9, 0.4), [source])
-  const armMap = useMemo(() => cloneMetal(source, 0.35, 1.3), [source])
 
   const pillarW = 0.24
   const pillarH = 2.72
   const pillarD = 0.28
-  const beamW = 3.12
+  const beamW = 4.2
   const beamH = 0.09
   const beamD = 0.22
-  const farW = 0.2
-  const farH = 1.84
-  const farD = 0.24
 
   const pillarGeo = useRoundedBox(pillarW, pillarH, pillarD, 0.024)
-  const pillarFootGeo = useRoundedBox(0.32, 0.055, 0.34, 0.016)
   const beamGeo = useRoundedBox(beamW, beamH, beamD, 0.014)
-  const farGeo = useRoundedBox(farW, farH, farD, 0.02)
-  const farFootGeo = useRoundedBox(0.28, 0.055, 0.3, 0.016)
-  const baseGeo = useRoundedBox(3.28, 0.04, 0.22, 0.012)
 
   const pillarX = 1.52
   const beamY = 1.68
-  const beamX = -0.16
+  const beamX = -0.42
   const beamTop = beamY + beamH / 2
-  const farX = beamX - beamW / 2 + farW / 2 + 0.02
-  const baseX = (pillarX + farX) / 2
-  const readerX = -0.58
+  const readerX = -0.32
   const scale = isMobile ? 1.18 : 1.16
-  const pivot = [0.28, 1.38, 0]
+  const pivot = [0.06, 1.38, 0]
 
   return (
-    <group position={isMobile ? [-0.55, 0.06, 0] : [-0.68, 0, 0]} scale={scale}>
+    <group position={isMobile ? [-0.5, 0.06, 0] : [-0.62, 0, 0]} scale={scale}>
       <OrbitRig orbit={orbit} reducedMotion={reducedMotion} pivot={pivot}>
-        <mesh geometry={baseGeo} position={[baseX, 0.03, 0]}>
-          <Metal map={pillarMap} roughness={0.5} metalness={0.62} />
-        </mesh>
-        <mesh geometry={pillarFootGeo} position={[pillarX, 0.055, 0]}>
-          <Metal map={pillarMap} roughness={0.46} metalness={0.66} />
-        </mesh>
-        <mesh geometry={farFootGeo} position={[farX, 0.055, 0]}>
-          <Metal map={pillarMap} roughness={0.46} metalness={0.66} />
-        </mesh>
-
         <mesh geometry={pillarGeo} position={[pillarX, pillarH / 2, 0]}>
-          <Metal map={pillarMap} />
-        </mesh>
-
-        <mesh geometry={farGeo} position={[farX, farH / 2, 0]}>
           <Metal map={pillarMap} />
         </mesh>
 
@@ -751,8 +590,6 @@ function Turnstile({ isMobile, orbit, reducedMotion }) {
         </mesh>
 
         <SwipeHead map={readerMap} position={[readerX, beamTop, 0]} />
-
-        <Tripod map={armMap} />
       </OrbitRig>
     </group>
   )
@@ -770,8 +607,8 @@ function GleamLight({ reducedMotion, isMobile }) {
   useFrame(({ clock }) => {
     if (!light.current || reducedMotion) return
     const u = (clock.elapsedTime % 5.5) / 5.5
-    const start = isMobile ? -2.4 : -3.1
-    const span = isMobile ? 4.6 : 5.6
+    const start = isMobile ? -2.6 : -3.4
+    const span = isMobile ? 5.0 : 6.0
     light.current.position.x = start + u * span
     light.current.position.y = 2.45
     light.current.position.z = 2.8
@@ -797,13 +634,13 @@ function AimCamera({ isMobile }) {
 
   useEffect(() => {
     if (isMobile) {
-      camera.position.set(-0.2, 2.12, 6.95)
+      camera.position.set(-0.12, 2.12, 6.95)
       camera.fov = 32
-      camera.lookAt(-0.28, 1.36, 0)
+      camera.lookAt(0.04, 1.36, 0)
     } else {
-      camera.position.set(-0.32, 2.18, 7.15)
+      camera.position.set(-0.22, 2.18, 7.15)
       camera.fov = 26
-      camera.lookAt(-0.28, 1.4, 0)
+      camera.lookAt(0.04, 1.4, 0)
     }
     camera.updateProjectionMatrix()
   }, [camera, isMobile])
@@ -837,11 +674,10 @@ TurnstileScene.propTypes = {
   orbit: PropTypes.shape({ current: PropTypes.object }).isRequired,
 }
 
-function CssTurnstile() {
+function CssEntryScene() {
   return (
     <Fallback>
       <Pillar />
-      <FarBlock />
       <Beam>
         <CssSwipeHead>
           <CssRail />
@@ -849,9 +685,6 @@ function CssTurnstile() {
           <CssRail />
         </CssSwipeHead>
       </Beam>
-      <Arm $rot={90} />
-      <Arm $rot={210} />
-      <Arm $rot={330} />
       <GleamSweep />
     </Fallback>
   )
@@ -927,12 +760,12 @@ export default function SwipeLine() {
           onPointerCancel={onPointerUp}
           onClick={onClick}
         >
-          <Suspense fallback={<CssTurnstile />}>
+          <Suspense fallback={<CssEntryScene />}>
             <Canvas
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [-0.2, 2.12, 6.95] : [-0.32, 2.18, 7.15],
+                position: isMobile ? [-0.12, 2.12, 6.95] : [-0.22, 2.18, 7.15],
                 fov: isMobile ? 32 : 26,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'auto' }}
@@ -954,7 +787,7 @@ export default function SwipeLine() {
           </Suspense>
         </Stage>
       ) : (
-        <CssTurnstile />
+        <CssEntryScene />
       )}
     </LineContainer>
   )
