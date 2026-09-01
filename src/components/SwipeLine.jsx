@@ -479,19 +479,19 @@ Tripod.propTypes = {
 }
 
 function SwipeHead({ map, position }) {
-  const wellL = 1.18
-  const wellW = 0.4
-  const wellH = 0.006
-  const plateL = 1.1
-  const plateW = 0.36
-  const plateH = 0.008
+  const wellL = 1.14
+  const wellW = 0.34
+  const wellH = 0.005
+  const plateL = 1.06
+  const plateW = 0.3
+  const plateH = 0.007
   const railL = 1.06
-  const railW = 0.182
-  const railBodyH = 0.088
-  const grooveW = 0.072
+  const railW = 0.176
+  const railBodyH = 0.055
+  const grooveW = 0.068
   const chamferLen = 0.2
-  const chamferWidth = 0.09
-  const domeR = railW * 0.52
+  const chamferWidth = 0.08
+  const domeR = railW * 0.36
   const domeL = railL - chamferLen * 0.45
   const railZ = grooveW / 2
 
@@ -581,7 +581,7 @@ function Turnstile({ isMobile, orbit, reducedMotion }) {
   const pillarD = 0.48
   const beamW = 3.08
   const beamH = 0.145
-  const beamD = 0.42
+  const beamD = 0.36
   const farW = 0.38
   const farH = 1.28
   const farD = 0.4
@@ -636,6 +636,10 @@ function Turnstile({ isMobile, orbit, reducedMotion }) {
         <mesh geometry={beamGeo} position={[beamX, beamY, 0]}>
           <Metal map={beamMap} roughness={0.38} metalness={0.76} />
         </mesh>
+        <mesh position={[beamX, beamY - beamH / 2 - 0.01, 0.0]}>
+          <boxGeometry args={[beamW * 0.97, 0.018, beamD * 0.88]} />
+          <Metal map={beamMap} roughness={0.5} metalness={0.62} color="#cfcfcf" />
+        </mesh>
 
         <SwipeHead map={readerMap} position={[readerX, beamTop, 0]} />
 
@@ -684,13 +688,13 @@ function AimCamera({ isMobile }) {
 
   useEffect(() => {
     if (isMobile) {
-      camera.position.set(-0.22, 2.15, 6.95)
+      camera.position.set(-0.18, 1.72, 6.7)
       camera.fov = 34
-      camera.lookAt(-0.32, 1.02, 0)
+      camera.lookAt(-0.28, 0.98, 0)
     } else {
-      camera.position.set(-0.38, 2.22, 7.15)
+      camera.position.set(-0.32, 1.78, 6.85)
       camera.fov = 26
-      camera.lookAt(-0.32, 1.02, 0)
+      camera.lookAt(-0.28, 0.98, 0)
     }
     camera.updateProjectionMatrix()
   }, [camera, isMobile])
@@ -819,7 +823,7 @@ export default function SwipeLine() {
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [-0.22, 2.15, 6.95] : [-0.38, 2.22, 7.15],
+                position: isMobile ? [-0.18, 1.72, 6.7] : [-0.32, 1.78, 6.85],
                 fov: isMobile ? 34 : 26,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'auto' }}
