@@ -569,26 +569,20 @@ TripodAssembly.propTypes = {
 
 function Tripod({ map }) {
   const beamY = 1.68
-  const beamH = 0.09
-  const beamTop = beamY + beamH / 2
-  const readerX = -0.58
-  const wellL = 1.14
-  const wellH = 0.005
-  const plateH = 0.007
-  const railBodyH = 0.055
-  const housingH = wellH + plateH + railBodyH
-
-  // +X face of SwipeHead housing (pillar side), mid-height — hub protrudes into throat
-  const mountX = readerX + wellL / 2
-  const mountY = beamTop + housingH * 0.5
+  const beamW = 3.12
+  const beamX = -0.16
+  const beamFaceX = beamX + beamW / 2
   const plateTilt = THREE.MathUtils.degToRad(45)
 
+  // Inner +X face of beam (pillar side) — plate flush, hub/arms protrude toward +X
   return (
     <group
-      position={[mountX, mountY, 0]}
-      rotation={[0, 0, plateTilt]}
+      position={[beamFaceX, beamY, 0]}
+      rotation={[0, Math.PI, 0]}
     >
-      <TripodAssembly map={map} />
+      <group rotation={[0, 0, plateTilt]}>
+        <TripodAssembly map={map} />
+      </group>
     </group>
   )
 }
