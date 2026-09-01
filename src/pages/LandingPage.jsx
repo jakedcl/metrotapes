@@ -49,8 +49,8 @@ const LampSlot = styled(animated.div)`
   transform-origin: bottom right;
 
   @media (min-width: 768px) {
-    right: 5%;
-    bottom: -1.25rem;
+    right: 8%;
+    bottom: -2.5rem;
   }
 
   @media (max-width: 767px) {
