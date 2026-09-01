@@ -14,8 +14,10 @@ const ARM_LEN = 0.5
 const ARM_R = 0.019
 const HUB_R = 0.044
 const HUB_TILT = Math.PI / 4
-const ROTOR_AXIS = new THREE.Vector3(Math.sin(HUB_TILT), Math.cos(HUB_TILT), 0).normalize()
-const BLOCKING_ARM = new THREE.Vector3(-1, 0, 0)
+// Axle runs through the pillar into the throat; arms sweep in the Y-Z plane.
+const ROTOR_AXIS = new THREE.Vector3(1, 0, 0)
+// Rest pose: one arm level across the walkway (Z), two droop down in a V.
+const BLOCKING_ARM = new THREE.Vector3(0, 0, 1)
 
 const gleam = keyframes`
   0% { transform: translateX(-80%) skewX(-18deg); }
@@ -524,12 +526,6 @@ TripodArm.propTypes = {
 }
 
 function Tripod({ map }) {
-  const axisQuat = useMemo(() => {
-    const q = new THREE.Quaternion()
-    q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), ROTOR_AXIS)
-    return q
-  }, [])
-
   const armDirs = useMemo(() => [
     BLOCKING_ARM.clone(),
     BLOCKING_ARM.clone().applyAxisAngle(ROTOR_AXIS, (Math.PI * 2) / 3),
@@ -537,25 +533,26 @@ function Tripod({ map }) {
   ], [])
 
   return (
-    <group position={[0.42, 1.36, 0]}>
-      <mesh position={[0, -0.038, 0]}>
-        <cylinderGeometry args={[0.03, 0.036, 0.076, 20]} />
-        <Metal map={map} roughness={0.4} metalness={0.78} />
-      </mesh>
-
-      <group quaternion={axisQuat}>
-        <mesh position={[0, 0.018, 0]}>
-          <cylinderGeometry args={[HUB_R * 0.82, HUB_R, 0.058, 24]} />
-          <Metal map={map} roughness={0.34} metalness={0.84} />
+    <group position={[1.06, 1.36, 0]}>
+      <group rotation={[0, 0, -HUB_TILT]}>
+        <mesh position={[0, -0.038, 0]}>
+          <cylinderGeometry args={[0.03, 0.036, 0.076, 20]} />
+          <Metal map={map} roughness={0.4} metalness={0.78} />
         </mesh>
-        <mesh position={[0, 0.052, 0]}>
-          <cylinderGeometry args={[HUB_R, HUB_R * 0.88, 0.02, 24]} />
-          <Metal map={map} roughness={0.36} metalness={0.82} />
-        </mesh>
-        {armDirs.map((dir) => (
-          <TripodArm key={`${dir.x}-${dir.y}-${dir.z}`} map={map} direction={dir} />
-        ))}
+        <group rotation={[0, 0, Math.PI / 2]}>
+          <mesh position={[0, 0.018, 0]}>
+            <cylinderGeometry args={[HUB_R * 0.82, HUB_R, 0.058, 24]} />
+            <Metal map={map} roughness={0.34} metalness={0.84} />
+          </mesh>
+          <mesh position={[0, 0.052, 0]}>
+            <cylinderGeometry args={[HUB_R, HUB_R * 0.88, 0.02, 24]} />
+            <Metal map={map} roughness={0.36} metalness={0.82} />
+          </mesh>
+        </group>
       </group>
+      {armDirs.map((dir) => (
+        <TripodArm key={`${dir.x}-${dir.y}-${dir.z}`} map={map} direction={dir} />
+      ))}
     </group>
   )
 }
