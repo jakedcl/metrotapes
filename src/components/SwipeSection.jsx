@@ -34,7 +34,7 @@ const CardWrapper = styled.div`
 
   @media (min-width: 768px) {
     left: 6%;
-    bottom: 8.4rem;
+    bottom: 7.4rem;
     transform: scale(0.78);
   }
 `
