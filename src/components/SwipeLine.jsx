@@ -358,10 +358,10 @@ function Turnstile({ isMobile }) {
   const beamH = 0.42
   const beamD = 0.56
   const readerL = 1.78
-  const readerH = 0.34
+  const readerH = 0.4
   const readerD = 0.4
   const slotL = 1.52
-  const slotH = 0.11
+  const slotH = 0.085
 
   const pillarGeo = useRoundedBox(pillarW, pillarH, pillarD, 0.045)
   const footGeo = useRoundedBox(0.9, 0.12, 0.72, 0.03)
@@ -389,10 +389,10 @@ function Turnstile({ isMobile }) {
   const readerX = beamX - 0.12
   const readerY = beamY + beamH / 2 + readerH / 2 - 0.04
   const readerZ = beamD / 2 + readerD / 2 - 0.1
-  const scale = isMobile ? 0.82 : 0.95
+  const scale = isMobile ? 1.02 : 0.95
 
   return (
-    <group position={isMobile ? [-0.4, -0.02, 0] : [-0.75, 0, 0]} scale={scale}>
+    <group position={isMobile ? [0.12, 0.02, 0] : [-0.75, 0, 0]} scale={scale}>
       <mesh geometry={footGeo} position={[pillarX, 0.06, 0]}>
         <Metal map={pillarMap} roughness={0.46} metalness={0.66} />
       </mesh>
@@ -417,7 +417,7 @@ function Turnstile({ isMobile }) {
       <group position={[readerX, readerY, readerZ]}>
         <mesh position={[0, 0, -readerD / 2]}>
           <extrudeGeometry args={[readerShape, readerExtrude]} />
-          <Metal map={readerMap} roughness={0.34} metalness={0.8} />
+          <Metal map={readerMap} roughness={0.32} metalness={0.82} color="#f0f0f0" />
         </mesh>
 
         <mesh>
@@ -488,9 +488,9 @@ function AimCamera({ isMobile }) {
 
   useEffect(() => {
     if (isMobile) {
-      camera.position.set(0.05, 2.15, 10.4)
-      camera.fov = 32
-      camera.lookAt(-0.05, 0.95, 0)
+      camera.position.set(0.2, 2.05, 8.4)
+      camera.fov = 34
+      camera.lookAt(0.15, 1.02, 0)
     } else {
       camera.position.set(-0.1, 2.35, 9.6)
       camera.fov = 28
@@ -564,8 +564,8 @@ export default function SwipeLine() {
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [0.05, 2.15, 10.4] : [-0.1, 2.35, 9.6],
-                fov: isMobile ? 32 : 28,
+                position: isMobile ? [0.2, 2.05, 8.4] : [-0.1, 2.35, 9.6],
+                fov: isMobile ? 34 : 28,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'none' }}
               onCreated={({ gl }) => {
