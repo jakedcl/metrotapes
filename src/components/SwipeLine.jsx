@@ -154,17 +154,17 @@ const CssGroove = styled.div`
 const Arm = styled.div`
   ${metalFill}
   position: absolute;
-  width: 7px;
-  height: 50%;
+  width: 6px;
+  height: 40%;
   left: 40%;
-  bottom: 4%;
+  bottom: 16%;
   border-radius: 4px;
   transform-origin: top center;
-  transform: rotate(${(p) => p.$rot}deg);
+  transform: rotateX(72deg) rotateZ(${(p) => p.$rot}deg);
 
   @media (max-width: 767px) {
     left: 34%;
-    width: 6px;
+    width: 5px;
   }
 `
 
@@ -487,18 +487,18 @@ EntryLamp.propTypes = {
 }
 
 function Tripod({ map }) {
-  const len = 1.28
-  const r = 0.015
+  const len = 1.22
+  const r = 0.014
   const angles = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]
 
   return (
-    <group position={[-0.12, 1.48, 0.22]} rotation={[0.42, 0, 0]}>
+    <group position={[-0.12, 1.48, 0]}>
       <mesh>
-        <cylinderGeometry args={[0.038, 0.038, 0.09, 20]} />
+        <cylinderGeometry args={[0.032, 0.032, 0.1, 20]} />
         <Metal map={map} roughness={0.34} metalness={0.82} />
       </mesh>
       <mesh>
-        <sphereGeometry args={[0.046, 16, 12]} />
+        <sphereGeometry args={[0.042, 16, 12]} />
         <Metal map={map} roughness={0.32} metalness={0.84} />
       </mesh>
       {angles.map((angle) => (
@@ -775,9 +775,9 @@ function CssTurnstile() {
           <CssRail />
         </CssSwipeHead>
       </Beam>
-      <Arm $rot={-90} />
-      <Arm $rot={28} />
-      <Arm $rot={152} />
+      <Arm $rot={90} />
+      <Arm $rot={210} />
+      <Arm $rot={330} />
       <GleamSweep />
     </Fallback>
   )
