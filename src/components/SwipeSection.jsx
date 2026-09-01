@@ -9,7 +9,7 @@ const SwipeContainer = styled.div`
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 16rem;
+  height: 18rem;
   display: flex;
   align-items: flex-end;
   pointer-events: none;
@@ -17,7 +17,7 @@ const SwipeContainer = styled.div`
   z-index: 1;
 
   @media (min-width: 768px) {
-    height: 26rem;
+    height: 28rem;
   }
 `
 
