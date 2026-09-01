@@ -438,7 +438,7 @@ function EntryLamp({ position, rotation = [0, 0, 0] }) {
   }, [entryMap, lampMap])
 
   return (
-    <group position={position} rotation={rotation} scale={0.86}>
+    <group position={position} rotation={rotation} scale={0.4}>
       <mesh position={[0, 0.16, 0.01]}>
         <boxGeometry args={[0.44, 0.138, 0.012]} />
         <meshStandardMaterial color="#000000" roughness={0.62} metalness={0.04} />
@@ -487,20 +487,24 @@ EntryLamp.propTypes = {
 }
 
 function Tripod({ map }) {
-  const len = 1.42
-  const r = 0.042
+  const len = 1.28
+  const r = 0.015
   const angles = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]
 
   return (
-    <group position={[-0.1, 1.54, 0.2]} rotation={[1.16, 0.05, 0]}>
-      <mesh rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.068, 0.068, 0.2, 20]} />
+    <group position={[-0.12, 1.48, 0.22]} rotation={[0.42, 0, 0]}>
+      <mesh>
+        <cylinderGeometry args={[0.038, 0.038, 0.09, 20]} />
         <Metal map={map} roughness={0.34} metalness={0.82} />
       </mesh>
+      <mesh>
+        <sphereGeometry args={[0.046, 16, 12]} />
+        <Metal map={map} roughness={0.32} metalness={0.84} />
+      </mesh>
       {angles.map((angle) => (
-        <group key={angle} rotation={[angle, 0, 0]}>
-          <mesh position={[0, len / 2, 0]}>
-            <cylinderGeometry args={[r, r, len, 18]} />
+        <group key={angle} rotation={[0, angle, 0]}>
+          <mesh position={[len / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[r, r, len, 16]} />
             <Metal map={map} roughness={0.34} metalness={0.8} />
           </mesh>
         </group>
@@ -611,32 +615,32 @@ function Turnstile({ isMobile, orbit, reducedMotion }) {
   const readerMap = useMemo(() => cloneMetal(source, 0.9, 0.4), [source])
   const armMap = useMemo(() => cloneMetal(source, 0.35, 1.3), [source])
 
-  const pillarW = 0.28
-  const pillarH = 2.58
-  const pillarD = 0.32
+  const pillarW = 0.24
+  const pillarH = 2.72
+  const pillarD = 0.28
   const beamW = 3.12
-  const beamH = 0.1
-  const beamD = 0.24
-  const farW = 0.24
-  const farH = 1.78
-  const farD = 0.28
+  const beamH = 0.09
+  const beamD = 0.22
+  const farW = 0.2
+  const farH = 1.84
+  const farD = 0.24
 
-  const pillarGeo = useRoundedBox(pillarW, pillarH, pillarD, 0.028)
-  const pillarFootGeo = useRoundedBox(0.36, 0.06, 0.38, 0.018)
-  const beamGeo = useRoundedBox(beamW, beamH, beamD, 0.016)
-  const farGeo = useRoundedBox(farW, farH, farD, 0.024)
-  const farFootGeo = useRoundedBox(0.32, 0.06, 0.34, 0.018)
-  const baseGeo = useRoundedBox(3.28, 0.045, 0.26, 0.014)
+  const pillarGeo = useRoundedBox(pillarW, pillarH, pillarD, 0.024)
+  const pillarFootGeo = useRoundedBox(0.32, 0.055, 0.34, 0.016)
+  const beamGeo = useRoundedBox(beamW, beamH, beamD, 0.014)
+  const farGeo = useRoundedBox(farW, farH, farD, 0.02)
+  const farFootGeo = useRoundedBox(0.28, 0.055, 0.3, 0.016)
+  const baseGeo = useRoundedBox(3.28, 0.04, 0.22, 0.012)
 
   const pillarX = 1.52
-  const beamY = 1.62
+  const beamY = 1.68
   const beamX = -0.16
   const beamTop = beamY + beamH / 2
   const farX = beamX - beamW / 2 + farW / 2 + 0.02
   const baseX = (pillarX + farX) / 2
   const readerX = -0.58
-  const scale = isMobile ? 1.1 : 1.06
-  const pivot = [0.28, 1.32, 0]
+  const scale = isMobile ? 1.18 : 1.16
+  const pivot = [0.28, 1.38, 0]
 
   return (
     <group position={isMobile ? [-0.55, 0.06, 0] : [-0.68, 0, 0]} scale={scale}>
@@ -661,8 +665,8 @@ function Turnstile({ isMobile, orbit, reducedMotion }) {
 
         <EntryLamp
           position={[
-            pillarX - pillarW / 2 - 0.016,
-            beamTop + 0.32,
+            pillarX - pillarW / 2 - 0.01,
+            beamTop + 0.18,
             0,
           ]}
           rotation={[0, -Math.PI / 2, 0]}
@@ -719,13 +723,13 @@ function AimCamera({ isMobile }) {
 
   useEffect(() => {
     if (isMobile) {
-      camera.position.set(-0.2, 2.08, 7.2)
+      camera.position.set(-0.2, 2.12, 6.95)
       camera.fov = 32
-      camera.lookAt(-0.28, 1.28, 0)
+      camera.lookAt(-0.28, 1.36, 0)
     } else {
-      camera.position.set(-0.32, 2.22, 7.55)
+      camera.position.set(-0.32, 2.18, 7.15)
       camera.fov = 26
-      camera.lookAt(-0.28, 1.32, 0)
+      camera.lookAt(-0.28, 1.4, 0)
     }
     camera.updateProjectionMatrix()
   }, [camera, isMobile])
@@ -771,9 +775,9 @@ function CssTurnstile() {
           <CssRail />
         </CssSwipeHead>
       </Beam>
-      <Arm $rot={-48} />
-      <Arm $rot={8} />
-      <Arm $rot={62} />
+      <Arm $rot={-90} />
+      <Arm $rot={28} />
+      <Arm $rot={152} />
       <GleamSweep />
     </Fallback>
   )
@@ -854,7 +858,7 @@ export default function SwipeLine() {
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [-0.2, 2.08, 7.2] : [-0.32, 2.22, 7.55],
+                position: isMobile ? [-0.2, 2.12, 6.95] : [-0.32, 2.18, 7.15],
                 fov: isMobile ? 32 : 26,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'auto' }}

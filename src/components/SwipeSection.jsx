@@ -17,7 +17,7 @@ const SwipeContainer = styled.div`
   z-index: 1;
 
   @media (min-width: 768px) {
-    height: 38rem;
+    height: 42rem;
   }
 `
 
@@ -34,7 +34,7 @@ const CardWrapper = styled.div`
 
   @media (min-width: 768px) {
     left: 6%;
-    bottom: 10.5rem;
+    bottom: 12rem;
     transform: scale(0.78);
   }
 `
