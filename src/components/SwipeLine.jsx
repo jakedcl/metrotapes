@@ -359,13 +359,6 @@ function EntryLamp({ position }) {
 
   return (
     <group position={position}>
-      {[-0.09, 0.09].map((x) => (
-        <mesh key={x} position={[x, 0.36, 0.012]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.055, 0.055, 0.02, 20]} />
-          <meshStandardMaterial color="#141414" roughness={0.32} metalness={0.62} />
-        </mesh>
-      ))}
-
       <mesh position={[0, 0.16, 0.01]}>
         <boxGeometry args={[0.44, 0.14, 0.018]} />
         <meshStandardMaterial color="#ececec" roughness={0.48} metalness={0.1} />
