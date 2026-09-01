@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unknown-property */
-import styled, { keyframes } from 'styled-components'
+import styled, { keyframes, css } from 'styled-components'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -14,107 +14,34 @@ const gleam = keyframes`
   100% { transform: translateX(180%) skewX(-18deg); }
 `
 
-const metalClip = `
-  clip-path: polygon(
-    0 100%,
-    0 36%,
-    62% 40%,
-    100% 78%,
-    100% 100%
-  );
-
-  @media (max-width: 767px) {
-    clip-path: polygon(
-      0 100%,
-      0 44%,
-      52% 48%,
-      100% 70%,
-      100% 100%
-    );
-  }
-`
-
-const LineContainer = styled.div`
-  width: 100%;
-  height: 18rem;
-  pointer-events: none;
-  overflow: visible;
-
-  @media (min-width: 768px) {
-    height: 22rem;
-  }
-`
-
-const Line = styled.div`
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
+const metalFill = css`
   background:
     linear-gradient(
       to bottom,
-      rgba(255, 255, 255, 0.15) 0%,
-      rgba(255, 255, 255, 0) 50%,
-      rgba(0, 0, 0, 0.15) 100%
+      rgba(255, 255, 255, 0.16) 0%,
+      rgba(255, 255, 255, 0) 48%,
+      rgba(0, 0, 0, 0.18) 100%
     ),
     url('/metal.jpg') repeat,
     linear-gradient(
       to right,
       #888 0%,
-      #CCC 20%,
-      #CCC 80%,
+      #ccc 22%,
+      #ccc 78%,
       #888 100%
     );
   background-blend-mode: overlay, multiply, normal;
   box-shadow:
     inset 0 2px 5px rgba(255, 255, 255, 0.3),
     inset 0 -2px 5px rgba(0, 0, 0, 0.5),
-    0 -1px 2px rgba(0, 0, 0, 0.2),
-    0 1px 2px rgba(0, 0, 0, 0.3);
-  border-top: 1px solid rgba(255, 255, 255, 0.4);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-  ${metalClip}
+    0 1px 3px rgba(0, 0, 0, 0.35);
+`
 
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 38%;
-    background: linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0.18) 50%,
-      rgba(255, 255, 255, 0) 100%
-    );
-    pointer-events: none;
-    animation: ${gleam} 5.5s ease-in-out infinite;
-
-    @media (prefers-reduced-motion: reduce) {
-      animation: none;
-    }
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    left: 6%;
-    width: 58%;
-    top: 46%;
-    height: 14px;
-    border-radius: 7px;
-    background: linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 0.72) 0%,
-      rgba(20, 20, 20, 0.95) 45%,
-      rgba(0, 0, 0, 0.8) 100%
-    );
-    box-shadow:
-      inset 0 3px 4px rgba(0, 0, 0, 0.85),
-      0 1px 0 rgba(255, 255, 255, 0.28);
-    pointer-events: none;
-  }
+const LineContainer = styled.div`
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
 `
 
 const Stage = styled.div`
@@ -128,12 +55,87 @@ const Stage = styled.div`
   }
 `
 
-const Gleam = styled.div`
+const Fallback = styled.div`
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+`
+
+const Pillar = styled.div`
+  ${metalFill}
+  position: absolute;
+  right: 26%;
+  bottom: 2%;
+  width: 14%;
+  height: 90%;
+  border-radius: 4px 4px 2px 2px;
+
+  @media (max-width: 767px) {
+    right: 18%;
+    width: 18%;
+  }
+`
+
+const Beam = styled.div`
+  ${metalFill}
+  position: absolute;
+  left: 16%;
+  right: 32%;
+  bottom: 44%;
+  height: 16%;
+  border-radius: 3px;
+  overflow: hidden;
+
+  @media (max-width: 767px) {
+    left: 8%;
+    right: 26%;
+    bottom: 42%;
+    height: 15%;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 8%;
+    right: 14%;
+    top: 32%;
+    height: 28%;
+    border-radius: 5px;
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.72) 0%,
+      rgba(20, 20, 20, 0.95) 45%,
+      rgba(0, 0, 0, 0.8) 100%
+    );
+    box-shadow:
+      inset 0 3px 4px rgba(0, 0, 0, 0.85),
+      0 1px 0 rgba(255, 255, 255, 0.28);
+  }
+`
+
+const Arm = styled.div`
+  ${metalFill}
+  position: absolute;
+  width: 11px;
+  height: 38%;
+  left: 38%;
+  bottom: 8%;
+  border-radius: 6px;
+  transform-origin: top center;
+  transform: rotate(${(p) => p.$rot}deg);
+
+  @media (max-width: 767px) {
+    left: 32%;
+    width: 9px;
+  }
+`
+
+const GleamSweep = styled.div`
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  ${metalClip}
 
   &::before {
     content: '';
@@ -145,7 +147,7 @@ const Gleam = styled.div`
     background: linear-gradient(
       90deg,
       rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0.22) 50%,
+      rgba(255, 255, 255, 0.2) 50%,
       rgba(255, 255, 255, 0) 100%
     );
     animation: ${gleam} 5.5s ease-in-out infinite;
@@ -176,7 +178,7 @@ function cloneMetal(texture, repeatX, repeatY) {
   return map
 }
 
-function useRoundedBox(width, height, depth, radius, segments = 4) {
+function useRoundedBox(width, height, depth, radius, segments = 3) {
   const geometry = useMemo(
     () => new RoundedBoxGeometry(width, height, depth, segments, radius),
     [width, height, depth, radius, segments],
@@ -212,11 +214,11 @@ function roundedRect(path, x, y, w, h, r, clockwise = false) {
   path.closePath()
 }
 
-function createHousingShape(width, height, slotW, slotH, slotY) {
+function createReaderShape(len, dep, slotLen, slotDep) {
   const s = new THREE.Shape()
-  roundedRect(s, -width / 2, -height / 2, width, height, Math.min(0.16, height * 0.12), false)
+  roundedRect(s, -len / 2, -dep / 2, len, dep, 0.045)
   const hole = new THREE.Path()
-  roundedRect(hole, -slotW / 2, slotY - slotH / 2, slotW, slotH, Math.min(0.06, slotH * 0.35), true)
+  roundedRect(hole, -slotLen / 2, -slotDep / 2, slotLen, slotDep, 0.012, true)
   s.holes.push(hole)
   return s
 }
@@ -234,13 +236,67 @@ function createArrowShape() {
   return s
 }
 
-function createWedgeShape() {
-  const s = new THREE.Shape()
-  s.moveTo(0, 0)
-  s.lineTo(0.7, 0.28)
-  s.lineTo(0.7, -0.28)
-  s.closePath()
-  return s
+function createEntryTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256
+  canvas.height = 512
+  const ctx = canvas.getContext('2d')
+  const grout = ctx.createLinearGradient(0, 0, 256, 0)
+  grout.addColorStop(0, '#8f8f8f')
+  grout.addColorStop(0.45, '#cfcfcf')
+  grout.addColorStop(1, '#9a9a9a')
+  ctx.fillStyle = grout
+  ctx.fillRect(0, 0, 256, 512)
+
+  const lamp = (y) => {
+    ctx.beginPath()
+    ctx.arc(128, y, 28, 0, Math.PI * 2)
+    ctx.fillStyle = '#1a1a1a'
+    ctx.fill()
+  }
+  lamp(78)
+  lamp(148)
+
+  ctx.fillStyle = '#f4f4f4'
+  ctx.fillRect(46, 198, 164, 54)
+  ctx.fillStyle = '#111'
+  ctx.font = 'bold 36px Helvetica, Arial, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('Entry', 128, 227)
+
+  ctx.beginPath()
+  ctx.arc(128, 348, 52, 0, Math.PI * 2)
+  ctx.fillStyle = '#1a8f3a'
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(128, 348, 46, 0, Math.PI * 2)
+  ctx.fillStyle = '#22a844'
+  ctx.fill()
+
+  ctx.save()
+  ctx.translate(128, 348)
+  ctx.rotate((-135 * Math.PI) / 180)
+  ctx.fillStyle = '#f6e34a'
+  ctx.beginPath()
+  ctx.moveTo(26, 0)
+  ctx.lineTo(-10, -15)
+  ctx.lineTo(-10, -6)
+  ctx.lineTo(-28, -6)
+  ctx.lineTo(-28, 6)
+  ctx.lineTo(-10, 6)
+  ctx.lineTo(-10, 15)
+  ctx.closePath()
+  ctx.fill()
+  ctx.restore()
+
+  ctx.fillStyle = '#0d0d0d'
+  ctx.fillRect(78, 430, 100, 36)
+
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 8
+  return tex
 }
 
 function Metal({ map, roughness = 0.42, metalness = 0.72, color = '#c5c5c5' }) {
@@ -261,119 +317,171 @@ Metal.propTypes = {
   color: PropTypes.string,
 }
 
-function ReaderHousing({ isMobile }) {
-  const { viewport } = useThree()
-  const source = useLoader(THREE.TextureLoader, '/metal.jpg')
-  const housingMap = useMemo(() => cloneMetal(source, 1.55, 0.5), [source])
-  const deckMap = useMemo(() => cloneMetal(source, 2.4, 0.7), [source])
-  const wedgeMap = useMemo(() => cloneMetal(source, 0.85, 0.4), [source])
-
-  const vh = viewport.height
-  const vw = viewport.width
-  const deckW = vw * 1.16
-  const deckH = vh * 0.16
-  const deckD = vh * 0.38
-  const bodyW = isMobile ? vw * 0.68 : vw * 0.56
-  const bodyH = vh * 0.72
-  const bodyD = vh * 0.42
-  const slotW = bodyW * 0.84
-  const slotH = bodyH * 0.28
-  const slotY = bodyH * 0.02
-  const yaw = isMobile ? 0.28 : 0.32
-  const xShift = isMobile ? -vw * 0.03 : -vw * 0.09
-
-  const deckGeo = useRoundedBox(deckW, deckH, deckD, 0.07, 3)
-  const housingShape = useMemo(
-    () => createHousingShape(bodyW, bodyH, slotW, slotH, slotY),
-    [bodyW, bodyH, slotW, slotH, slotY],
-  )
-  const housingExtrude = useMemo(() => ({
-    depth: bodyD,
-    bevelEnabled: true,
-    bevelThickness: 0.07,
-    bevelSize: 0.07,
-    bevelSegments: 2,
-  }), [bodyD])
-  const arrow = useMemo(() => createArrowShape(), [])
-  const wedge = useMemo(() => createWedgeShape(), [])
-  const arrowExtrude = useMemo(() => ({
-    depth: 0.045,
-    bevelEnabled: false,
-  }), [])
-  const wedgeExtrude = useMemo(() => ({
-    depth: 0.22,
-    bevelEnabled: true,
-    bevelThickness: 0.03,
-    bevelSize: 0.03,
-    bevelSegments: 1,
-  }), [])
-
-  const housingY = deckH / 2 + bodyH / 2
+function Tripod({ map }) {
+  const len = 1.16
+  const r = 0.068
+  const angles = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]
 
   return (
-    <group position={[0, -vh * 0.14, 0.18]}>
-      <mesh geometry={deckGeo} position={[vw * 0.05, 0, -0.02]} rotation={[-0.08, 0.02, 0]}>
-        <Metal map={deckMap} roughness={0.48} metalness={0.64} />
+    <group position={[-0.58, 0.58, 0.04]} rotation={[0.62, 0.04, 0]}>
+      <mesh rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.12, 0.12, 0.3, 16]} />
+        <Metal map={map} roughness={0.38} metalness={0.78} />
       </mesh>
-
-      <group position={[xShift, housingY, 0.08]} rotation={[-0.2, yaw, 0]}>
-        <mesh position={[0, 0, -bodyD / 2]}>
-          <extrudeGeometry args={[housingShape, housingExtrude]} />
-          <Metal map={housingMap} />
-        </mesh>
-
-        <mesh position={[0, slotY, 0]}>
-          <boxGeometry args={[slotW * 0.98, slotH * 0.92, bodyD * 0.72]} />
-          <meshStandardMaterial
-            color={SLOT_DARK}
-            roughness={0.92}
-            metalness={0.16}
-          />
-        </mesh>
-
-        <mesh
-          position={[slotW * 0.28, slotY, bodyD / 2 + 0.01]}
-          scale={Math.max(0.28, bodyH * 0.22)}
-        >
-          <extrudeGeometry args={[wedge, wedgeExtrude]} />
-          <Metal map={wedgeMap} />
-        </mesh>
-
-        <mesh
-          position={[-bodyW * 0.22, -bodyH * 0.28, bodyD / 2 + 0.01]}
-          scale={Math.max(0.2, bodyH * 0.2)}
-        >
-          <extrudeGeometry args={[arrow, arrowExtrude]} />
-          <meshStandardMaterial color="#141414" roughness={0.55} metalness={0.25} />
-        </mesh>
-      </group>
+      {angles.map((angle) => (
+        <group key={angle} rotation={[angle, 0, 0]}>
+          <mesh position={[0, len / 2, 0]}>
+            <cylinderGeometry args={[r, r, len, 12]} />
+            <Metal map={map} roughness={0.4} metalness={0.76} />
+          </mesh>
+        </group>
+      ))}
     </group>
   )
 }
 
-ReaderHousing.propTypes = {
+Tripod.propTypes = {
+  map: PropTypes.object,
+}
+
+function Turnstile({ isMobile }) {
+  const source = useLoader(THREE.TextureLoader, '/metal.jpg')
+  const pillarMap = useMemo(() => cloneMetal(source, 0.55, 2.1), [source])
+  const beamMap = useMemo(() => cloneMetal(source, 2.2, 0.45), [source])
+  const readerMap = useMemo(() => cloneMetal(source, 1.4, 0.45), [source])
+  const armMap = useMemo(() => cloneMetal(source, 0.35, 1.3), [source])
+  const entryMap = useMemo(() => createEntryTexture(), [])
+
+  useEffect(() => () => entryMap.dispose(), [entryMap])
+
+  const pillarW = 0.82
+  const pillarH = 2.48
+  const pillarD = 0.66
+  const beamW = 2.62
+  const beamH = 0.4
+  const beamD = 0.58
+  const readerL = 1.52
+  const readerH = 0.22
+  const readerD = 0.36
+  const slotL = 1.34
+  const slotD = 0.055
+
+  const pillarGeo = useRoundedBox(pillarW, pillarH, pillarD, 0.045)
+  const footGeo = useRoundedBox(0.92, 0.12, 0.74, 0.03)
+  const beamGeo = useRoundedBox(beamW, beamH, beamD, 0.04)
+  const readerShape = useMemo(
+    () => createReaderShape(readerL, readerD, slotL, slotD),
+    [readerL, readerD, slotL, slotD],
+  )
+  const readerExtrude = useMemo(() => ({
+    depth: readerH,
+    bevelEnabled: true,
+    bevelThickness: 0.018,
+    bevelSize: 0.018,
+    bevelSegments: 1,
+  }), [readerH])
+  const arrow = useMemo(() => createArrowShape(), [])
+  const arrowExtrude = useMemo(() => ({
+    depth: 0.012,
+    bevelEnabled: false,
+  }), [])
+
+  const pillarX = 1.48
+  const beamY = 1.22
+  const beamX = -0.18
+  const readerTilt = -0.4
+  const scale = isMobile ? 0.92 : 1.05
+
+  return (
+    <group position={isMobile ? [-0.15, -0.08, 0] : [-0.55, -0.12, 0]} scale={scale}>
+      <mesh geometry={footGeo} position={[pillarX, 0.06, 0]}>
+        <Metal map={pillarMap} roughness={0.5} metalness={0.62} />
+      </mesh>
+
+      <mesh geometry={pillarGeo} position={[pillarX, pillarH / 2, 0]}>
+        <Metal map={pillarMap} />
+      </mesh>
+
+      <mesh
+        position={[pillarX, 1.78, 0.34]}
+        rotation={[-0.4, 0, 0]}
+      >
+        <planeGeometry args={[0.64, 1.08]} />
+        <meshStandardMaterial
+          map={entryMap}
+          roughness={0.48}
+          metalness={0.38}
+        />
+      </mesh>
+
+      <mesh geometry={beamGeo} position={[beamX, beamY, 0]}>
+        <Metal map={beamMap} roughness={0.44} metalness={0.7} />
+      </mesh>
+
+      <group
+        position={[beamX - 0.18, beamY + beamH / 2 + 0.02, 0.16]}
+        rotation={[readerTilt, 0, 0]}
+      >
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, readerH / 2, 0]}>
+          <extrudeGeometry args={[readerShape, readerExtrude]} />
+          <Metal map={readerMap} roughness={0.4} metalness={0.74} />
+        </mesh>
+
+        <mesh position={[0, readerH * 0.45, 0]}>
+          <boxGeometry args={[slotL * 0.98, readerH * 0.7, slotD * 0.95]} />
+          <meshStandardMaterial
+            color={SLOT_DARK}
+            roughness={0.92}
+            metalness={0.14}
+          />
+        </mesh>
+
+        <mesh
+          position={[-readerL / 2 + 0.01, readerH * 0.45, 0]}
+          rotation={[0, Math.PI / 2, 0]}
+        >
+          <planeGeometry args={[slotD * 1.8, readerH * 0.85]} />
+          <meshBasicMaterial color={SLOT_DARK} />
+        </mesh>
+
+        <mesh
+          position={[0.12, readerH + 0.006, 0.08]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          scale={0.22}
+        >
+          <extrudeGeometry args={[arrow, arrowExtrude]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.55} metalness={0.22} />
+        </mesh>
+      </group>
+
+      <Tripod map={armMap} />
+    </group>
+  )
+}
+
+Turnstile.propTypes = {
   isMobile: PropTypes.bool,
 }
 
 function GleamLight({ reducedMotion, isMobile }) {
   const light = useRef()
 
-  useFrame(({ clock, viewport }) => {
+  useFrame(({ clock }) => {
     if (!light.current || reducedMotion) return
     const u = (clock.elapsedTime % 5.5) / 5.5
-    const span = viewport.width * 0.85
-    const start = isMobile ? -span * 0.42 : -span * 0.48
+    const start = isMobile ? -2.4 : -3.1
+    const span = isMobile ? 4.6 : 5.6
     light.current.position.x = start + u * span
-    light.current.position.y = 1.35
-    light.current.position.z = 2.6
+    light.current.position.y = 2.05
+    light.current.position.z = 3.1
   })
 
   return (
     <pointLight
       ref={light}
-      intensity={2.35}
+      intensity={2.2}
       color={GOLDEN}
-      distance={10}
+      distance={11}
     />
   )
 }
@@ -387,7 +495,16 @@ function AimCamera({ isMobile }) {
   const { camera } = useThree()
 
   useEffect(() => {
-    camera.lookAt(isMobile ? -0.15 : -0.55, 0.55, 0.15)
+    if (isMobile) {
+      camera.position.set(0.05, 1.72, 6.85)
+      camera.fov = 36
+      camera.lookAt(0.05, 1.08, 0)
+    } else {
+      camera.position.set(-0.15, 1.78, 6.35)
+      camera.fov = 32
+      camera.lookAt(-0.15, 1.12, 0)
+    }
+    camera.updateProjectionMatrix()
   }, [camera, isMobile])
 
   return null
@@ -397,24 +514,37 @@ AimCamera.propTypes = {
   isMobile: PropTypes.bool,
 }
 
-function ReaderScene({ isMobile, reducedMotion }) {
+function TurnstileScene({ isMobile, reducedMotion }) {
   return (
     <>
       <AimCamera isMobile={isMobile} />
-      <ambientLight intensity={0.48} />
-      <directionalLight position={[-4.2, 2.1, 6.4]} intensity={1.85} />
-      <directionalLight position={[2.4, 4.2, 1.6]} intensity={0.55} />
-      <directionalLight position={[3.6, 1.2, 3.2]} intensity={0.38} />
-      <directionalLight position={[-2.2, 0.2, -3.4]} intensity={0.22} />
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[-4.2, 2.4, 6.2]} intensity={1.7} />
+      <directionalLight position={[2.6, 4.0, 1.8]} intensity={0.52} />
+      <directionalLight position={[3.4, 1.4, 3.0]} intensity={0.36} />
+      <directionalLight position={[-2.0, 0.4, -3.2]} intensity={0.2} />
       <GleamLight reducedMotion={reducedMotion} isMobile={isMobile} />
-      <ReaderHousing isMobile={isMobile} />
+      <Turnstile isMobile={isMobile} />
     </>
   )
 }
 
-ReaderScene.propTypes = {
+TurnstileScene.propTypes = {
   isMobile: PropTypes.bool,
   reducedMotion: PropTypes.bool,
+}
+
+function CssTurnstile() {
+  return (
+    <Fallback>
+      <Pillar />
+      <Beam />
+      <Arm $rot={-48} />
+      <Arm $rot={8} />
+      <Arm $rot={62} />
+      <GleamSweep />
+    </Fallback>
+  )
 }
 
 export default function SwipeLine() {
@@ -437,13 +567,13 @@ export default function SwipeLine() {
     <LineContainer>
       {use3d ? (
         <Stage>
-          <Suspense fallback={<Line />}>
+          <Suspense fallback={<CssTurnstile />}>
             <Canvas
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [-1.9, 2.05, 4.5] : [-2.55, 2.15, 4.85],
-                fov: 30,
+                position: isMobile ? [0.05, 1.72, 6.85] : [-0.15, 1.78, 6.35],
+                fov: isMobile ? 36 : 32,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'none' }}
               onCreated={({ gl }) => {
@@ -454,13 +584,12 @@ export default function SwipeLine() {
                 })
               }}
             >
-              <ReaderScene isMobile={isMobile} reducedMotion={reducedMotion} />
+              <TurnstileScene isMobile={isMobile} reducedMotion={reducedMotion} />
             </Canvas>
           </Suspense>
-          <Gleam />
         </Stage>
       ) : (
-        <Line />
+        <CssTurnstile />
       )}
     </LineContainer>
   )
