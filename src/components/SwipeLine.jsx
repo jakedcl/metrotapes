@@ -241,10 +241,10 @@ function ReaderHousing({ isMobile }) {
   const bodyW = isMobile ? vw * 0.7 : vw * 0.6
   const bodyH = vh * 0.7
   const bodyD = vh * 0.48
-  const slotH = bodyH * 0.2
-  const bottomH = bodyH * 0.4
+  const slotH = bodyH * 0.26
+  const bottomH = bodyH * 0.38
   const topH = bodyH - bottomH - slotH
-  const yaw = isMobile ? 0.38 : 0.44
+  const yaw = isMobile ? 0.32 : 0.36
   const xShift = isMobile ? -vw * 0.04 : -vw * 0.1
 
   const deckGeo = useRoundedBox(deckW, deckH, deckD, 0.07, 3)
@@ -268,7 +268,7 @@ function ReaderHousing({ isMobile }) {
   const bottomY = -bodyH / 2 + bottomH / 2
   const topY = bodyH / 2 - topH / 2
   const slotY = bottomY + bottomH / 2 + slotH / 2
-  const wedgeScale = Math.max(0.9, bodyH * 0.75)
+  const wedgeScale = Math.max(0.35, bodyH * 0.28)
 
   return (
     <group position={[0, -vh * 0.16, 0.2]}>
@@ -276,7 +276,7 @@ function ReaderHousing({ isMobile }) {
         <Metal map={deckMap} roughness={0.48} metalness={0.64} />
       </mesh>
 
-      <group position={[xShift, housingY, 0.12]} rotation={[-0.05, yaw, 0]}>
+      <group position={[xShift, housingY, 0.12]} rotation={[-0.18, yaw, 0]}>
         <mesh geometry={bottomGeo} position={[0, bottomY, 0]}>
           <Metal map={housingMap} />
         </mesh>
@@ -310,8 +310,8 @@ function ReaderHousing({ isMobile }) {
         </mesh>
 
         <mesh
-          position={[-bodyW * 0.12, bottomY - bottomH * 0.02, bodyD / 2 + 0.012]}
-          scale={bodyH * 0.5}
+          position={[-bodyW * 0.18, bottomY + bottomH * 0.12, bodyD / 2 + 0.012]}
+          scale={Math.max(0.22, bodyH * 0.22)}
         >
           <extrudeGeometry args={[arrow, arrowExtrude]} />
           <meshStandardMaterial color="#141414" roughness={0.55} metalness={0.25} />
@@ -357,7 +357,7 @@ function AimCamera({ isMobile }) {
   const { camera } = useThree()
 
   useEffect(() => {
-    camera.lookAt(isMobile ? -0.2 : -0.7, 0.12, 0.2)
+    camera.lookAt(isMobile ? -0.15 : -0.55, 0.55, 0.15)
   }, [camera, isMobile])
 
   return null
@@ -412,7 +412,7 @@ export default function SwipeLine() {
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [-2.15, 1.55, 4.35] : [-2.9, 1.62, 4.7],
+                position: isMobile ? [-1.9, 2.05, 4.5] : [-2.55, 2.15, 4.85],
                 fov: 30,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'none' }}
