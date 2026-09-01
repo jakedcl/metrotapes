@@ -214,11 +214,11 @@ function roundedRect(path, x, y, w, h, r, clockwise = false) {
   path.closePath()
 }
 
-function createReaderShape(len, dep, slotLen, slotDep) {
+function createReaderShape(len, height, slotLen, slotH) {
   const s = new THREE.Shape()
-  roundedRect(s, -len / 2, -dep / 2, len, dep, 0.045)
+  roundedRect(s, -len / 2, -height / 2, len, height, Math.min(0.05, height * 0.22))
   const hole = new THREE.Path()
-  roundedRect(hole, -slotLen / 2, -slotDep / 2, slotLen, slotDep, 0.012, true)
+  roundedRect(hole, -slotLen / 2, -slotH / 2, slotLen, slotH, Math.min(0.02, slotH * 0.4), true)
   s.holes.push(hole)
   return s
 }
@@ -290,16 +290,13 @@ function createEntryTexture() {
   ctx.fill()
   ctx.restore()
 
-  ctx.fillStyle = '#0d0d0d'
-  ctx.fillRect(78, 430, 100, 36)
-
   const tex = new THREE.CanvasTexture(canvas)
   tex.colorSpace = THREE.SRGBColorSpace
   tex.anisotropy = 8
   return tex
 }
 
-function Metal({ map, roughness = 0.42, metalness = 0.72, color = '#c5c5c5' }) {
+function Metal({ map, roughness = 0.36, metalness = 0.78, color = '#e6e6e6' }) {
   return (
     <meshStandardMaterial
       map={map}
@@ -318,21 +315,21 @@ Metal.propTypes = {
 }
 
 function Tripod({ map }) {
-  const len = 1.16
-  const r = 0.068
+  const len = 1.22
+  const r = 0.085
   const angles = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]
 
   return (
-    <group position={[-0.58, 0.58, 0.04]} rotation={[0.62, 0.04, 0]}>
+    <group position={[-0.7, 0.62, 0.18]} rotation={[0.95, 0.06, 0]}>
       <mesh rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.12, 0.12, 0.3, 16]} />
-        <Metal map={map} roughness={0.38} metalness={0.78} />
+        <cylinderGeometry args={[0.13, 0.13, 0.32, 16]} />
+        <Metal map={map} roughness={0.34} metalness={0.82} />
       </mesh>
       {angles.map((angle) => (
         <group key={angle} rotation={[angle, 0, 0]}>
           <mesh position={[0, len / 2, 0]}>
             <cylinderGeometry args={[r, r, len, 12]} />
-            <Metal map={map} roughness={0.4} metalness={0.76} />
+            <Metal map={map} roughness={0.34} metalness={0.8} />
           </mesh>
         </group>
       ))}
@@ -354,81 +351,77 @@ function Turnstile({ isMobile }) {
 
   useEffect(() => () => entryMap.dispose(), [entryMap])
 
-  const pillarW = 0.82
-  const pillarH = 2.48
-  const pillarD = 0.66
-  const beamW = 2.62
-  const beamH = 0.4
-  const beamD = 0.58
-  const readerL = 1.52
-  const readerH = 0.22
-  const readerD = 0.36
-  const slotL = 1.34
-  const slotD = 0.055
+  const pillarW = 0.78
+  const pillarH = 2.42
+  const pillarD = 0.64
+  const beamW = 2.72
+  const beamH = 0.42
+  const beamD = 0.56
+  const readerL = 1.78
+  const readerH = 0.34
+  const readerD = 0.4
+  const slotL = 1.52
+  const slotH = 0.11
 
   const pillarGeo = useRoundedBox(pillarW, pillarH, pillarD, 0.045)
-  const footGeo = useRoundedBox(0.92, 0.12, 0.74, 0.03)
+  const footGeo = useRoundedBox(0.9, 0.12, 0.72, 0.03)
   const beamGeo = useRoundedBox(beamW, beamH, beamD, 0.04)
   const readerShape = useMemo(
-    () => createReaderShape(readerL, readerD, slotL, slotD),
-    [readerL, readerD, slotL, slotD],
+    () => createReaderShape(readerL, readerH, slotL, slotH),
+    [readerL, readerH, slotL, slotH],
   )
   const readerExtrude = useMemo(() => ({
-    depth: readerH,
+    depth: readerD,
     bevelEnabled: true,
-    bevelThickness: 0.018,
-    bevelSize: 0.018,
+    bevelThickness: 0.02,
+    bevelSize: 0.02,
     bevelSegments: 1,
-  }), [readerH])
+  }), [readerD])
   const arrow = useMemo(() => createArrowShape(), [])
   const arrowExtrude = useMemo(() => ({
-    depth: 0.012,
+    depth: 0.014,
     bevelEnabled: false,
   }), [])
 
-  const pillarX = 1.48
-  const beamY = 1.22
-  const beamX = -0.18
-  const readerTilt = -0.4
-  const scale = isMobile ? 0.92 : 1.05
+  const pillarX = 1.52
+  const beamY = 1.18
+  const beamX = -0.22
+  const readerX = beamX - 0.12
+  const readerY = beamY + beamH / 2 + readerH / 2 - 0.04
+  const readerZ = beamD / 2 + readerD / 2 - 0.1
+  const scale = isMobile ? 0.82 : 0.95
 
   return (
-    <group position={isMobile ? [-0.15, -0.08, 0] : [-0.55, -0.12, 0]} scale={scale}>
+    <group position={isMobile ? [-0.4, -0.02, 0] : [-0.75, 0, 0]} scale={scale}>
       <mesh geometry={footGeo} position={[pillarX, 0.06, 0]}>
-        <Metal map={pillarMap} roughness={0.5} metalness={0.62} />
+        <Metal map={pillarMap} roughness={0.46} metalness={0.66} />
       </mesh>
 
       <mesh geometry={pillarGeo} position={[pillarX, pillarH / 2, 0]}>
         <Metal map={pillarMap} />
       </mesh>
 
-      <mesh
-        position={[pillarX, 1.78, 0.34]}
-        rotation={[-0.4, 0, 0]}
-      >
-        <planeGeometry args={[0.64, 1.08]} />
+      <mesh position={[pillarX, 1.86, pillarD / 2 + 0.012]} rotation={[-0.28, 0, 0]}>
+        <planeGeometry args={[0.48, 0.78]} />
         <meshStandardMaterial
           map={entryMap}
-          roughness={0.48}
-          metalness={0.38}
+          roughness={0.5}
+          metalness={0.28}
         />
       </mesh>
 
       <mesh geometry={beamGeo} position={[beamX, beamY, 0]}>
-        <Metal map={beamMap} roughness={0.44} metalness={0.7} />
+        <Metal map={beamMap} roughness={0.38} metalness={0.76} />
       </mesh>
 
-      <group
-        position={[beamX - 0.18, beamY + beamH / 2 + 0.02, 0.16]}
-        rotation={[readerTilt, 0, 0]}
-      >
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, readerH / 2, 0]}>
+      <group position={[readerX, readerY, readerZ]}>
+        <mesh position={[0, 0, -readerD / 2]}>
           <extrudeGeometry args={[readerShape, readerExtrude]} />
-          <Metal map={readerMap} roughness={0.4} metalness={0.74} />
+          <Metal map={readerMap} roughness={0.34} metalness={0.8} />
         </mesh>
 
-        <mesh position={[0, readerH * 0.45, 0]}>
-          <boxGeometry args={[slotL * 0.98, readerH * 0.7, slotD * 0.95]} />
+        <mesh>
+          <boxGeometry args={[slotL * 0.98, slotH * 0.92, readerD * 0.78]} />
           <meshStandardMaterial
             color={SLOT_DARK}
             roughness={0.92}
@@ -437,17 +430,16 @@ function Turnstile({ isMobile }) {
         </mesh>
 
         <mesh
-          position={[-readerL / 2 + 0.01, readerH * 0.45, 0]}
+          position={[-readerL / 2 + 0.008, 0, 0]}
           rotation={[0, Math.PI / 2, 0]}
         >
-          <planeGeometry args={[slotD * 1.8, readerH * 0.85]} />
+          <planeGeometry args={[readerD * 0.55, slotH]} />
           <meshBasicMaterial color={SLOT_DARK} />
         </mesh>
 
         <mesh
-          position={[0.12, readerH + 0.006, 0.08]}
-          rotation={[-Math.PI / 2, 0, 0]}
-          scale={0.22}
+          position={[0.22, readerH * 0.28, readerD / 2 + 0.006]}
+          scale={0.2}
         >
           <extrudeGeometry args={[arrow, arrowExtrude]} />
           <meshStandardMaterial color="#1a1a1a" roughness={0.55} metalness={0.22} />
@@ -496,13 +488,13 @@ function AimCamera({ isMobile }) {
 
   useEffect(() => {
     if (isMobile) {
-      camera.position.set(0.05, 1.72, 6.85)
-      camera.fov = 36
-      camera.lookAt(0.05, 1.08, 0)
-    } else {
-      camera.position.set(-0.15, 1.78, 6.35)
+      camera.position.set(0.05, 2.15, 10.4)
       camera.fov = 32
-      camera.lookAt(-0.15, 1.12, 0)
+      camera.lookAt(-0.05, 0.95, 0)
+    } else {
+      camera.position.set(-0.1, 2.35, 9.6)
+      camera.fov = 28
+      camera.lookAt(-0.2, 1.0, 0)
     }
     camera.updateProjectionMatrix()
   }, [camera, isMobile])
@@ -518,11 +510,11 @@ function TurnstileScene({ isMobile, reducedMotion }) {
   return (
     <>
       <AimCamera isMobile={isMobile} />
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[-4.2, 2.4, 6.2]} intensity={1.7} />
-      <directionalLight position={[2.6, 4.0, 1.8]} intensity={0.52} />
-      <directionalLight position={[3.4, 1.4, 3.0]} intensity={0.36} />
-      <directionalLight position={[-2.0, 0.4, -3.2]} intensity={0.2} />
+      <ambientLight intensity={0.62} />
+      <directionalLight position={[-3.6, 3.2, 7.4]} intensity={2.05} />
+      <directionalLight position={[0.2, 2.4, 8.2]} intensity={0.9} />
+      <directionalLight position={[3.2, 4.2, 2.2]} intensity={0.55} />
+      <directionalLight position={[-2.2, 0.6, -3.0]} intensity={0.28} />
       <GleamLight reducedMotion={reducedMotion} isMobile={isMobile} />
       <Turnstile isMobile={isMobile} />
     </>
@@ -572,12 +564,13 @@ export default function SwipeLine() {
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [0.05, 1.72, 6.85] : [-0.15, 1.78, 6.35],
-                fov: isMobile ? 36 : 32,
+                position: isMobile ? [0.05, 2.15, 10.4] : [-0.1, 2.35, 9.6],
+                fov: isMobile ? 32 : 28,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'none' }}
               onCreated={({ gl }) => {
                 gl.setClearColor(0x000000, 0)
+                gl.toneMappingExposure = 1.2
                 gl.domElement.addEventListener('webglcontextlost', (event) => {
                   event.preventDefault()
                   setUse3d(false)
