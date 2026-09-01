@@ -49,9 +49,14 @@ const Stage = styled.div`
   width: 100%;
   height: 100%;
   overflow: visible;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 
   canvas {
     display: block;
+    touch-action: none;
   }
 `
 
@@ -236,60 +241,31 @@ function createArrowShape() {
   return s
 }
 
-function createEntryTexture() {
+function createLampArrow() {
+  const s = new THREE.Shape()
+  s.moveTo(-0.62, -0.17)
+  s.lineTo(0.06, -0.17)
+  s.lineTo(0.06, -0.44)
+  s.lineTo(0.68, 0)
+  s.lineTo(0.06, 0.44)
+  s.lineTo(0.06, 0.17)
+  s.lineTo(-0.62, 0.17)
+  s.closePath()
+  return s
+}
+
+function createEntryLabelTexture() {
   const canvas = document.createElement('canvas')
-  canvas.width = 256
-  canvas.height = 512
+  canvas.width = 512
+  canvas.height = 160
   const ctx = canvas.getContext('2d')
-  const grout = ctx.createLinearGradient(0, 0, 256, 0)
-  grout.addColorStop(0, '#8f8f8f')
-  grout.addColorStop(0.45, '#cfcfcf')
-  grout.addColorStop(1, '#9a9a9a')
-  ctx.fillStyle = grout
-  ctx.fillRect(0, 0, 256, 512)
-
-  const lamp = (y) => {
-    ctx.beginPath()
-    ctx.arc(128, y, 28, 0, Math.PI * 2)
-    ctx.fillStyle = '#1a1a1a'
-    ctx.fill()
-  }
-  lamp(78)
-  lamp(148)
-
-  ctx.fillStyle = '#f4f4f4'
-  ctx.fillRect(46, 198, 164, 54)
-  ctx.fillStyle = '#111'
-  ctx.font = 'bold 36px Helvetica, Arial, sans-serif'
+  ctx.fillStyle = '#f3f3f3'
+  ctx.fillRect(0, 0, 512, 160)
+  ctx.fillStyle = '#111111'
+  ctx.font = 'bold 96px Helvetica, Arial, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText('Entry', 128, 227)
-
-  ctx.beginPath()
-  ctx.arc(128, 348, 52, 0, Math.PI * 2)
-  ctx.fillStyle = '#1a8f3a'
-  ctx.fill()
-  ctx.beginPath()
-  ctx.arc(128, 348, 46, 0, Math.PI * 2)
-  ctx.fillStyle = '#22a844'
-  ctx.fill()
-
-  ctx.save()
-  ctx.translate(128, 348)
-  ctx.rotate((-135 * Math.PI) / 180)
-  ctx.fillStyle = '#f6e34a'
-  ctx.beginPath()
-  ctx.moveTo(26, 0)
-  ctx.lineTo(-10, -15)
-  ctx.lineTo(-10, -6)
-  ctx.lineTo(-28, -6)
-  ctx.lineTo(-28, 6)
-  ctx.lineTo(-10, 6)
-  ctx.lineTo(-10, 15)
-  ctx.closePath()
-  ctx.fill()
-  ctx.restore()
-
+  ctx.fillText('Entry', 256, 86)
   const tex = new THREE.CanvasTexture(canvas)
   tex.colorSpace = THREE.SRGBColorSpace
   tex.anisotropy = 8
@@ -312,6 +288,108 @@ Metal.propTypes = {
   roughness: PropTypes.number,
   metalness: PropTypes.number,
   color: PropTypes.string,
+}
+
+function OrbitRig({ orbit, reducedMotion, pivot, children }) {
+  const group = useRef()
+
+  useFrame(({ clock }) => {
+    if (!group.current) return
+    const idle = reducedMotion ? 0 : Math.sin(clock.elapsedTime * 0.22) * 0.18
+    const yaw = orbit.current.yaw + idle
+    const pitch = orbit.current.pitch
+    group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, yaw, 0.12)
+    group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, pitch, 0.12)
+  })
+
+  return (
+    <group ref={group} position={pivot}>
+      <group position={[-pivot[0], -pivot[1], -pivot[2]]}>
+        {children}
+      </group>
+    </group>
+  )
+}
+
+OrbitRig.propTypes = {
+  orbit: PropTypes.shape({ current: PropTypes.object }).isRequired,
+  reducedMotion: PropTypes.bool,
+  pivot: PropTypes.arrayOf(PropTypes.number).isRequired,
+  children: PropTypes.node,
+}
+
+function EntryLamp({ position }) {
+  const entryMap = useMemo(() => createEntryLabelTexture(), [])
+  const arrow = useMemo(() => createLampArrow(), [])
+  const arrowExtrude = useMemo(() => ({
+    depth: 0.02,
+    bevelEnabled: true,
+    bevelThickness: 0.007,
+    bevelSize: 0.01,
+    bevelSegments: 1,
+  }), [])
+
+  useEffect(() => () => entryMap.dispose(), [entryMap])
+
+  return (
+    <group position={position}>
+      {[-0.09, 0.09].map((x) => (
+        <mesh key={x} position={[x, 0.36, 0.012]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.055, 0.055, 0.02, 20]} />
+          <meshStandardMaterial color="#141414" roughness={0.32} metalness={0.62} />
+        </mesh>
+      ))}
+
+      <mesh position={[0, 0.16, 0.01]}>
+        <boxGeometry args={[0.44, 0.14, 0.018]} />
+        <meshStandardMaterial color="#ececec" roughness={0.48} metalness={0.1} />
+      </mesh>
+      <mesh position={[0, 0.16, 0.02]}>
+        <planeGeometry args={[0.42, 0.12]} />
+        <meshBasicMaterial map={entryMap} toneMapped={false} />
+      </mesh>
+
+      <group position={[0, -0.14, 0.02]}>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.178, 0.178, 0.032, 32]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.38} metalness={0.72} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.01]}>
+          <cylinderGeometry args={[0.15, 0.15, 0.03, 32]} />
+          <meshStandardMaterial
+            color="#0ea338"
+            emissive="#26e85c"
+            emissiveIntensity={1.35}
+            roughness={0.22}
+            metalness={0}
+          />
+        </mesh>
+        <mesh position={[0, 0, 0.026]}>
+          <circleGeometry args={[0.144, 32]} />
+          <meshBasicMaterial color="#14c845" toneMapped={false} />
+        </mesh>
+        <mesh
+          position={[0, 0, 0.036]}
+          rotation={[0, 0, -Math.PI * 0.78]}
+          scale={0.165}
+        >
+          <extrudeGeometry args={[arrow, arrowExtrude]} />
+          <meshStandardMaterial
+            color="#e6b417"
+            emissive="#f5d24a"
+            emissiveIntensity={0.85}
+            roughness={0.28}
+            metalness={0.38}
+          />
+        </mesh>
+        <pointLight color="#3dff6a" intensity={0.65} distance={1.7} position={[0, 0, 0.22]} />
+      </group>
+    </group>
+  )
+}
+
+EntryLamp.propTypes = {
+  position: PropTypes.arrayOf(PropTypes.number).isRequired,
 }
 
 function Tripod({ map }) {
@@ -341,15 +419,12 @@ Tripod.propTypes = {
   map: PropTypes.object,
 }
 
-function Turnstile({ isMobile }) {
+function Turnstile({ isMobile, orbit, reducedMotion }) {
   const source = useLoader(THREE.TextureLoader, '/metal.jpg')
   const pillarMap = useMemo(() => cloneMetal(source, 0.55, 2.1), [source])
   const beamMap = useMemo(() => cloneMetal(source, 2.2, 0.45), [source])
   const readerMap = useMemo(() => cloneMetal(source, 1.4, 0.45), [source])
   const armMap = useMemo(() => cloneMetal(source, 0.35, 1.3), [source])
-  const entryMap = useMemo(() => createEntryTexture(), [])
-
-  useEffect(() => () => entryMap.dispose(), [entryMap])
 
   const pillarW = 0.78
   const pillarH = 2.42
@@ -390,69 +465,67 @@ function Turnstile({ isMobile }) {
   const readerY = beamY + beamH / 2 + readerH / 2 - 0.04
   const readerZ = beamD / 2 + readerD / 2 - 0.1
   const scale = isMobile ? 1.02 : 0.95
+  const pivot = [0.65, 1.12, 0]
 
   return (
     <group position={isMobile ? [-0.62, 0.04, 0] : [-0.75, 0, 0]} scale={scale}>
-      <mesh geometry={footGeo} position={[pillarX, 0.06, 0]}>
-        <Metal map={pillarMap} roughness={0.46} metalness={0.66} />
-      </mesh>
-
-      <mesh geometry={pillarGeo} position={[pillarX, pillarH / 2, 0]}>
-        <Metal map={pillarMap} />
-      </mesh>
-
-      <mesh position={[pillarX, 1.86, pillarD / 2 + 0.012]} rotation={[-0.28, 0, 0]}>
-        <planeGeometry args={[0.48, 0.78]} />
-        <meshStandardMaterial
-          map={entryMap}
-          roughness={0.5}
-          metalness={0.28}
-        />
-      </mesh>
-
-      <mesh geometry={beamGeo} position={[beamX, beamY, 0]}>
-        <Metal map={beamMap} roughness={0.38} metalness={0.76} />
-      </mesh>
-
-      <group position={[readerX, readerY, readerZ]}>
-        <mesh position={[0, 0, -readerD / 2]}>
-          <extrudeGeometry args={[readerShape, readerExtrude]} />
-          <Metal map={readerMap} roughness={0.32} metalness={0.82} color="#f0f0f0" />
+      <OrbitRig orbit={orbit} reducedMotion={reducedMotion} pivot={pivot}>
+        <mesh geometry={footGeo} position={[pillarX, 0.06, 0]}>
+          <Metal map={pillarMap} roughness={0.46} metalness={0.66} />
         </mesh>
 
-        <mesh>
-          <boxGeometry args={[slotL * 0.98, slotH * 0.92, readerD * 0.78]} />
-          <meshStandardMaterial
-            color={SLOT_DARK}
-            roughness={0.92}
-            metalness={0.14}
-          />
+        <mesh geometry={pillarGeo} position={[pillarX, pillarH / 2, 0]}>
+          <Metal map={pillarMap} />
         </mesh>
 
-        <mesh
-          position={[-readerL / 2 + 0.008, 0, 0]}
-          rotation={[0, Math.PI / 2, 0]}
-        >
-          <planeGeometry args={[readerD * 0.55, slotH]} />
-          <meshBasicMaterial color={SLOT_DARK} />
+        <EntryLamp position={[pillarX, 1.7, pillarD / 2 + 0.018]} />
+
+        <mesh geometry={beamGeo} position={[beamX, beamY, 0]}>
+          <Metal map={beamMap} roughness={0.38} metalness={0.76} />
         </mesh>
 
-        <mesh
-          position={[0.22, readerH * 0.28, readerD / 2 + 0.006]}
-          scale={0.2}
-        >
-          <extrudeGeometry args={[arrow, arrowExtrude]} />
-          <meshStandardMaterial color="#1a1a1a" roughness={0.55} metalness={0.22} />
-        </mesh>
-      </group>
+        <group position={[readerX, readerY, readerZ]}>
+          <mesh position={[0, 0, -readerD / 2]}>
+            <extrudeGeometry args={[readerShape, readerExtrude]} />
+            <Metal map={readerMap} roughness={0.32} metalness={0.82} color="#f0f0f0" />
+          </mesh>
 
-      <Tripod map={armMap} />
+          <mesh>
+            <boxGeometry args={[slotL * 0.98, slotH * 0.92, readerD * 0.78]} />
+            <meshStandardMaterial
+              color={SLOT_DARK}
+              roughness={0.92}
+              metalness={0.14}
+            />
+          </mesh>
+
+          <mesh
+            position={[-readerL / 2 + 0.008, 0, 0]}
+            rotation={[0, Math.PI / 2, 0]}
+          >
+            <planeGeometry args={[readerD * 0.55, slotH]} />
+            <meshBasicMaterial color={SLOT_DARK} />
+          </mesh>
+
+          <mesh
+            position={[0.22, readerH * 0.28, readerD / 2 + 0.006]}
+            scale={0.2}
+          >
+            <extrudeGeometry args={[arrow, arrowExtrude]} />
+            <meshStandardMaterial color="#1a1a1a" roughness={0.55} metalness={0.22} />
+          </mesh>
+        </group>
+
+        <Tripod map={armMap} />
+      </OrbitRig>
     </group>
   )
 }
 
 Turnstile.propTypes = {
   isMobile: PropTypes.bool,
+  orbit: PropTypes.shape({ current: PropTypes.object }).isRequired,
+  reducedMotion: PropTypes.bool,
 }
 
 function GleamLight({ reducedMotion, isMobile }) {
@@ -506,7 +579,7 @@ AimCamera.propTypes = {
   isMobile: PropTypes.bool,
 }
 
-function TurnstileScene({ isMobile, reducedMotion }) {
+function TurnstileScene({ isMobile, reducedMotion, orbit }) {
   return (
     <>
       <AimCamera isMobile={isMobile} />
@@ -516,7 +589,7 @@ function TurnstileScene({ isMobile, reducedMotion }) {
       <directionalLight position={[3.2, 4.2, 2.2]} intensity={0.55} />
       <directionalLight position={[-2.2, 0.6, -3.0]} intensity={0.28} />
       <GleamLight reducedMotion={reducedMotion} isMobile={isMobile} />
-      <Turnstile isMobile={isMobile} />
+      <Turnstile isMobile={isMobile} orbit={orbit} reducedMotion={reducedMotion} />
     </>
   )
 }
@@ -524,6 +597,7 @@ function TurnstileScene({ isMobile, reducedMotion }) {
 TurnstileScene.propTypes = {
   isMobile: PropTypes.bool,
   reducedMotion: PropTypes.bool,
+  orbit: PropTypes.shape({ current: PropTypes.object }).isRequired,
 }
 
 function CssTurnstile() {
@@ -547,6 +621,15 @@ export default function SwipeLine() {
   )
   const reducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const orbit = useRef({ yaw: 0, pitch: 0 })
+  const drag = useRef({
+    pointerId: null,
+    x: 0,
+    y: 0,
+    yaw: 0,
+    pitch: 0,
+    moved: false,
+  })
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)')
@@ -555,10 +638,51 @@ export default function SwipeLine() {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
+  const onPointerDown = (event) => {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    drag.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      yaw: orbit.current.yaw,
+      pitch: orbit.current.pitch,
+      moved: false,
+    }
+  }
+
+  const onPointerMove = (event) => {
+    const state = drag.current
+    if (state.pointerId !== event.pointerId) return
+    const dx = event.clientX - state.x
+    const dy = event.clientY - state.y
+    if (!state.moved && Math.hypot(dx, dy) < 8) return
+    state.moved = true
+    orbit.current.yaw = state.yaw + dx * 0.0075
+    orbit.current.pitch = THREE.MathUtils.clamp(state.pitch + dy * 0.0038, -0.42, 0.32)
+  }
+
+  const onPointerUp = (event) => {
+    if (drag.current.pointerId !== event.pointerId) return
+    drag.current.pointerId = null
+  }
+
+  const onClick = (event) => {
+    if (!drag.current.moved) return
+    event.preventDefault()
+    event.stopPropagation()
+    drag.current.moved = false
+  }
+
   return (
     <LineContainer>
       {use3d ? (
-        <Stage>
+        <Stage
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onClick={onClick}
+        >
           <Suspense fallback={<CssTurnstile />}>
             <Canvas
               gl={{ alpha: true, antialias: true }}
@@ -567,7 +691,7 @@ export default function SwipeLine() {
                 position: isMobile ? [-0.05, 2.12, 8.7] : [-0.1, 2.35, 9.6],
                 fov: isMobile ? 34 : 28,
               }}
-              style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'none' }}
+              style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'auto' }}
               onCreated={({ gl }) => {
                 gl.setClearColor(0x000000, 0)
                 gl.toneMappingExposure = 1.2
@@ -577,7 +701,11 @@ export default function SwipeLine() {
                 })
               }}
             >
-              <TurnstileScene isMobile={isMobile} reducedMotion={reducedMotion} />
+              <TurnstileScene
+                isMobile={isMobile}
+                reducedMotion={reducedMotion}
+                orbit={orbit}
+              />
             </Canvas>
           </Suspense>
         </Stage>
