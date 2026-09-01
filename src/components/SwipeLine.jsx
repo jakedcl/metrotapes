@@ -526,15 +526,13 @@ TripodArm.propTypes = {
 }
 
 function Tripod({ map }) {
-  // Match Turnstile() layout — hub on inner pillar face, centered in throat opening
-  const pillarX = 1.52
-  const pillarW = 0.24
+  // Match Turnstile() layout — hub protrudes into throat past card reader
   const beamY = 1.68
+  const readerX = -0.58
 
-  // Inner pillar face at pillarX - pillarW/2; hub sits slightly proud into the throat
-  const hubX = pillarX - pillarW / 2 - 0.022
+  const hubX = readerX - 0.12
   const hubY = beamY
-  const hubZ = 0
+  const hubZ = 0.04
 
   const armDirs = useMemo(() => [
     BLOCKING_ARM.clone(),
