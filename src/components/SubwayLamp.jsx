@@ -17,7 +17,7 @@ const BAND = { color: '#2a2a2a', roughness: 0.45, metalness: 0.4 }
 const Slot = styled.div`
   position: relative;
   width: 220px;
-  height: 580px;
+  height: 600px;
   pointer-events: none;
   overflow: visible;
 
