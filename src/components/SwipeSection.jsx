@@ -28,7 +28,7 @@ const CardWrapper = styled.div`
   z-index: 2;
   pointer-events: auto;
   overflow: visible;
-  transform: scale(0.85);
+  transform: scale(0.75);
   transform-origin: bottom left;
   transition: transform 0.3s ease;
 
