@@ -23,19 +23,19 @@ const SwipeContainer = styled.div`
 
 const CardWrapper = styled.div`
   position: absolute;
-  left: 8px;
-  bottom: 0.7rem;
+  left: 0;
+  bottom: 2.4rem;
   z-index: 2;
   pointer-events: auto;
   overflow: visible;
-  transform: scale(1.0);
+  transform: scale(0.92);
   transform-origin: bottom left;
   transition: transform 0.3s ease;
 
   @media (min-width: 768px) {
-    left: 20px;
-    bottom: 5rem;
-    transform: scale(1);
+    left: 4%;
+    bottom: 7.2rem;
+    transform: scale(0.86);
   }
 `
 
