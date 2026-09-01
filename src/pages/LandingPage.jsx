@@ -3,7 +3,7 @@ import SwipeSection from '../components/SwipeSection'
 import SubwaySign from '../components/SubwaySign'
 import SubwayLamp from '../components/SubwayLamp'
 import PropTypes from 'prop-types'
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState } from 'react'
 import { useSpring, animated } from '@react-spring/web'
 
 const Container = styled.div`
@@ -70,16 +70,6 @@ export default function LandingPage({ onUnlock }) {
     setIsUnlocking(true)
     onUnlock()
   }
-
-  useEffect(() => {
-    if (isUnlocking) return undefined
-
-    const timeout = setTimeout(() => {
-      metroCardRef.current?.click()
-    }, 10000)
-
-    return () => clearTimeout(timeout)
-  }, [isUnlocking])
 
   const signSpring = useSpring({
     opacity: isUnlocking ? 0 : 1,
