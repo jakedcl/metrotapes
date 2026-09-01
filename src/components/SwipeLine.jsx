@@ -12,14 +12,16 @@ const SLOT_DARK = '#141414'
 // Real-world proportions in meters (NYC tripod turnstile reference).
 const BODY_W = 0.28
 const LEG_D = 0.2
-const THROAT = 0.78
+const THROAT = 0.8
 const H_TALL = 1.0
-const H_SHORT = 0.56
-const H_BASE = 0.045
+const H_SHORT = 0.54
+const H_BASE = 0.042
 const ARM_LEN = 0.5
 const ARM_R = 0.019
 const SCENE_SCALE = 2.62
-const BEVEL = 0.008
+const BEVEL = 0.006
+const SLOPE_ANGLE = 0.38
+const STAINLESS = '#ececec'
 
 const gleam = keyframes`
   0% { transform: translateX(-80%) skewX(-18deg); }
@@ -87,7 +89,7 @@ const CssTallLeg = styled.div`
   width: 7%;
   height: 90%;
   border-radius: 3px 3px 2px 2px;
-  transform: skewY(-4deg);
+  transform: skewY(-3deg);
   transform-origin: bottom right;
 
   @media (max-width: 767px) {
@@ -102,7 +104,7 @@ const CssShortLeg = styled.div`
   left: 12%;
   bottom: 2%;
   width: 6%;
-  height: 54%;
+  height: 52%;
   border-radius: 3px 3px 2px 2px;
 
   @media (max-width: 767px) {
@@ -125,10 +127,12 @@ const CssSwipeHead = styled.div`
   ${metalFill}
   position: absolute;
   right: 17%;
-  top: 8%;
+  top: 7%;
   width: 10%;
-  height: 7%;
+  height: 6.5%;
   border-radius: 3px;
+  transform: skewY(-8deg);
+  transform-origin: bottom right;
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.28);
 
   &::after {
@@ -136,8 +140,8 @@ const CssSwipeHead = styled.div`
     position: absolute;
     left: 12%;
     right: 12%;
-    top: 38%;
-    height: 18%;
+    top: 40%;
+    height: 16%;
     background: ${SLOT_DARK};
     border-radius: 1px;
   }
@@ -151,9 +155,9 @@ const CssSwipeHead = styled.div`
 const CssEntry = styled.div`
   position: absolute;
   right: 17.5%;
-  top: 22%;
-  width: 6.5%;
-  height: 14%;
+  top: 24%;
+  width: 6%;
+  height: 7%;
   background: #000;
   border: 1px solid #fff;
   border-radius: 2px;
@@ -164,19 +168,48 @@ const CssEntry = styled.div`
   }
 `
 
+const CssLamp = styled.div`
+  position: absolute;
+  right: 18.2%;
+  top: 33%;
+  width: 4.8%;
+  height: 4.8%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 38%, #7dff9a 0%, #22d954 38%, #0ea338 72%, #067a28 100%);
+  box-shadow: 0 0 8px rgba(34, 217, 84, 0.55);
+
+  &::after {
+    content: '➤';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #d9a40f;
+    font-size: 0.55rem;
+    transform: rotate(-42deg);
+  }
+
+  @media (max-width: 767px) {
+    right: 13%;
+    width: 6%;
+    height: 6%;
+  }
+`
+
 const Arm = styled.div`
   ${metalFill}
   position: absolute;
   width: 6px;
-  height: 38%;
-  left: 42%;
-  bottom: 18%;
+  height: 36%;
+  left: 43%;
+  bottom: 20%;
   border-radius: 4px;
   transform-origin: left center;
   transform: rotateZ(${(p) => p.$rot}deg);
 
   @media (max-width: 767px) {
-    left: 36%;
+    left: 37%;
     width: 5px;
   }
 `
@@ -324,7 +357,7 @@ function createLampFaceTexture() {
   return tex
 }
 
-function Metal({ map, roughness = 0.4, metalness = 0.76, color = '#dedede' }) {
+function Metal({ map, roughness = 0.4, metalness = 0.72, color = STAINLESS }) {
   return (
     <meshStandardMaterial
       map={map}
@@ -375,10 +408,10 @@ function EntryPanel({ position }) {
   const lampMap = useMemo(() => createLampFaceTexture(), [])
   const arrow = useMemo(() => createLampArrow(), [])
   const arrowExtrude = useMemo(() => ({
-    depth: 0.012,
+    depth: 0.01,
     bevelEnabled: true,
-    bevelThickness: 0.004,
-    bevelSize: 0.006,
+    bevelThickness: 0.003,
+    bevelSize: 0.005,
     bevelSegments: 1,
   }), [])
 
@@ -389,43 +422,43 @@ function EntryPanel({ position }) {
 
   return (
     <group position={position}>
-      <mesh position={[0, 0.14, 0.004]}>
-        <boxGeometry args={[0.2, 0.064, 0.01]} />
+      <mesh position={[0, 0.128, 0.003]}>
+        <boxGeometry args={[0.178, 0.058, 0.008]} />
         <meshStandardMaterial color="#050505" roughness={0.55} metalness={0.08} />
       </mesh>
-      <mesh position={[0, 0.14, 0.01]}>
-        <planeGeometry args={[0.2, 0.064]} />
+      <mesh position={[0, 0.128, 0.008]}>
+        <planeGeometry args={[0.178, 0.058]} />
         <meshBasicMaterial map={entryMap} toneMapped={false} />
       </mesh>
 
-      <group position={[0, 0.04, 0.012]}>
+      <group position={[0, 0.036, 0.01]}>
         <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.086, 0.086, 0.018, 32]} />
+          <cylinderGeometry args={[0.074, 0.074, 0.016, 32]} />
           <meshStandardMaterial color="#1a1a1a" roughness={0.34} metalness={0.78} />
         </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.005]}>
-          <cylinderGeometry args={[0.068, 0.068, 0.012, 32]} />
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.004]}>
+          <cylinderGeometry args={[0.058, 0.058, 0.01, 32]} />
           <meshStandardMaterial
             color="#0d9a34"
             emissive="#1ad24a"
-            emissiveIntensity={0.65}
+            emissiveIntensity={0.72}
             roughness={0.35}
             metalness={0}
           />
         </mesh>
-        <mesh position={[0, 0, 0.012]}>
-          <circleGeometry args={[0.067, 32]} />
+        <mesh position={[0, 0, 0.01]}>
+          <circleGeometry args={[0.057, 32]} />
           <meshBasicMaterial map={lampMap} toneMapped={false} />
         </mesh>
         <mesh
-          position={[0, 0, 0.016]}
+          position={[0, 0, 0.013]}
           rotation={[0, 0, -Math.PI * 0.78]}
-          scale={0.085}
+          scale={0.072}
         >
           <extrudeGeometry args={[arrow, arrowExtrude]} />
           <meshBasicMaterial color="#d9a40f" toneMapped={false} />
         </mesh>
-        <pointLight color="#3dff6a" intensity={0.35} distance={0.9} position={[0, 0, 0.1]} />
+        <pointLight color="#3dff6a" intensity={0.42} distance={0.75} position={[0, 0, 0.08]} />
       </group>
     </group>
   )
@@ -436,26 +469,30 @@ EntryPanel.propTypes = {
 }
 
 function SwipeHead({ map, position, rotation = [0, 0, 0] }) {
-  const housingGeo = useRoundedBox(0.16, 0.034, 0.1, 0.004)
-  const lipGeo = useRoundedBox(0.14, 0.008, 0.084, 0.002)
+  const housingGeo = useRoundedBox(0.168, 0.032, 0.096, 0.003)
+  const lipGeo = useRoundedBox(0.148, 0.007, 0.082, 0.002)
+  const bezelGeo = useRoundedBox(0.118, 0.005, 0.052, 0.001)
 
   return (
     <group position={position} rotation={rotation}>
-      <mesh geometry={housingGeo} position={[0, 0.017, 0]}>
-        <Metal map={map} roughness={0.36} metalness={0.8} color="#ececec" />
+      <mesh geometry={housingGeo} position={[0, 0.016, 0]}>
+        <Metal map={map} roughness={0.36} metalness={0.78} color="#f0f0f0" />
       </mesh>
-      <mesh geometry={lipGeo} position={[0, 0.036, 0]}>
-        <Metal map={map} roughness={0.32} metalness={0.84} color="#f4f4f4" />
+      <mesh geometry={lipGeo} position={[0, 0.034, 0]}>
+        <Metal map={map} roughness={0.32} metalness={0.82} color="#f6f6f6" />
       </mesh>
-      <mesh position={[0, 0.038, 0]}>
-        <boxGeometry args={[0.11, 0.006, 0.048]} />
+      <mesh geometry={bezelGeo} position={[0, 0.037, 0.002]}>
+        <meshStandardMaterial color="#1a1a1a" roughness={0.88} metalness={0.1} />
+      </mesh>
+      <mesh position={[0, 0.038, 0.002]}>
+        <boxGeometry args={[0.104, 0.005, 0.044]} />
         <meshStandardMaterial color={SLOT_DARK} roughness={0.92} metalness={0.06} />
       </mesh>
-      <mesh position={[-0.048, 0.038, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[0.048, 0.005]} />
+      <mesh position={[-0.046, 0.038, 0.002]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[0.044, 0.004]} />
         <meshBasicMaterial color={SLOT_DARK} />
       </mesh>
-      <pointLight color={GOLDEN} intensity={0.45} distance={1.1} position={[0, 0.08, 0.12]} />
+      <pointLight color={GOLDEN} intensity={0.38} distance={1.0} position={[0, 0.07, 0.1]} />
     </group>
   )
 }
@@ -471,19 +508,23 @@ function Rotor({ map, position }) {
 
   return (
     <group position={position}>
-      <mesh>
-        <cylinderGeometry args={[0.036, 0.036, 0.055, 20]} />
-        <Metal map={map} roughness={0.38} metalness={0.82} />
+      <mesh position={[0, 0, 0.014]}>
+        <cylinderGeometry args={[0.034, 0.034, 0.012, 20]} />
+        <Metal map={map} roughness={0.38} metalness={0.8} />
       </mesh>
       <mesh>
-        <sphereGeometry args={[0.044, 16, 12]} />
-        <Metal map={map} roughness={0.36} metalness={0.84} />
+        <cylinderGeometry args={[0.03, 0.03, 0.048, 20]} />
+        <Metal map={map} roughness={0.38} metalness={0.82} />
       </mesh>
       {armAngles.map((angle) => (
         <group key={angle} rotation={[0, angle, 0]}>
           <mesh position={[ARM_LEN / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
             <cylinderGeometry args={[ARM_R, ARM_R, ARM_LEN, 18]} />
             <Metal map={map} roughness={0.38} metalness={0.8} />
+          </mesh>
+          <mesh position={[ARM_LEN - 0.012, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[ARM_R * 1.08, ARM_R * 1.08, 0.016, 14]} />
+            <meshStandardMaterial color="#1a1a1a" roughness={0.82} metalness={0.12} />
           </mesh>
         </group>
       ))}
@@ -499,20 +540,22 @@ Rotor.propTypes = {
 function Frame({ map }) {
   const tallZ = THROAT / 2 + LEG_D / 2
   const shortZ = -(THROAT / 2 + LEG_D / 2)
-  const lowerH = H_TALL * 0.68
+  const lowerH = H_TALL * 0.66
   const slopeH = H_TALL - lowerH
-  const slopeAngle = 0.42
+  const totalDepth = THROAT + LEG_D * 2
 
-  const baseGeo = useRoundedBox(BODY_W + 0.04, H_BASE, THROAT + LEG_D * 2 + 0.06, BEVEL)
+  const baseGeo = useRoundedBox(BODY_W + 0.036, H_BASE, totalDepth + 0.04, BEVEL)
   const tallLowerGeo = useRoundedBox(BODY_W, lowerH, LEG_D, BEVEL)
-  const tallSlopeGeo = useRoundedBox(BODY_W, slopeH * 1.05, LEG_D * 0.92, BEVEL)
+  const tallSlopeGeo = useRoundedBox(BODY_W, slopeH * 1.02, LEG_D * 0.94, BEVEL)
   const shortGeo = useRoundedBox(BODY_W, H_SHORT, LEG_D, BEVEL)
-  const shortCapGeo = useRoundedBox(BODY_W * 0.92, 0.05, LEG_D * 0.88, BEVEL)
+  const shortCapGeo = useRoundedBox(BODY_W * 0.94, 0.042, LEG_D * 0.9, BEVEL)
+  const mountWallGeo = useRoundedBox(BODY_W * 0.88, 0.22, 0.014, 0.002)
+  const throatLipGeo = useRoundedBox(BODY_W * 0.94, 0.012, 0.014, 0.002)
 
   return (
     <group>
       <mesh geometry={baseGeo} position={[0, H_BASE / 2, 0]}>
-        <Metal map={map} roughness={0.44} metalness={0.7} />
+        <Metal map={map} roughness={0.42} metalness={0.68} color="#e4e4e4" />
       </mesh>
 
       <mesh geometry={tallLowerGeo} position={[0, H_BASE + lowerH / 2, tallZ]}>
@@ -521,21 +564,39 @@ function Frame({ map }) {
 
       <mesh
         geometry={tallSlopeGeo}
-        position={[0, H_BASE + lowerH + slopeH * 0.42, tallZ + 0.012]}
-        rotation={[slopeAngle, 0, 0]}
+        position={[0, H_BASE + lowerH + slopeH * 0.4, tallZ + 0.01]}
+        rotation={[SLOPE_ANGLE, 0, 0]}
       >
-        <Metal map={map} roughness={0.38} metalness={0.78} />
+        <Metal map={map} roughness={0.38} metalness={0.76} color="#f0f0f0" />
       </mesh>
 
       <mesh geometry={shortGeo} position={[0, H_BASE + H_SHORT / 2, shortZ]}>
         <Metal map={map} />
       </mesh>
 
+      <mesh geometry={shortCapGeo} position={[0, H_BASE + H_SHORT + 0.02, shortZ]}>
+        <Metal map={map} roughness={0.38} metalness={0.76} color="#f0f0f0" />
+      </mesh>
+
       <mesh
-        geometry={shortCapGeo}
-        position={[0, H_BASE + H_SHORT + 0.024, shortZ]}
+        geometry={mountWallGeo}
+        position={[0, H_BASE + 0.48, tallZ - LEG_D / 2 + 0.007]}
       >
-        <Metal map={map} roughness={0.38} metalness={0.78} color="#e8e8e8" />
+        <Metal map={map} roughness={0.44} metalness={0.7} color="#e0e0e0" />
+      </mesh>
+
+      <mesh
+        geometry={throatLipGeo}
+        position={[0, H_BASE + H_SHORT + 0.006, shortZ + LEG_D / 2 - 0.007]}
+      >
+        <Metal map={map} roughness={0.4} metalness={0.72} />
+      </mesh>
+
+      <mesh
+        geometry={throatLipGeo}
+        position={[0, H_BASE + lowerH + 0.006, tallZ - LEG_D / 2 + 0.007]}
+      >
+        <Metal map={map} roughness={0.4} metalness={0.72} />
       </mesh>
     </group>
   )
@@ -547,16 +608,15 @@ Frame.propTypes = {
 
 function Turnstile({ isMobile, orbit, reducedMotion }) {
   const source = useLoader(THREE.TextureLoader, '/metal.jpg')
-  const bodyMap = useMemo(() => cloneMetal(source, 0.45, 1.8), [source])
-  const readerMap = useMemo(() => cloneMetal(source, 0.7, 0.35), [source])
-  const armMap = useMemo(() => cloneMetal(source, 0.3, 1.2), [source])
+  const bodyMap = useMemo(() => cloneMetal(source, 0.5, 1.6), [source])
+  const readerMap = useMemo(() => cloneMetal(source, 0.75, 0.32), [source])
+  const armMap = useMemo(() => cloneMetal(source, 0.35, 1.1), [source])
 
   const tallZ = THROAT / 2 + LEG_D / 2
-  const lowerH = H_TALL * 0.68
+  const lowerH = H_TALL * 0.66
   const slopeH = H_TALL - lowerH
-  const slopeAngle = 0.42
-  const slopeCenterY = H_BASE + lowerH + slopeH * 0.42
-  const slopeCenterZ = tallZ + 0.012
+  const slopeCenterY = H_BASE + lowerH + slopeH * 0.4
+  const slopeCenterZ = tallZ + 0.01
   const pivot = [0, H_BASE + 0.48, 0]
   const scale = isMobile ? 1.12 : 1.08
 
@@ -565,17 +625,17 @@ function Turnstile({ isMobile, orbit, reducedMotion }) {
       <OrbitRig orbit={orbit} reducedMotion={reducedMotion} pivot={pivot}>
         <Frame map={bodyMap} />
 
-        <EntryPanel position={[0, H_BASE + 0.62, tallZ + LEG_D / 2 + 0.006]} />
+        <EntryPanel position={[0, H_BASE + 0.58, tallZ + LEG_D / 2 + 0.005]} />
 
         <SwipeHead
           map={readerMap}
-          position={[0, slopeCenterY + 0.04, slopeCenterZ + 0.04]}
-          rotation={[slopeAngle, 0, 0]}
+          position={[0, slopeCenterY + 0.036, slopeCenterZ + 0.038]}
+          rotation={[SLOPE_ANGLE, 0, 0]}
         />
 
         <Rotor
           map={armMap}
-          position={[0, H_BASE + 0.48, tallZ - LEG_D / 2 - 0.02]}
+          position={[0, H_BASE + 0.48, tallZ - LEG_D / 2 + 0.012]}
         />
       </OrbitRig>
     </group>
@@ -621,13 +681,13 @@ function AimCamera({ isMobile }) {
 
   useEffect(() => {
     if (isMobile) {
-      camera.position.set(-0.18, 2.08, 6.85)
+      camera.position.set(-0.16, 1.96, 6.55)
       camera.fov = 32
-      camera.lookAt(-0.22, 1.34, 0.18)
+      camera.lookAt(-0.2, 1.28, 0.12)
     } else {
-      camera.position.set(-0.28, 2.14, 7.05)
+      camera.position.set(-0.24, 2.02, 6.75)
       camera.fov = 26
-      camera.lookAt(-0.22, 1.38, 0.18)
+      camera.lookAt(-0.2, 1.32, 0.12)
     }
     camera.updateProjectionMatrix()
   }, [camera, isMobile])
@@ -643,12 +703,12 @@ function TurnstileScene({ isMobile, reducedMotion, orbit }) {
   return (
     <>
       <AimCamera isMobile={isMobile} />
-      <ambientLight intensity={0.62} />
-      <directionalLight position={[-3.6, 3.2, 7.4]} intensity={2.05} />
-      <directionalLight position={[-0.7, 5.4, 2.6]} intensity={0.85} />
-      <directionalLight position={[0.2, 2.4, 8.2]} intensity={0.9} />
-      <directionalLight position={[3.2, 4.2, 2.2]} intensity={0.55} />
-      <directionalLight position={[-2.2, 0.6, -3.0]} intensity={0.28} />
+      <ambientLight intensity={0.74} />
+      <directionalLight position={[-3.2, 3.4, 7.0]} intensity={2.2} />
+      <directionalLight position={[-0.5, 5.2, 2.4]} intensity={0.95} />
+      <directionalLight position={[0.4, 2.6, 7.8]} intensity={1.05} />
+      <directionalLight position={[3.0, 4.0, 2.0]} intensity={0.6} />
+      <directionalLight position={[-2.0, 0.8, -2.8]} intensity={0.32} />
       <GleamLight reducedMotion={reducedMotion} isMobile={isMobile} />
       <Turnstile isMobile={isMobile} orbit={orbit} reducedMotion={reducedMotion} />
     </>
@@ -668,6 +728,7 @@ function CssTurnstile() {
       <CssTallLeg />
       <CssShortLeg />
       <CssEntry />
+      <CssLamp />
       <CssSwipeHead />
       <Arm $rot={0} />
       <Arm $rot={120} />
@@ -685,7 +746,7 @@ export default function SwipeLine() {
   )
   const reducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const orbit = useRef({ yaw: 0.42, pitch: 0.08 })
+  const orbit = useRef({ yaw: 0.36, pitch: 0.06 })
   const drag = useRef({
     pointerId: null,
     x: 0,
@@ -752,13 +813,13 @@ export default function SwipeLine() {
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [-0.18, 2.08, 6.85] : [-0.28, 2.14, 7.05],
+                position: isMobile ? [-0.16, 1.96, 6.55] : [-0.24, 2.02, 6.75],
                 fov: isMobile ? 32 : 26,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'auto' }}
               onCreated={({ gl }) => {
                 gl.setClearColor(0x000000, 0)
-                gl.toneMappingExposure = 1.2
+                gl.toneMappingExposure = 1.38
                 gl.domElement.addEventListener('webglcontextlost', (event) => {
                   event.preventDefault()
                   setUse3d(false)
