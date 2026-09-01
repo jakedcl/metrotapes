@@ -9,7 +9,7 @@ const SwipeContainer = styled.div`
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 18rem;
+  height: 22rem;
   display: flex;
   align-items: flex-end;
   pointer-events: none;
@@ -23,12 +23,12 @@ const SwipeContainer = styled.div`
 
 const CardWrapper = styled.div`
   position: absolute;
-  left: 0;
-  bottom: 3.2rem;
+  left: -8px;
+  bottom: 2.6rem;
   z-index: 2;
   pointer-events: auto;
   overflow: visible;
-  transform: scale(0.84);
+  transform: scale(0.52);
   transform-origin: bottom left;
   transition: transform 0.3s ease;
 
