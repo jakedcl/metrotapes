@@ -2,22 +2,17 @@
 import { Suspense, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import styled, { keyframes } from 'styled-components'
+import styled from 'styled-components'
 import PropTypes from 'prop-types'
 
 /**
  * NYC subway globe, built from primitives so it can emit light.
- * Green over cream glass, dark equatorial band, teal iron post with 4 flared fins.
+ * Frosted green-over-cream glass, painted iron — not a neon.
  * Header lamp stays the PNG button.
  */
-const IRON = { color: '#1c3d38', roughness: 0.46, metalness: 0.28 }
-const IRON_DARK = { color: '#102926', roughness: 0.62, metalness: 0.18 }
-const BAND = { color: '#1a1a1a', roughness: 0.35, metalness: 0.58 }
-
-const glow = keyframes`
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 0.95; }
-`
+const IRON = { color: '#2f5d52', roughness: 0.72, metalness: 0.1 }
+const IRON_DARK = { color: '#1c3f38', roughness: 0.8, metalness: 0.06 }
+const BAND = { color: '#2a2a2a', roughness: 0.45, metalness: 0.4 }
 
 const Slot = styled.div`
   position: relative;
@@ -29,34 +24,6 @@ const Slot = styled.div`
   @media (min-width: 768px) {
     width: 320px;
     height: 600px;
-  }
-
-  &::before {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 18%;
-    width: 180px;
-    height: 180px;
-    transform: translate(-50%, -50%);
-    background: radial-gradient(
-      circle,
-      rgba(61, 220, 90, 0.45) 0%,
-      rgba(61, 220, 90, 0.14) 32%,
-      transparent 66%
-    );
-    pointer-events: none;
-    animation: ${glow} 3.6s ease-in-out infinite;
-
-    @media (min-width: 768px) {
-      width: 230px;
-      height: 230px;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      animation: none;
-      opacity: 0.7;
-    }
   }
 
   canvas {
@@ -104,9 +71,6 @@ function createTriangleShape() {
 
 function LampMesh({ reducedMotion }) {
   const group = useRef()
-  const globe = useRef()
-  const greenLight = useRef()
-  const warmLight = useRef()
   const finShape = useMemo(() => createFinShape(), [])
   const triangleShape = useMemo(() => createTriangleShape(), [])
   const finExtrude = useMemo(() => ({
@@ -122,46 +86,43 @@ function LampMesh({ reducedMotion }) {
   }), [])
 
   useFrame(({ clock }) => {
+    if (!group.current || reducedMotion) return
     const t = clock.elapsedTime
-    const pulse = reducedMotion ? 1 : 0.9 + Math.sin(t * 1.35) * 0.1
-    if (greenLight.current) greenLight.current.intensity = 1.15 * pulse
-    if (warmLight.current) warmLight.current.intensity = 1.7 * pulse
-    if (globe.current && !reducedMotion) {
-      globe.current.scale.setScalar(1 + (pulse - 1) * 0.035)
-    }
-    if (group.current && !reducedMotion) {
-      group.current.rotation.y = 0.4 + Math.sin(t * 0.32) * 0.2
-      group.current.rotation.x = 0.06 + Math.sin(t * 0.24) * 0.03
-    }
+    group.current.rotation.y = 0.38 + Math.sin(t * 0.2) * 0.1
+    group.current.rotation.x = 0.05 + Math.sin(t * 0.16) * 0.02
   })
 
   return (
     <group ref={group} position={[0, -0.12, 0]}>
-      <group ref={globe} position={[0, 1.55, 0]}>
+      <group position={[0, 1.55, 0]}>
         <mesh>
-          <sphereGeometry args={[0.12, 16, 16]} />
-          <meshBasicMaterial color="#fff4c4" />
+          <sphereGeometry args={[0.1, 16, 16]} />
+          <meshStandardMaterial
+            color="#fff4dc"
+            emissive="#f0d090"
+            emissiveIntensity={0.7}
+            roughness={0.4}
+            metalness={0}
+          />
         </mesh>
         <mesh>
           <sphereGeometry args={[0.48, 32, 20, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <meshStandardMaterial
-            color="#3ddc5a"
-            emissive="#1aa83c"
-            emissiveIntensity={2.2}
-            roughness={0.28}
+            color="#3aaa52"
+            emissive="#1f6e34"
+            emissiveIntensity={0.55}
+            roughness={0.62}
             metalness={0}
-            toneMapped={false}
           />
         </mesh>
         <mesh>
           <sphereGeometry args={[0.48, 32, 20, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
           <meshStandardMaterial
-            color="#f4ecd0"
-            emissive="#ffe7a0"
-            emissiveIntensity={1.45}
-            roughness={0.32}
+            color="#f2ead6"
+            emissive="#e2c58a"
+            emissiveIntensity={0.38}
+            roughness={0.58}
             metalness={0}
-            toneMapped={false}
           />
         </mesh>
         <mesh rotation={[Math.PI / 2, 0, 0]}>
@@ -169,18 +130,10 @@ function LampMesh({ reducedMotion }) {
           <meshStandardMaterial {...BAND} />
         </mesh>
         <pointLight
-          ref={greenLight}
-          color="#b8ffc4"
-          intensity={1.15}
-          distance={5}
-          position={[0, 0.18, 0]}
-        />
-        <pointLight
-          ref={warmLight}
-          color="#ffe7b0"
-          intensity={1.7}
-          distance={5}
-          position={[0, -0.12, 0]}
+          color="#ffe8c2"
+          intensity={0.95}
+          distance={4.5}
+          position={[0, -0.04, 0]}
         />
       </group>
 
@@ -244,9 +197,9 @@ LampMesh.propTypes = {
 function LampScene({ reducedMotion }) {
   return (
     <>
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[2.2, 3, 4]} intensity={0.8} />
-      <directionalLight position={[-2, 0.6, 1.4]} intensity={0.22} />
+      <ambientLight intensity={0.72} />
+      <directionalLight position={[-2.4, 3.2, 3.6]} intensity={1.15} />
+      <directionalLight position={[2.2, 1.2, 2]} intensity={0.35} />
       <LampMesh reducedMotion={reducedMotion} />
     </>
   )
