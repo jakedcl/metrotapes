@@ -272,6 +272,26 @@ function createEntryLabelTexture() {
   return tex
 }
 
+function createLampFaceTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256
+  canvas.height = 256
+  const ctx = canvas.getContext('2d')
+  const glow = ctx.createRadialGradient(128, 118, 8, 128, 128, 128)
+  glow.addColorStop(0, '#7dff9a')
+  glow.addColorStop(0.28, '#22d954')
+  glow.addColorStop(0.72, '#0ea338')
+  glow.addColorStop(1, '#067a28')
+  ctx.fillStyle = glow
+  ctx.beginPath()
+  ctx.arc(128, 128, 128, 0, Math.PI * 2)
+  ctx.fill()
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 8
+  return tex
+}
+
 function Metal({ map, roughness = 0.36, metalness = 0.78, color = '#e6e6e6' }) {
   return (
     <meshStandardMaterial
@@ -320,16 +340,22 @@ OrbitRig.propTypes = {
 
 function EntryLamp({ position }) {
   const entryMap = useMemo(() => createEntryLabelTexture(), [])
+  const lampMap = useMemo(() => createLampFaceTexture(), [])
   const arrow = useMemo(() => createLampArrow(), [])
   const arrowExtrude = useMemo(() => ({
-    depth: 0.02,
+    depth: 0.012,
     bevelEnabled: true,
-    bevelThickness: 0.007,
-    bevelSize: 0.01,
+    bevelThickness: 0.004,
+    bevelSize: 0.006,
     bevelSegments: 1,
   }), [])
 
-  useEffect(() => () => entryMap.dispose(), [entryMap])
+  useEffect(() => {
+    return () => {
+      entryMap.dispose()
+      lampMap.dispose()
+    }
+  }, [entryMap, lampMap])
 
   return (
     <group position={position}>
@@ -351,38 +377,36 @@ function EntryLamp({ position }) {
 
       <group position={[0, -0.14, 0.02]}>
         <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.178, 0.178, 0.032, 32]} />
-          <meshStandardMaterial color="#1a1a1a" roughness={0.38} metalness={0.72} />
+          <cylinderGeometry args={[0.188, 0.188, 0.036, 32]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.34} metalness={0.78} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.008]}>
+          <torusGeometry args={[0.158, 0.016, 10, 32]} />
+          <meshStandardMaterial color="#2c2c2c" roughness={0.3} metalness={0.82} />
         </mesh>
         <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.01]}>
-          <cylinderGeometry args={[0.15, 0.15, 0.03, 32]} />
+          <cylinderGeometry args={[0.148, 0.148, 0.022, 32]} />
           <meshStandardMaterial
-            color="#0ea338"
-            emissive="#26e85c"
-            emissiveIntensity={1.35}
-            roughness={0.22}
+            color="#0d9a34"
+            emissive="#1ad24a"
+            emissiveIntensity={0.7}
+            roughness={0.35}
             metalness={0}
           />
         </mesh>
-        <mesh position={[0, 0, 0.026]}>
-          <circleGeometry args={[0.144, 32]} />
-          <meshBasicMaterial color="#14c845" toneMapped={false} />
+        <mesh position={[0, 0, 0.022]}>
+          <circleGeometry args={[0.146, 32]} />
+          <meshBasicMaterial map={lampMap} toneMapped={false} />
         </mesh>
         <mesh
-          position={[0, 0, 0.036]}
+          position={[0, 0, 0.03]}
           rotation={[0, 0, -Math.PI * 0.78]}
-          scale={0.165}
+          scale={0.185}
         >
           <extrudeGeometry args={[arrow, arrowExtrude]} />
-          <meshStandardMaterial
-            color="#e6b417"
-            emissive="#f5d24a"
-            emissiveIntensity={0.85}
-            roughness={0.28}
-            metalness={0.38}
-          />
+          <meshBasicMaterial color="#d9a40f" toneMapped={false} />
         </mesh>
-        <pointLight color="#3dff6a" intensity={0.65} distance={1.7} position={[0, 0, 0.22]} />
+        <pointLight color="#3dff6a" intensity={0.55} distance={1.5} position={[0, 0, 0.2]} />
       </group>
     </group>
   )
