@@ -452,14 +452,14 @@ EntryLamp.propTypes = {
 }
 
 function Tripod({ map }) {
-  const len = 1.16
-  const r = 0.112
+  const len = 1.12
+  const r = 0.12
   const angles = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]
 
   return (
-    <group position={[-0.18, 0.5, 0.28]} rotation={[1.18, 0.06, 0]}>
+    <group position={[-0.12, 0.48, 0.26]} rotation={[1.16, 0.05, 0]}>
       <mesh rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.162, 0.162, 0.38, 18]} />
+        <cylinderGeometry args={[0.168, 0.168, 0.4, 18]} />
         <Metal map={map} roughness={0.34} metalness={0.82} />
       </mesh>
       {angles.map((angle) => (
@@ -479,15 +479,15 @@ Tripod.propTypes = {
 }
 
 function SwipeHead({ map, position }) {
-  const wellL = 1.22
-  const wellW = 0.44
-  const wellH = 0.008
-  const plateL = 1.12
-  const plateW = 0.4
-  const plateH = 0.01
+  const wellL = 1.18
+  const wellW = 0.4
+  const wellH = 0.006
+  const plateL = 1.1
+  const plateW = 0.36
+  const plateH = 0.008
   const railL = 1.06
-  const railW = 0.188
-  const railBodyH = 0.096
+  const railW = 0.182
+  const railBodyH = 0.088
   const grooveW = 0.072
   const chamferLen = 0.2
   const chamferWidth = 0.09
@@ -576,32 +576,32 @@ function Turnstile({ isMobile, orbit, reducedMotion }) {
   const readerMap = useMemo(() => cloneMetal(source, 0.9, 0.4), [source])
   const armMap = useMemo(() => cloneMetal(source, 0.35, 1.3), [source])
 
-  const pillarW = 0.5
-  const pillarH = 2.0
-  const pillarD = 0.52
-  const beamW = 3.02
-  const beamH = 0.2
-  const beamD = 0.46
-  const farW = 0.4
-  const farH = 1.36
-  const farD = 0.44
+  const pillarW = 0.42
+  const pillarH = 1.96
+  const pillarD = 0.48
+  const beamW = 3.08
+  const beamH = 0.145
+  const beamD = 0.42
+  const farW = 0.38
+  const farH = 1.28
+  const farD = 0.4
 
-  const pillarGeo = useRoundedBox(pillarW, pillarH, pillarD, 0.04)
-  const pillarFootGeo = useRoundedBox(0.62, 0.09, 0.58, 0.025)
-  const beamGeo = useRoundedBox(beamW, beamH, beamD, 0.028)
-  const farGeo = useRoundedBox(farW, farH, farD, 0.035)
-  const farFootGeo = useRoundedBox(0.5, 0.09, 0.52, 0.025)
-  const baseGeo = useRoundedBox(3.28, 0.06, 0.4, 0.02)
+  const pillarGeo = useRoundedBox(pillarW, pillarH, pillarD, 0.035)
+  const pillarFootGeo = useRoundedBox(0.54, 0.08, 0.54, 0.022)
+  const beamGeo = useRoundedBox(beamW, beamH, beamD, 0.022)
+  const farGeo = useRoundedBox(farW, farH, farD, 0.03)
+  const farFootGeo = useRoundedBox(0.46, 0.08, 0.48, 0.022)
+  const baseGeo = useRoundedBox(3.32, 0.055, 0.36, 0.016)
 
-  const pillarX = 1.5
-  const beamY = 1.22
+  const pillarX = 1.52
+  const beamY = 1.18
   const beamX = -0.16
   const beamTop = beamY + beamH / 2
   const farX = beamX - beamW / 2 + farW / 2 + 0.02
   const baseX = (pillarX + farX) / 2
-  const readerX = -0.62
-  const scale = isMobile ? 1.06 : 1.0
-  const pivot = [0.28, 1.02, 0]
+  const readerX = -0.58
+  const scale = isMobile ? 1.08 : 1.04
+  const pivot = [0.3, 0.98, 0]
 
   return (
     <group position={isMobile ? [-0.55, 0.06, 0] : [-0.68, 0, 0]} scale={scale}>
@@ -627,7 +627,7 @@ function Turnstile({ isMobile, orbit, reducedMotion }) {
         <EntryLamp
           position={[
             pillarX - pillarW / 2 - 0.016,
-            beamTop + 0.28,
+            beamTop + 0.24,
             0,
           ]}
           rotation={[0, -Math.PI / 2, 0]}
@@ -684,13 +684,13 @@ function AimCamera({ isMobile }) {
 
   useEffect(() => {
     if (isMobile) {
-      camera.position.set(-0.28, 2.72, 7.35)
+      camera.position.set(-0.22, 2.15, 6.95)
       camera.fov = 34
-      camera.lookAt(-0.38, 1.14, 0)
+      camera.lookAt(-0.32, 1.02, 0)
     } else {
-      camera.position.set(-0.42, 3.05, 7.55)
+      camera.position.set(-0.38, 2.22, 7.15)
       camera.fov = 26
-      camera.lookAt(-0.42, 1.16, 0)
+      camera.lookAt(-0.32, 1.02, 0)
     }
     camera.updateProjectionMatrix()
   }, [camera, isMobile])
@@ -752,7 +752,7 @@ export default function SwipeLine() {
   )
   const reducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const orbit = useRef({ yaw: 0.52, pitch: 0.24 })
+  const orbit = useRef({ yaw: 0.48, pitch: 0.1 })
   const drag = useRef({
     pointerId: null,
     x: 0,
@@ -819,7 +819,7 @@ export default function SwipeLine() {
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [-0.28, 2.72, 7.35] : [-0.42, 3.05, 7.55],
+                position: isMobile ? [-0.22, 2.15, 6.95] : [-0.38, 2.22, 7.15],
                 fov: isMobile ? 34 : 26,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'auto' }}
