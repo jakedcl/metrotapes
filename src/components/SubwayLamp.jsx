@@ -69,6 +69,71 @@ function createTriangleShape() {
   return s
 }
 
+function createGleamTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 64
+  canvas.height = 256
+  const ctx = canvas.getContext('2d')
+  const fade = ctx.createLinearGradient(0, 0, 64, 0)
+  fade.addColorStop(0, 'rgba(255,248,230,0)')
+  fade.addColorStop(0.35, 'rgba(255,252,240,1)')
+  fade.addColorStop(0.65, 'rgba(255,252,240,1)')
+  fade.addColorStop(1, 'rgba(255,248,230,0)')
+  ctx.fillStyle = fade
+  ctx.fillRect(0, 0, 64, 256)
+  ctx.globalCompositeOperation = 'destination-in'
+  const band = ctx.createLinearGradient(0, 0, 0, 256)
+  band.addColorStop(0, 'rgba(255,255,255,0)')
+  band.addColorStop(0.42, 'rgba(255,255,255,0)')
+  band.addColorStop(0.5, 'rgba(255,255,255,0.55)')
+  band.addColorStop(0.58, 'rgba(255,255,255,0)')
+  band.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = band
+  ctx.fillRect(0, 0, 64, 256)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return texture
+}
+
+function easeInOut(t) {
+  return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2
+}
+
+/** Soft metal band that slides down the post, same idea as SwipeLine's gleam. */
+function PostGleam({ reducedMotion }) {
+  const mesh = useRef()
+  const texture = useMemo(() => createGleamTexture(), [])
+
+  useFrame(({ clock }) => {
+    if (!mesh.current) return
+    const top = 0.58
+    const bottom = -1.86
+    if (reducedMotion) {
+      mesh.current.position.y = -0.12
+      return
+    }
+    const t = (clock.elapsedTime % 5.5) / 5.5
+    mesh.current.position.y = top + (bottom - top) * easeInOut(t)
+  })
+
+  return (
+    <mesh ref={mesh} position={[0, 0.58, 0.162]} renderOrder={2}>
+      <planeGeometry args={[0.38, 0.78]} />
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        toneMapped={false}
+      />
+    </mesh>
+  )
+}
+
+PostGleam.propTypes = {
+  reducedMotion: PropTypes.bool,
+}
+
 function LampMesh({ reducedMotion }) {
   const group = useRef()
   const finShape = useMemo(() => createFinShape(), [])
@@ -186,6 +251,8 @@ function LampMesh({ reducedMotion }) {
         <boxGeometry args={[0.1, 0.18, 0.04]} />
         <meshStandardMaterial color="#071210" />
       </mesh>
+
+      <PostGleam reducedMotion={reducedMotion} />
     </group>
   )
 }
