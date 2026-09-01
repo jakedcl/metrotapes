@@ -27,8 +27,8 @@ const Slot = styled.div`
   overflow: visible;
 
   @media (min-width: 768px) {
-    width: 280px;
-    height: 720px;
+    width: 320px;
+    height: 600px;
   }
 
   &::before {
