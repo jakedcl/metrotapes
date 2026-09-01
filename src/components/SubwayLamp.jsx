@@ -76,17 +76,19 @@ function createGleamTexture() {
   const ctx = canvas.getContext('2d')
   const fade = ctx.createLinearGradient(0, 0, 64, 0)
   fade.addColorStop(0, 'rgba(255,248,230,0)')
-  fade.addColorStop(0.35, 'rgba(255,252,240,1)')
-  fade.addColorStop(0.65, 'rgba(255,252,240,1)')
+  fade.addColorStop(0.28, 'rgba(255,252,240,1)')
+  fade.addColorStop(0.72, 'rgba(255,252,240,1)')
   fade.addColorStop(1, 'rgba(255,248,230,0)')
   ctx.fillStyle = fade
   ctx.fillRect(0, 0, 64, 256)
   ctx.globalCompositeOperation = 'destination-in'
   const band = ctx.createLinearGradient(0, 0, 0, 256)
   band.addColorStop(0, 'rgba(255,255,255,0)')
-  band.addColorStop(0.42, 'rgba(255,255,255,0)')
-  band.addColorStop(0.5, 'rgba(255,255,255,0.55)')
-  band.addColorStop(0.58, 'rgba(255,255,255,0)')
+  band.addColorStop(0.36, 'rgba(255,255,255,0)')
+  band.addColorStop(0.47, 'rgba(255,252,240,0.45)')
+  band.addColorStop(0.5, 'rgba(255,255,255,0.92)')
+  band.addColorStop(0.53, 'rgba(255,252,240,0.45)')
+  band.addColorStop(0.64, 'rgba(255,255,255,0)')
   band.addColorStop(1, 'rgba(255,255,255,0)')
   ctx.fillStyle = band
   ctx.fillRect(0, 0, 64, 256)
@@ -99,34 +101,49 @@ function easeInOut(t) {
   return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2
 }
 
+const GLEAM_FACES = [
+  { position: [0, 0, 0.168], rotation: [0, 0, 0] },
+  { position: [0.168, 0, 0], rotation: [0, Math.PI / 2, 0] },
+]
+
 /** Soft metal band that slides down the post, same idea as SwipeLine's gleam. */
 function PostGleam({ reducedMotion }) {
-  const mesh = useRef()
+  const group = useRef()
   const texture = useMemo(() => createGleamTexture(), [])
+  const material = useMemo(() => new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  }), [texture])
 
   useFrame(({ clock }) => {
-    if (!mesh.current) return
-    const top = 0.58
-    const bottom = -1.86
+    if (!group.current) return
+    const top = 0.52
+    const bottom = -1.88
     if (reducedMotion) {
-      mesh.current.position.y = -0.12
+      group.current.position.y = -0.08
       return
     }
     const t = (clock.elapsedTime % 5.5) / 5.5
-    mesh.current.position.y = top + (bottom - top) * easeInOut(t)
+    group.current.position.y = top + (bottom - top) * easeInOut(t)
   })
 
   return (
-    <mesh ref={mesh} position={[0, 0.58, 0.162]} renderOrder={2}>
-      <planeGeometry args={[0.38, 0.78]} />
-      <meshBasicMaterial
-        map={texture}
-        transparent
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-        toneMapped={false}
-      />
-    </mesh>
+    <group ref={group} position={[0, 0.52, 0]}>
+      {GLEAM_FACES.map((face) => (
+        <mesh
+          key={face.position.join(',')}
+          position={face.position}
+          rotation={face.rotation}
+          renderOrder={2}
+          material={material}
+        >
+          <planeGeometry args={[0.42, 0.9]} />
+        </mesh>
+      ))}
+    </group>
   )
 }
 
