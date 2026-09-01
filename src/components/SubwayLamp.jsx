@@ -69,88 +69,6 @@ function createTriangleShape() {
   return s
 }
 
-function createGleamTexture() {
-  const canvas = document.createElement('canvas')
-  canvas.width = 64
-  canvas.height = 256
-  const ctx = canvas.getContext('2d')
-  const fade = ctx.createLinearGradient(0, 0, 64, 0)
-  fade.addColorStop(0, 'rgba(255,248,230,0)')
-  fade.addColorStop(0.28, 'rgba(255,252,240,1)')
-  fade.addColorStop(0.72, 'rgba(255,252,240,1)')
-  fade.addColorStop(1, 'rgba(255,248,230,0)')
-  ctx.fillStyle = fade
-  ctx.fillRect(0, 0, 64, 256)
-  ctx.globalCompositeOperation = 'destination-in'
-  const band = ctx.createLinearGradient(0, 0, 0, 256)
-  band.addColorStop(0, 'rgba(255,255,255,0)')
-  band.addColorStop(0.36, 'rgba(255,255,255,0)')
-  band.addColorStop(0.47, 'rgba(255,252,240,0.45)')
-  band.addColorStop(0.5, 'rgba(255,255,255,0.92)')
-  band.addColorStop(0.53, 'rgba(255,252,240,0.45)')
-  band.addColorStop(0.64, 'rgba(255,255,255,0)')
-  band.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.fillStyle = band
-  ctx.fillRect(0, 0, 64, 256)
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  return texture
-}
-
-function easeInOut(t) {
-  return t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2
-}
-
-const GLEAM_FACES = [
-  { position: [0, 0, 0.168], rotation: [0, 0, 0] },
-  { position: [0.168, 0, 0], rotation: [0, Math.PI / 2, 0] },
-]
-
-/** Soft metal band that slides down the post, same idea as SwipeLine's gleam. */
-function PostGleam({ reducedMotion }) {
-  const group = useRef()
-  const texture = useMemo(() => createGleamTexture(), [])
-  const material = useMemo(() => new THREE.MeshBasicMaterial({
-    map: texture,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    toneMapped: false,
-  }), [texture])
-
-  useFrame(({ clock }) => {
-    if (!group.current) return
-    const top = 0.52
-    const bottom = -1.88
-    if (reducedMotion) {
-      group.current.position.y = -0.08
-      return
-    }
-    const t = (clock.elapsedTime % 5.5) / 5.5
-    group.current.position.y = top + (bottom - top) * easeInOut(t)
-  })
-
-  return (
-    <group ref={group} position={[0, 0.52, 0]}>
-      {GLEAM_FACES.map((face) => (
-        <mesh
-          key={face.position.join(',')}
-          position={face.position}
-          rotation={face.rotation}
-          renderOrder={2}
-          material={material}
-        >
-          <planeGeometry args={[0.42, 0.9]} />
-        </mesh>
-      ))}
-    </group>
-  )
-}
-
-PostGleam.propTypes = {
-  reducedMotion: PropTypes.bool,
-}
-
 function LampMesh({ reducedMotion }) {
   const group = useRef()
   const finShape = useMemo(() => createFinShape(), [])
@@ -268,8 +186,6 @@ function LampMesh({ reducedMotion }) {
         <boxGeometry args={[0.1, 0.18, 0.04]} />
         <meshStandardMaterial color="#071210" />
       </mesh>
-
-      <PostGleam reducedMotion={reducedMotion} />
     </group>
   )
 }
