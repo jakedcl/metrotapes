@@ -13,11 +13,6 @@ const SLOT_DARK = '#141414'
 const ARM_LEN = 0.5
 const ARM_R = 0.019
 const HUB_R = 0.044
-const HUB_TILT = Math.PI / 4
-// Axle runs through the pillar into the throat; arms sweep in the Y-Z plane.
-const ROTOR_AXIS = new THREE.Vector3(1, 0, 0)
-// Rest pose: one arm level across the walkway (Z), two droop down in a V.
-const BLOCKING_ARM = new THREE.Vector3(0, 0, 1)
 
 const gleam = keyframes`
   0% { transform: translateX(-80%) skewX(-18deg); }
@@ -526,42 +521,41 @@ TripodArm.propTypes = {
 }
 
 function Tripod({ map }) {
-  // Match Turnstile() layout — hub protrudes into throat past card reader
+  // Match Turnstile() layout — hub on pillar-facing (+X) side of SwipeHead
   const beamY = 1.68
+  const beamH = 0.09
+  const beamTop = beamY + beamH / 2
   const readerX = -0.58
+  const wellL = 1.14
+  const wellH = 0.005
+  const plateH = 0.007
+  const railBodyH = 0.055
 
-  const hubX = readerX - 0.12
-  const hubY = beamY
-  const hubZ = 0.04
+  const hubX = readerX + wellL / 2 + 0.024
+  const hubY = beamTop + wellH + plateH + railBodyH * 0.42
+  const hubZ = 0
 
   const armDirs = useMemo(() => [
-    BLOCKING_ARM.clone(),
-    BLOCKING_ARM.clone().applyAxisAngle(ROTOR_AXIS, (Math.PI * 2) / 3),
-    BLOCKING_ARM.clone().applyAxisAngle(ROTOR_AXIS, (Math.PI * 4) / 3),
+    new THREE.Vector3(0, -1, 0),
+    new THREE.Vector3(0, 0, 1),
+    new THREE.Vector3(0, 0, -1),
   ], [])
 
   return (
-    <group
-      position={[hubX, hubY, hubZ]}
-      rotation={[0, -Math.PI / 2, 0]}
-    >
-      {/* Bracket plate on pillar wall, tilted into walkway */}
-      <group rotation={[HUB_TILT, 0, 0]}>
-        <mesh position={[0, 0, -0.028]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.03, 0.036, 0.054, 20]} />
-          <Metal map={map} roughness={0.4} metalness={0.78} />
-        </mesh>
-        <group rotation={[0, 0, Math.PI / 2]}>
-          <mesh position={[0, 0.018, 0]}>
-            <cylinderGeometry args={[HUB_R * 0.82, HUB_R, 0.058, 24]} />
-            <Metal map={map} roughness={0.34} metalness={0.84} />
-          </mesh>
-          <mesh position={[0, 0.052, 0]}>
-            <cylinderGeometry args={[HUB_R, HUB_R * 0.88, 0.02, 24]} />
-            <Metal map={map} roughness={0.36} metalness={0.82} />
-          </mesh>
-        </group>
-      </group>
+    <group position={[hubX, hubY, hubZ]}>
+      {/* Bracket plate flush on swiper +X face; axle runs along +X */}
+      <mesh position={[-0.028, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.03, 0.036, 0.054, 20]} />
+        <Metal map={map} roughness={0.4} metalness={0.78} />
+      </mesh>
+      <mesh position={[0.018, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[HUB_R * 0.82, HUB_R, 0.058, 24]} />
+        <Metal map={map} roughness={0.34} metalness={0.84} />
+      </mesh>
+      <mesh position={[0.052, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[HUB_R, HUB_R * 0.88, 0.02, 24]} />
+        <Metal map={map} roughness={0.36} metalness={0.82} />
+      </mesh>
       {armDirs.map((dir) => (
         <TripodArm key={`${dir.x}-${dir.y}-${dir.z}`} map={map} direction={dir} />
       ))}
