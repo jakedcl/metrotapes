@@ -526,6 +526,15 @@ TripodArm.propTypes = {
 }
 
 function Tripod({ map }) {
+  // Match Turnstile() layout — hub on inner pillar face, in the throat opening
+  const pillarX = 1.52
+  const pillarW = 0.24
+  const beamY = 1.68
+
+  const hubX = pillarX - pillarW / 2 - 0.03
+  const hubY = beamY - 0.08
+  const hubZ = 0
+
   const armDirs = useMemo(() => [
     BLOCKING_ARM.clone(),
     BLOCKING_ARM.clone().applyAxisAngle(ROTOR_AXIS, (Math.PI * 2) / 3),
@@ -533,7 +542,10 @@ function Tripod({ map }) {
   ], [])
 
   return (
-    <group position={[1.06, 1.36, 0]}>
+    <group
+      position={[hubX, hubY, hubZ]}
+      rotation={[0, -Math.PI / 2, 0]}
+    >
       <group rotation={[0, 0, -HUB_TILT]}>
         <mesh position={[0, -0.038, 0]}>
           <cylinderGeometry args={[0.03, 0.036, 0.076, 20]} />
