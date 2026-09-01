@@ -300,20 +300,55 @@ function createLampArrow() {
 }
 
 function createEntryLabelTexture() {
+  const width = 1024
+  const height = 320
   const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 160
+  canvas.width = width
+  canvas.height = height
   const ctx = canvas.getContext('2d')
-  ctx.fillStyle = '#f3f3f3'
-  ctx.fillRect(0, 0, 512, 160)
-  ctx.fillStyle = '#111111'
-  ctx.font = 'bold 96px Helvetica, Arial, sans-serif'
+
+  ctx.fillStyle = '#000000'
+  ctx.fillRect(0, 0, width, height)
+
+  const border = 9
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = border
+  ctx.lineJoin = 'miter'
+  ctx.strokeRect(border / 2, border / 2, width - border, height - border)
+
+  const label = 'Entry'
+  ctx.fillStyle = '#ffffff'
   ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('Entry', 256, 86)
+  ctx.textBaseline = 'alphabetic'
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '-0.03em'
+
+  const padX = 52
+  const padY = 24
+  const maxW = width - border * 2 - padX * 2
+  const maxH = height - border * 2 - padY * 2
+  let size = maxH * 1.18
+  for (let i = 0; i < 10; i += 1) {
+    ctx.font = `bold ${size}px Helvetica, "Helvetica Neue", Arial, sans-serif`
+    const metrics = ctx.measureText(label)
+    const textW = metrics.width
+    const textH = (metrics.actualBoundingBoxAscent || size * 0.72)
+      + (metrics.actualBoundingBoxDescent || size * 0.18)
+    const scale = Math.min(maxW / textW, maxH / textH, 1.08)
+    if (Math.abs(1 - scale) < 0.015) break
+    size *= scale
+  }
+
+  ctx.font = `bold ${size}px Helvetica, "Helvetica Neue", Arial, sans-serif`
+  const metrics = ctx.measureText(label)
+  const ascent = metrics.actualBoundingBoxAscent || size * 0.72
+  const descent = metrics.actualBoundingBoxDescent || size * 0.18
+  const y = (height - (ascent + descent)) / 2 + ascent
+  ctx.fillText(label, width / 2, y)
+
   const tex = new THREE.CanvasTexture(canvas)
   tex.colorSpace = THREE.SRGBColorSpace
-  tex.anisotropy = 8
+  tex.anisotropy = 16
+  tex.needsUpdate = true
   return tex
 }
 
@@ -405,11 +440,11 @@ function EntryLamp({ position, rotation = [0, 0, 0] }) {
   return (
     <group position={position} rotation={rotation} scale={0.86}>
       <mesh position={[0, 0.16, 0.01]}>
-        <boxGeometry args={[0.44, 0.14, 0.018]} />
-        <meshStandardMaterial color="#ececec" roughness={0.48} metalness={0.1} />
+        <boxGeometry args={[0.44, 0.138, 0.012]} />
+        <meshStandardMaterial color="#000000" roughness={0.62} metalness={0.04} />
       </mesh>
-      <mesh position={[0, 0.16, 0.02]}>
-        <planeGeometry args={[0.42, 0.12]} />
+      <mesh position={[0, 0.16, 0.017]}>
+        <planeGeometry args={[0.44, 0.138]} />
         <meshBasicMaterial map={entryMap} toneMapped={false} />
       </mesh>
 
