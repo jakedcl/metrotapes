@@ -526,13 +526,14 @@ TripodArm.propTypes = {
 }
 
 function Tripod({ map }) {
-  // Match Turnstile() layout — hub on inner pillar face, in the throat opening
+  // Match Turnstile() layout — hub on inner pillar face, centered in throat opening
   const pillarX = 1.52
   const pillarW = 0.24
   const beamY = 1.68
 
-  const hubX = pillarX - pillarW / 2 - 0.03
-  const hubY = beamY - 0.08
+  // Inner pillar face at pillarX - pillarW/2; hub sits slightly proud into the throat
+  const hubX = pillarX - pillarW / 2 - 0.022
+  const hubY = beamY
   const hubZ = 0
 
   const armDirs = useMemo(() => [
@@ -546,9 +547,10 @@ function Tripod({ map }) {
       position={[hubX, hubY, hubZ]}
       rotation={[0, -Math.PI / 2, 0]}
     >
-      <group rotation={[0, 0, -HUB_TILT]}>
-        <mesh position={[0, -0.038, 0]}>
-          <cylinderGeometry args={[0.03, 0.036, 0.076, 20]} />
+      {/* Bracket plate on pillar wall, tilted into walkway */}
+      <group rotation={[HUB_TILT, 0, 0]}>
+        <mesh position={[0, 0, -0.028]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.03, 0.036, 0.054, 20]} />
           <Metal map={map} roughness={0.4} metalness={0.78} />
         </mesh>
         <group rotation={[0, 0, Math.PI / 2]}>
