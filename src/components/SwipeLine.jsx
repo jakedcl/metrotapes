@@ -320,7 +320,7 @@ function Tripod({ map }) {
   const angles = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]
 
   return (
-    <group position={[-0.7, 0.62, 0.18]} rotation={[0.95, 0.06, 0]}>
+    <group position={[-0.7, 0.58, 0.22]} rotation={[1.22, 0.08, 0]}>
       <mesh rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.13, 0.13, 0.32, 16]} />
         <Metal map={map} roughness={0.34} metalness={0.82} />
@@ -392,7 +392,7 @@ function Turnstile({ isMobile }) {
   const scale = isMobile ? 1.02 : 0.95
 
   return (
-    <group position={isMobile ? [0.12, 0.02, 0] : [-0.75, 0, 0]} scale={scale}>
+    <group position={isMobile ? [-0.62, 0.04, 0] : [-0.75, 0, 0]} scale={scale}>
       <mesh geometry={footGeo} position={[pillarX, 0.06, 0]}>
         <Metal map={pillarMap} roughness={0.46} metalness={0.66} />
       </mesh>
@@ -488,9 +488,9 @@ function AimCamera({ isMobile }) {
 
   useEffect(() => {
     if (isMobile) {
-      camera.position.set(0.2, 2.05, 8.4)
+      camera.position.set(-0.05, 2.12, 8.7)
       camera.fov = 34
-      camera.lookAt(0.15, 1.02, 0)
+      camera.lookAt(-0.2, 1.02, 0)
     } else {
       camera.position.set(-0.1, 2.35, 9.6)
       camera.fov = 28
@@ -564,7 +564,7 @@ export default function SwipeLine() {
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [0.2, 2.05, 8.4] : [-0.1, 2.35, 9.6],
+                position: isMobile ? [-0.05, 2.12, 8.7] : [-0.1, 2.35, 9.6],
                 fov: isMobile ? 34 : 28,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'none' }}
