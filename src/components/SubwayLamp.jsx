@@ -201,18 +201,18 @@ function LivingLight({ reducedMotion }) {
     if (!light.current || reducedMotion) return
     const t = clock.elapsedTime
     // Slow station key around the post — highlights on fins and square iron, not a spin
-    light.current.position.x = Math.cos(t * 0.22) * 2.5
-    light.current.position.y = 0.3 + Math.sin(t * 0.16) * 1.2
-    light.current.position.z = 0.9 + Math.sin(t * 0.22) * 2.3
+    light.current.position.x = Math.cos(t * 0.26) * 1.85
+    light.current.position.y = 0.55 + Math.sin(t * 0.18) * 0.95
+    light.current.position.z = 1.05 + Math.sin(t * 0.26) * 1.65
   })
 
   return (
     <pointLight
       ref={light}
-      intensity={0.9}
+      intensity={1.55}
       color="#fff3c4"
-      distance={10}
-      position={[2.5, 0.3, 0.9]}
+      distance={8}
+      position={[1.85, 0.55, 1.05]}
     />
   )
 }
@@ -224,9 +224,9 @@ LivingLight.propTypes = {
 function LampScene({ reducedMotion }) {
   return (
     <>
-      <ambientLight intensity={0.62} />
-      <directionalLight position={[-2.4, 3.2, 3.6]} intensity={0.85} />
-      <directionalLight position={[2.2, 1.2, 2]} intensity={0.28} />
+      <ambientLight intensity={0.55} />
+      <directionalLight position={[-2.4, 3.2, 3.6]} intensity={0.78} />
+      <directionalLight position={[2.2, 1.2, 2]} intensity={0.22} />
       <LivingLight reducedMotion={reducedMotion} />
       <LampMesh reducedMotion={reducedMotion} />
     </>
