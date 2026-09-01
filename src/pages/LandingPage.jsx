@@ -40,22 +40,23 @@ const TitleContainer = styled(animated.div)`
 
 const LampSlot = styled(animated.div)`
   position: absolute;
-  left: 54%;
-  bottom: 3.25rem;
+  right: 4%;
+  left: auto;
+  bottom: 0;
   z-index: 1;
   pointer-events: none;
   overflow: visible;
-  transform-origin: bottom center;
+  transform-origin: bottom right;
 
   @media (min-width: 768px) {
-    left: 56%;
-    bottom: 3.5rem;
+    right: 5%;
+    bottom: -1.25rem;
   }
 
   @media (max-width: 767px) {
-    left: 50%;
-    bottom: 2.75rem;
-    transform: scale(0.78);
+    right: 0;
+    bottom: 0;
+    transform: scale(0.68);
   }
 `
 
