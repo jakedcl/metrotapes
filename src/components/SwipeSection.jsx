@@ -24,7 +24,7 @@ const SwipeContainer = styled.div`
 const CardWrapper = styled.div`
   position: absolute;
   left: 12px;
-  bottom: 4.5rem;
+  bottom: 2.5rem;
   z-index: 2;
   pointer-events: auto;
   overflow: visible;
