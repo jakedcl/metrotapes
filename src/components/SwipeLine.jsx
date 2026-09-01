@@ -9,19 +9,13 @@ import PropTypes from 'prop-types'
 const GOLDEN = '#fff4d4'
 const SLOT_DARK = '#141414'
 
-// Real-world proportions in meters (NYC tripod turnstile reference).
-const BODY_W = 0.28
-const LEG_D = 0.2
-const THROAT = 0.8
-const H_TALL = 1.0
-const H_SHORT = 0.54
-const H_BASE = 0.042
+// NYC tripod rotor — real-world proportions in meters
 const ARM_LEN = 0.5
 const ARM_R = 0.019
-const SCENE_SCALE = 2.62
-const BEVEL = 0.006
-const SLOPE_ANGLE = 0.38
-const STAINLESS = '#ececec'
+const HUB_R = 0.044
+const HUB_TILT = Math.PI / 4
+const ROTOR_AXIS = new THREE.Vector3(Math.sin(HUB_TILT), Math.cos(HUB_TILT), 0).normalize()
+const BLOCKING_ARM = new THREE.Vector3(-1, 0, 0)
 
 const gleam = keyframes`
   0% { transform: translateX(-80%) skewX(-18deg); }
@@ -81,135 +75,103 @@ const Fallback = styled.div`
   overflow: hidden;
 `
 
-const CssTallLeg = styled.div`
+const Pillar = styled.div`
   ${metalFill}
   position: absolute;
-  right: 18%;
+  right: 20%;
   bottom: 2%;
-  width: 7%;
-  height: 90%;
-  border-radius: 3px 3px 2px 2px;
-  transform: skewY(-3deg);
-  transform-origin: bottom right;
+  width: 6.2%;
+  height: 88%;
+  border-radius: 4px 4px 2px 2px;
 
   @media (max-width: 767px) {
-    right: 12%;
-    width: 9%;
-  }
-`
-
-const CssShortLeg = styled.div`
-  ${metalFill}
-  position: absolute;
-  left: 12%;
-  bottom: 2%;
-  width: 6%;
-  height: 52%;
-  border-radius: 3px 3px 2px 2px;
-
-  @media (max-width: 767px) {
-    left: 7%;
+    right: 14%;
     width: 8%;
   }
 `
 
-const CssBase = styled.div`
+const FarBlock = styled.div`
   ${metalFill}
   position: absolute;
-  left: 10%;
-  right: 16%;
+  left: 14%;
   bottom: 2%;
-  height: 3.5%;
-  border-radius: 2px;
+  width: 4.8%;
+  height: 58%;
+  border-radius: 3px 3px 2px 2px;
+
+  @media (max-width: 767px) {
+    left: 8%;
+    width: 6.5%;
+  }
+`
+
+const Beam = styled.div`
+  ${metalFill}
+  position: absolute;
+  left: 16%;
+  right: 25%;
+  bottom: 52%;
+  height: 4.2%;
+  border-radius: 3px;
+  overflow: visible;
+
+  @media (max-width: 767px) {
+    left: 10%;
+    right: 20%;
+    bottom: 50%;
+    height: 4.8%;
+  }
 `
 
 const CssSwipeHead = styled.div`
   ${metalFill}
   position: absolute;
-  right: 17%;
-  top: 7%;
-  width: 10%;
-  height: 6.5%;
-  border-radius: 3px;
-  transform: skewY(-8deg);
-  transform-origin: bottom right;
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.28);
-
-  &::after {
-    content: '';
-    position: absolute;
-    left: 12%;
-    right: 12%;
-    top: 40%;
-    height: 16%;
-    background: ${SLOT_DARK};
-    border-radius: 1px;
-  }
-
-  @media (max-width: 767px) {
-    right: 11%;
-    width: 12%;
-  }
+  left: 14%;
+  top: -22%;
+  width: 44%;
+  height: 48%;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 3px 6px 3px 4px;
+  box-sizing: border-box;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.28),
+    0 1px 3px rgba(0, 0, 0, 0.35);
 `
 
-const CssEntry = styled.div`
-  position: absolute;
-  right: 17.5%;
-  top: 24%;
-  width: 6%;
-  height: 7%;
-  background: #000;
-  border: 1px solid #fff;
-  border-radius: 2px;
-
-  @media (max-width: 767px) {
-    right: 12%;
-    width: 8%;
-  }
+const CssRail = styled.div`
+  ${metalFill}
+  height: 36%;
+  border-radius: 50% / 85%;
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.38),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.4);
 `
 
-const CssLamp = styled.div`
-  position: absolute;
-  right: 18.2%;
-  top: 33%;
-  width: 4.8%;
-  height: 4.8%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 42% 38%, #7dff9a 0%, #22d954 38%, #0ea338 72%, #067a28 100%);
-  box-shadow: 0 0 8px rgba(34, 217, 84, 0.55);
-
-  &::after {
-    content: '➤';
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #d9a40f;
-    font-size: 0.55rem;
-    transform: rotate(-42deg);
-  }
-
-  @media (max-width: 767px) {
-    right: 13%;
-    width: 6%;
-    height: 6%;
-  }
+const CssGroove = styled.div`
+  height: 18%;
+  margin: 0 12% 0 2%;
+  border-radius: 1px;
+  background: ${SLOT_DARK};
+  clip-path: polygon(0 0, 14% 22%, 100% 22%, 100% 78%, 14% 78%, 0 100%);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.85);
 `
 
 const Arm = styled.div`
   ${metalFill}
   position: absolute;
   width: 6px;
-  height: 36%;
-  left: 43%;
-  bottom: 20%;
+  height: 40%;
+  left: 40%;
+  bottom: 16%;
   border-radius: 4px;
-  transform-origin: left center;
-  transform: rotateZ(${(p) => p.$rot}deg);
+  transform-origin: top center;
+  transform: rotateX(72deg) rotateZ(${(p) => p.$rot}deg);
 
   @media (max-width: 767px) {
-    left: 37%;
+    left: 34%;
     width: 5px;
   }
 `
@@ -269,6 +231,67 @@ function useRoundedBox(width, height, depth, radius, segments = 3) {
 
   useEffect(() => () => geometry.dispose(), [geometry])
   return geometry
+}
+
+function createRailBodyShape(length, width, chamferLen, chamferWidth) {
+  const s = new THREE.Shape()
+  const hl = length / 2
+  const corner = Math.min(0.028, width * 0.14)
+
+  s.moveTo(-hl, chamferWidth)
+  s.lineTo(-hl + chamferLen, 0)
+  s.lineTo(hl - corner, 0)
+  s.quadraticCurveTo(hl, 0, hl, corner)
+  s.lineTo(hl, width - corner)
+  s.quadraticCurveTo(hl, width, hl - corner, width)
+  s.lineTo(-hl + corner, width)
+  s.quadraticCurveTo(-hl, width, -hl, width - corner)
+  s.lineTo(-hl, chamferWidth)
+  s.closePath()
+  return s
+}
+
+function createRailBodyGeometry(length, width, height, chamferLen, chamferWidth) {
+  const shape = createRailBodyShape(length, width, chamferLen, chamferWidth)
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: height,
+    bevelEnabled: false,
+    curveSegments: 6,
+  })
+  geo.rotateX(-Math.PI / 2)
+  geo.computeBoundingBox()
+  const bb = geo.boundingBox
+  geo.translate(
+    -(bb.min.x + bb.max.x) / 2,
+    -bb.min.y,
+    -bb.min.z,
+  )
+  geo.computeVertexNormals()
+  return geo
+}
+
+function mirrorGeometryZ(source) {
+  const geo = source.clone()
+  geo.scale(1, 1, -1)
+  const idx = geo.index
+  if (idx) {
+    const a = idx.array
+    for (let i = 0; i < a.length; i += 3) {
+      const tmp = a[i]
+      a[i] = a[i + 2]
+      a[i + 2] = tmp
+    }
+    idx.needsUpdate = true
+  }
+  geo.computeVertexNormals()
+  return geo
+}
+
+function createRailDomeGeometry(radius, length) {
+  const geo = new THREE.CylinderGeometry(radius, radius, length, 28, 1, false, 0, Math.PI)
+  geo.rotateZ(Math.PI / 2)
+  geo.computeVertexNormals()
+  return geo
 }
 
 function createLampArrow() {
@@ -357,7 +380,7 @@ function createLampFaceTexture() {
   return tex
 }
 
-function Metal({ map, roughness = 0.4, metalness = 0.72, color = STAINLESS }) {
+function Metal({ map, roughness = 0.36, metalness = 0.78, color = '#e6e6e6' }) {
   return (
     <meshStandardMaterial
       map={map}
@@ -403,96 +426,226 @@ OrbitRig.propTypes = {
   children: PropTypes.node,
 }
 
-function EntryPanel({ position }) {
+function EntryLamp({ position, rotation = [0, 0, 0] }) {
   const entryMap = useMemo(() => createEntryLabelTexture(), [])
   const lampMap = useMemo(() => createLampFaceTexture(), [])
   const arrow = useMemo(() => createLampArrow(), [])
   const arrowExtrude = useMemo(() => ({
-    depth: 0.01,
+    depth: 0.012,
     bevelEnabled: true,
-    bevelThickness: 0.003,
-    bevelSize: 0.005,
+    bevelThickness: 0.004,
+    bevelSize: 0.006,
     bevelSegments: 1,
   }), [])
 
-  useEffect(() => () => {
-    entryMap.dispose()
-    lampMap.dispose()
+  useEffect(() => {
+    return () => {
+      entryMap.dispose()
+      lampMap.dispose()
+    }
   }, [entryMap, lampMap])
 
   return (
-    <group position={position}>
-      <mesh position={[0, 0.128, 0.003]}>
-        <boxGeometry args={[0.178, 0.058, 0.008]} />
-        <meshStandardMaterial color="#050505" roughness={0.55} metalness={0.08} />
+    <group position={position} rotation={rotation} scale={0.44}>
+      <mesh position={[0, 0.16, 0.01]}>
+        <boxGeometry args={[0.44, 0.138, 0.012]} />
+        <meshStandardMaterial color="#000000" roughness={0.62} metalness={0.04} />
       </mesh>
-      <mesh position={[0, 0.128, 0.008]}>
-        <planeGeometry args={[0.178, 0.058]} />
+      <mesh position={[0, 0.16, 0.017]}>
+        <planeGeometry args={[0.44, 0.138]} />
         <meshBasicMaterial map={entryMap} toneMapped={false} />
       </mesh>
 
-      <group position={[0, 0.036, 0.01]}>
+      <group position={[0, -0.14, 0.02]}>
         <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.074, 0.074, 0.016, 32]} />
+          <cylinderGeometry args={[0.188, 0.188, 0.036, 32]} />
           <meshStandardMaterial color="#1a1a1a" roughness={0.34} metalness={0.78} />
         </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.004]}>
-          <cylinderGeometry args={[0.058, 0.058, 0.01, 32]} />
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.01]}>
+          <cylinderGeometry args={[0.148, 0.148, 0.022, 32]} />
           <meshStandardMaterial
             color="#0d9a34"
             emissive="#1ad24a"
-            emissiveIntensity={0.72}
+            emissiveIntensity={0.7}
             roughness={0.35}
             metalness={0}
           />
         </mesh>
-        <mesh position={[0, 0, 0.01]}>
-          <circleGeometry args={[0.057, 32]} />
+        <mesh position={[0, 0, 0.022]}>
+          <circleGeometry args={[0.146, 32]} />
           <meshBasicMaterial map={lampMap} toneMapped={false} />
         </mesh>
         <mesh
-          position={[0, 0, 0.013]}
+          position={[0, 0, 0.03]}
           rotation={[0, 0, -Math.PI * 0.78]}
-          scale={0.072}
+          scale={0.185}
         >
           <extrudeGeometry args={[arrow, arrowExtrude]} />
           <meshBasicMaterial color="#d9a40f" toneMapped={false} />
         </mesh>
-        <pointLight color="#3dff6a" intensity={0.42} distance={0.75} position={[0, 0, 0.08]} />
+        <pointLight color="#3dff6a" intensity={0.55} distance={1.5} position={[0, 0, 0.2]} />
       </group>
     </group>
   )
 }
 
-EntryPanel.propTypes = {
+EntryLamp.propTypes = {
   position: PropTypes.arrayOf(PropTypes.number).isRequired,
+  rotation: PropTypes.arrayOf(PropTypes.number),
 }
 
-function SwipeHead({ map, position, rotation = [0, 0, 0] }) {
-  const housingGeo = useRoundedBox(0.168, 0.032, 0.096, 0.003)
-  const lipGeo = useRoundedBox(0.148, 0.007, 0.082, 0.002)
-  const bezelGeo = useRoundedBox(0.118, 0.005, 0.052, 0.001)
+function TripodArm({ map, direction }) {
+  const dir = useMemo(() => direction.clone().normalize(), [direction])
+  const mid = useMemo(() => dir.clone().multiplyScalar(ARM_LEN / 2), [dir])
+  const tip = useMemo(() => dir.clone().multiplyScalar(ARM_LEN - 0.014), [dir])
+  const orient = useMemo(() => {
+    const q = new THREE.Quaternion()
+    q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+    return q
+  }, [dir])
 
   return (
-    <group position={position} rotation={rotation}>
-      <mesh geometry={housingGeo} position={[0, 0.016, 0]}>
-        <Metal map={map} roughness={0.36} metalness={0.78} color="#f0f0f0" />
+    <group>
+      <mesh position={mid.toArray()} quaternion={orient}>
+        <cylinderGeometry args={[ARM_R, ARM_R, ARM_LEN, 20]} />
+        <Metal map={map} roughness={0.36} metalness={0.8} />
       </mesh>
-      <mesh geometry={lipGeo} position={[0, 0.034, 0]}>
-        <Metal map={map} roughness={0.32} metalness={0.82} color="#f6f6f6" />
+      <mesh position={tip.toArray()} quaternion={orient}>
+        <cylinderGeometry args={[ARM_R * 1.14, ARM_R * 1.14, 0.024, 14]} />
+        <meshStandardMaterial color="#141414" roughness={0.9} metalness={0.04} />
       </mesh>
-      <mesh geometry={bezelGeo} position={[0, 0.037, 0.002]}>
-        <meshStandardMaterial color="#1a1a1a" roughness={0.88} metalness={0.1} />
+    </group>
+  )
+}
+
+TripodArm.propTypes = {
+  map: PropTypes.object,
+  direction: PropTypes.instanceOf(THREE.Vector3).isRequired,
+}
+
+function Tripod({ map }) {
+  const axisQuat = useMemo(() => {
+    const q = new THREE.Quaternion()
+    q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), ROTOR_AXIS)
+    return q
+  }, [])
+
+  const armDirs = useMemo(() => [
+    BLOCKING_ARM.clone(),
+    BLOCKING_ARM.clone().applyAxisAngle(ROTOR_AXIS, (Math.PI * 2) / 3),
+    BLOCKING_ARM.clone().applyAxisAngle(ROTOR_AXIS, (Math.PI * 4) / 3),
+  ], [])
+
+  return (
+    <group position={[0.42, 1.36, 0]}>
+      <mesh position={[0, -0.038, 0]}>
+        <cylinderGeometry args={[0.03, 0.036, 0.076, 20]} />
+        <Metal map={map} roughness={0.4} metalness={0.78} />
       </mesh>
-      <mesh position={[0, 0.038, 0.002]}>
-        <boxGeometry args={[0.104, 0.005, 0.044]} />
-        <meshStandardMaterial color={SLOT_DARK} roughness={0.92} metalness={0.06} />
+
+      <group quaternion={axisQuat}>
+        <mesh position={[0, 0.018, 0]}>
+          <cylinderGeometry args={[HUB_R * 0.82, HUB_R, 0.058, 24]} />
+          <Metal map={map} roughness={0.34} metalness={0.84} />
+        </mesh>
+        <mesh position={[0, 0.052, 0]}>
+          <cylinderGeometry args={[HUB_R, HUB_R * 0.88, 0.02, 24]} />
+          <Metal map={map} roughness={0.36} metalness={0.82} />
+        </mesh>
+        {armDirs.map((dir) => (
+          <TripodArm key={`${dir.x}-${dir.y}-${dir.z}`} map={map} direction={dir} />
+        ))}
+      </group>
+    </group>
+  )
+}
+
+Tripod.propTypes = {
+  map: PropTypes.object,
+}
+
+function SwipeHead({ map, position }) {
+  const wellL = 1.14
+  const wellW = 0.34
+  const wellH = 0.005
+  const plateL = 1.06
+  const plateW = 0.3
+  const plateH = 0.007
+  const railL = 1.06
+  const railW = 0.176
+  const railBodyH = 0.055
+  const grooveW = 0.068
+  const chamferLen = 0.2
+  const chamferWidth = 0.08
+  const domeR = railW * 0.36
+  const domeL = railL - chamferLen * 0.45
+  const railZ = grooveW / 2
+
+  const wellGeo = useRoundedBox(wellL, wellH, wellW, 0.003)
+  const plateGeo = useRoundedBox(plateL, plateH, plateW, 0.004)
+  const nearBody = useMemo(
+    () => createRailBodyGeometry(railL, railW, railBodyH, chamferLen, chamferWidth),
+    [railL, railW, railBodyH, chamferLen, chamferWidth],
+  )
+  const farBody = useMemo(() => mirrorGeometryZ(nearBody), [nearBody])
+  const domeGeo = useMemo(() => createRailDomeGeometry(domeR, domeL), [domeR, domeL])
+
+  useEffect(() => () => {
+    nearBody.dispose()
+    farBody.dispose()
+    domeGeo.dispose()
+  }, [nearBody, farBody, domeGeo])
+
+  const plateTop = wellH + plateH
+  const domeX = chamferLen * 0.18
+  const domeY = plateTop + railBodyH
+  const domeZ = railZ + railW / 2
+
+  return (
+    <group position={position}>
+      <mesh geometry={wellGeo} position={[0, wellH / 2, 0]}>
+        <Metal map={map} roughness={0.4} metalness={0.74} color="#d8d8d8" />
       </mesh>
-      <mesh position={[-0.046, 0.038, 0.002]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[0.044, 0.004]} />
+      <mesh geometry={plateGeo} position={[0, wellH + plateH / 2, 0]}>
+        <Metal map={map} roughness={0.34} metalness={0.8} color="#ececec" />
+      </mesh>
+
+      <mesh geometry={nearBody} position={[0, plateTop, railZ]}>
+        <Metal map={map} roughness={0.26} metalness={0.88} color="#f3f3f3" />
+      </mesh>
+      <mesh geometry={farBody} position={[0, plateTop, -railZ]}>
+        <Metal map={map} roughness={0.26} metalness={0.88} color="#f3f3f3" />
+      </mesh>
+
+      <mesh geometry={domeGeo} position={[domeX, domeY, domeZ]}>
+        <Metal map={map} roughness={0.24} metalness={0.9} color="#f6f6f6" />
+      </mesh>
+      <mesh geometry={domeGeo} position={[domeX, domeY, -domeZ]}>
+        <Metal map={map} roughness={0.24} metalness={0.9} color="#f6f6f6" />
+      </mesh>
+
+      <mesh position={[chamferLen * 0.42, plateTop + railBodyH * 0.46, 0]}>
+        <boxGeometry args={[railL - chamferLen * 0.55, railBodyH * 0.92, grooveW * 0.7]} />
+        <meshStandardMaterial
+          color={SLOT_DARK}
+          roughness={0.95}
+          metalness={0.08}
+        />
+      </mesh>
+      <mesh
+        position={[-railL / 2 + 0.008, plateTop + railBodyH * 0.42, 0]}
+        rotation={[0, Math.PI / 2, 0]}
+      >
+        <planeGeometry args={[grooveW + chamferWidth * 0.65, railBodyH * 0.9]} />
         <meshBasicMaterial color={SLOT_DARK} />
       </mesh>
-      <pointLight color={GOLDEN} intensity={0.38} distance={1.0} position={[0, 0.07, 0.1]} />
+
+      <pointLight
+        color={GOLDEN}
+        intensity={0.85}
+        distance={1.8}
+        position={[0.05, 0.28, 0.35]}
+      />
     </group>
   )
 }
@@ -500,143 +653,79 @@ function SwipeHead({ map, position, rotation = [0, 0, 0] }) {
 SwipeHead.propTypes = {
   map: PropTypes.object,
   position: PropTypes.arrayOf(PropTypes.number).isRequired,
-  rotation: PropTypes.arrayOf(PropTypes.number),
-}
-
-function Rotor({ map, position }) {
-  const armAngles = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]
-
-  return (
-    <group position={position}>
-      <mesh position={[0, 0, 0.014]}>
-        <cylinderGeometry args={[0.034, 0.034, 0.012, 20]} />
-        <Metal map={map} roughness={0.38} metalness={0.8} />
-      </mesh>
-      <mesh>
-        <cylinderGeometry args={[0.03, 0.03, 0.048, 20]} />
-        <Metal map={map} roughness={0.38} metalness={0.82} />
-      </mesh>
-      {armAngles.map((angle) => (
-        <group key={angle} rotation={[0, angle, 0]}>
-          <mesh position={[ARM_LEN / 2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[ARM_R, ARM_R, ARM_LEN, 18]} />
-            <Metal map={map} roughness={0.38} metalness={0.8} />
-          </mesh>
-          <mesh position={[ARM_LEN - 0.012, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[ARM_R * 1.08, ARM_R * 1.08, 0.016, 14]} />
-            <meshStandardMaterial color="#1a1a1a" roughness={0.82} metalness={0.12} />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  )
-}
-
-Rotor.propTypes = {
-  map: PropTypes.object,
-  position: PropTypes.arrayOf(PropTypes.number).isRequired,
-}
-
-function Frame({ map }) {
-  const tallZ = THROAT / 2 + LEG_D / 2
-  const shortZ = -(THROAT / 2 + LEG_D / 2)
-  const lowerH = H_TALL * 0.66
-  const slopeH = H_TALL - lowerH
-  const totalDepth = THROAT + LEG_D * 2
-
-  const baseGeo = useRoundedBox(BODY_W + 0.036, H_BASE, totalDepth + 0.04, BEVEL)
-  const tallLowerGeo = useRoundedBox(BODY_W, lowerH, LEG_D, BEVEL)
-  const tallSlopeGeo = useRoundedBox(BODY_W, slopeH * 1.02, LEG_D * 0.94, BEVEL)
-  const shortGeo = useRoundedBox(BODY_W, H_SHORT, LEG_D, BEVEL)
-  const shortCapGeo = useRoundedBox(BODY_W * 0.94, 0.042, LEG_D * 0.9, BEVEL)
-  const mountWallGeo = useRoundedBox(BODY_W * 0.88, 0.22, 0.014, 0.002)
-  const throatLipGeo = useRoundedBox(BODY_W * 0.94, 0.012, 0.014, 0.002)
-
-  return (
-    <group>
-      <mesh geometry={baseGeo} position={[0, H_BASE / 2, 0]}>
-        <Metal map={map} roughness={0.42} metalness={0.68} color="#e4e4e4" />
-      </mesh>
-
-      <mesh geometry={tallLowerGeo} position={[0, H_BASE + lowerH / 2, tallZ]}>
-        <Metal map={map} />
-      </mesh>
-
-      <mesh
-        geometry={tallSlopeGeo}
-        position={[0, H_BASE + lowerH + slopeH * 0.4, tallZ + 0.01]}
-        rotation={[SLOPE_ANGLE, 0, 0]}
-      >
-        <Metal map={map} roughness={0.38} metalness={0.76} color="#f0f0f0" />
-      </mesh>
-
-      <mesh geometry={shortGeo} position={[0, H_BASE + H_SHORT / 2, shortZ]}>
-        <Metal map={map} />
-      </mesh>
-
-      <mesh geometry={shortCapGeo} position={[0, H_BASE + H_SHORT + 0.02, shortZ]}>
-        <Metal map={map} roughness={0.38} metalness={0.76} color="#f0f0f0" />
-      </mesh>
-
-      <mesh
-        geometry={mountWallGeo}
-        position={[0, H_BASE + 0.48, tallZ - LEG_D / 2 + 0.007]}
-      >
-        <Metal map={map} roughness={0.44} metalness={0.7} color="#e0e0e0" />
-      </mesh>
-
-      <mesh
-        geometry={throatLipGeo}
-        position={[0, H_BASE + H_SHORT + 0.006, shortZ + LEG_D / 2 - 0.007]}
-      >
-        <Metal map={map} roughness={0.4} metalness={0.72} />
-      </mesh>
-
-      <mesh
-        geometry={throatLipGeo}
-        position={[0, H_BASE + lowerH + 0.006, tallZ - LEG_D / 2 + 0.007]}
-      >
-        <Metal map={map} roughness={0.4} metalness={0.72} />
-      </mesh>
-    </group>
-  )
-}
-
-Frame.propTypes = {
-  map: PropTypes.object,
 }
 
 function Turnstile({ isMobile, orbit, reducedMotion }) {
   const source = useLoader(THREE.TextureLoader, '/metal.jpg')
-  const bodyMap = useMemo(() => cloneMetal(source, 0.5, 1.6), [source])
-  const readerMap = useMemo(() => cloneMetal(source, 0.75, 0.32), [source])
-  const armMap = useMemo(() => cloneMetal(source, 0.35, 1.1), [source])
+  const pillarMap = useMemo(() => cloneMetal(source, 0.55, 2.1), [source])
+  const beamMap = useMemo(() => cloneMetal(source, 2.4, 0.32), [source])
+  const readerMap = useMemo(() => cloneMetal(source, 0.9, 0.4), [source])
+  const armMap = useMemo(() => cloneMetal(source, 0.35, 1.3), [source])
 
-  const tallZ = THROAT / 2 + LEG_D / 2
-  const lowerH = H_TALL * 0.66
-  const slopeH = H_TALL - lowerH
-  const slopeCenterY = H_BASE + lowerH + slopeH * 0.4
-  const slopeCenterZ = tallZ + 0.01
-  const pivot = [0, H_BASE + 0.48, 0]
-  const scale = isMobile ? 1.12 : 1.08
+  const pillarW = 0.24
+  const pillarH = 2.72
+  const pillarD = 0.28
+  const beamW = 3.12
+  const beamH = 0.09
+  const beamD = 0.22
+  const farW = 0.2
+  const farH = 1.84
+  const farD = 0.24
+
+  const pillarGeo = useRoundedBox(pillarW, pillarH, pillarD, 0.024)
+  const pillarFootGeo = useRoundedBox(0.32, 0.055, 0.34, 0.016)
+  const beamGeo = useRoundedBox(beamW, beamH, beamD, 0.014)
+  const farGeo = useRoundedBox(farW, farH, farD, 0.02)
+  const farFootGeo = useRoundedBox(0.28, 0.055, 0.3, 0.016)
+  const baseGeo = useRoundedBox(3.28, 0.04, 0.22, 0.012)
+
+  const pillarX = 1.52
+  const beamY = 1.68
+  const beamX = -0.16
+  const beamTop = beamY + beamH / 2
+  const farX = beamX - beamW / 2 + farW / 2 + 0.02
+  const baseX = (pillarX + farX) / 2
+  const readerX = -0.58
+  const scale = isMobile ? 1.18 : 1.16
+  const pivot = [0.28, 1.38, 0]
 
   return (
-    <group position={isMobile ? [-0.52, 0.04, 0] : [-0.64, 0, 0]} scale={SCENE_SCALE * scale}>
+    <group position={isMobile ? [-0.55, 0.06, 0] : [-0.68, 0, 0]} scale={scale}>
       <OrbitRig orbit={orbit} reducedMotion={reducedMotion} pivot={pivot}>
-        <Frame map={bodyMap} />
+        <mesh geometry={baseGeo} position={[baseX, 0.03, 0]}>
+          <Metal map={pillarMap} roughness={0.5} metalness={0.62} />
+        </mesh>
+        <mesh geometry={pillarFootGeo} position={[pillarX, 0.055, 0]}>
+          <Metal map={pillarMap} roughness={0.46} metalness={0.66} />
+        </mesh>
+        <mesh geometry={farFootGeo} position={[farX, 0.055, 0]}>
+          <Metal map={pillarMap} roughness={0.46} metalness={0.66} />
+        </mesh>
 
-        <EntryPanel position={[0, H_BASE + 0.58, tallZ + LEG_D / 2 + 0.005]} />
+        <mesh geometry={pillarGeo} position={[pillarX, pillarH / 2, 0]}>
+          <Metal map={pillarMap} />
+        </mesh>
 
-        <SwipeHead
-          map={readerMap}
-          position={[0, slopeCenterY + 0.036, slopeCenterZ + 0.038]}
-          rotation={[SLOPE_ANGLE, 0, 0]}
+        <mesh geometry={farGeo} position={[farX, farH / 2, 0]}>
+          <Metal map={pillarMap} />
+        </mesh>
+
+        <EntryLamp
+          position={[
+            pillarX - pillarW / 2 - 0.01,
+            beamTop + 0.18,
+            0,
+          ]}
+          rotation={[0, -Math.PI / 2, 0]}
         />
 
-        <Rotor
-          map={armMap}
-          position={[0, H_BASE + 0.48, tallZ - LEG_D / 2 + 0.012]}
-        />
+        <mesh geometry={beamGeo} position={[beamX, beamY, 0]}>
+          <Metal map={beamMap} roughness={0.38} metalness={0.76} />
+        </mesh>
+
+        <SwipeHead map={readerMap} position={[readerX, beamTop, 0]} />
+
+        <Tripod map={armMap} />
       </OrbitRig>
     </group>
   )
@@ -681,13 +770,13 @@ function AimCamera({ isMobile }) {
 
   useEffect(() => {
     if (isMobile) {
-      camera.position.set(-0.16, 1.96, 6.55)
+      camera.position.set(-0.2, 2.12, 6.95)
       camera.fov = 32
-      camera.lookAt(-0.2, 1.28, 0.12)
+      camera.lookAt(-0.28, 1.36, 0)
     } else {
-      camera.position.set(-0.24, 2.02, 6.75)
+      camera.position.set(-0.32, 2.18, 7.15)
       camera.fov = 26
-      camera.lookAt(-0.2, 1.32, 0.12)
+      camera.lookAt(-0.28, 1.4, 0)
     }
     camera.updateProjectionMatrix()
   }, [camera, isMobile])
@@ -703,12 +792,12 @@ function TurnstileScene({ isMobile, reducedMotion, orbit }) {
   return (
     <>
       <AimCamera isMobile={isMobile} />
-      <ambientLight intensity={0.74} />
-      <directionalLight position={[-3.2, 3.4, 7.0]} intensity={2.2} />
-      <directionalLight position={[-0.5, 5.2, 2.4]} intensity={0.95} />
-      <directionalLight position={[0.4, 2.6, 7.8]} intensity={1.05} />
-      <directionalLight position={[3.0, 4.0, 2.0]} intensity={0.6} />
-      <directionalLight position={[-2.0, 0.8, -2.8]} intensity={0.32} />
+      <ambientLight intensity={0.62} />
+      <directionalLight position={[-3.6, 3.2, 7.4]} intensity={2.05} />
+      <directionalLight position={[-0.7, 5.4, 2.6]} intensity={0.85} />
+      <directionalLight position={[0.2, 2.4, 8.2]} intensity={0.9} />
+      <directionalLight position={[3.2, 4.2, 2.2]} intensity={0.55} />
+      <directionalLight position={[-2.2, 0.6, -3.0]} intensity={0.28} />
       <GleamLight reducedMotion={reducedMotion} isMobile={isMobile} />
       <Turnstile isMobile={isMobile} orbit={orbit} reducedMotion={reducedMotion} />
     </>
@@ -724,15 +813,18 @@ TurnstileScene.propTypes = {
 function CssTurnstile() {
   return (
     <Fallback>
-      <CssBase />
-      <CssTallLeg />
-      <CssShortLeg />
-      <CssEntry />
-      <CssLamp />
-      <CssSwipeHead />
-      <Arm $rot={0} />
-      <Arm $rot={120} />
-      <Arm $rot={240} />
+      <Pillar />
+      <FarBlock />
+      <Beam>
+        <CssSwipeHead>
+          <CssRail />
+          <CssGroove />
+          <CssRail />
+        </CssSwipeHead>
+      </Beam>
+      <Arm $rot={90} />
+      <Arm $rot={210} />
+      <Arm $rot={330} />
       <GleamSweep />
     </Fallback>
   )
@@ -746,7 +838,7 @@ export default function SwipeLine() {
   )
   const reducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const orbit = useRef({ yaw: 0.36, pitch: 0.06 })
+  const orbit = useRef({ yaw: 0.42, pitch: 0.08 })
   const drag = useRef({
     pointerId: null,
     x: 0,
@@ -813,13 +905,13 @@ export default function SwipeLine() {
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [-0.16, 1.96, 6.55] : [-0.24, 2.02, 6.75],
+                position: isMobile ? [-0.2, 2.12, 6.95] : [-0.32, 2.18, 7.15],
                 fov: isMobile ? 32 : 26,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'auto' }}
               onCreated={({ gl }) => {
                 gl.setClearColor(0x000000, 0)
-                gl.toneMappingExposure = 1.38
+                gl.toneMappingExposure = 1.2
                 gl.domElement.addEventListener('webglcontextlost', (event) => {
                   event.preventDefault()
                   setUse3d(false)
