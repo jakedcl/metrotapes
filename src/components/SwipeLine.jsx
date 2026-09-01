@@ -438,7 +438,7 @@ function EntryLamp({ position, rotation = [0, 0, 0] }) {
   }, [entryMap, lampMap])
 
   return (
-    <group position={position} rotation={rotation} scale={0.4}>
+    <group position={position} rotation={rotation} scale={0.44}>
       <mesh position={[0, 0.16, 0.01]}>
         <boxGeometry args={[0.44, 0.138, 0.012]} />
         <meshStandardMaterial color="#000000" roughness={0.62} metalness={0.04} />
@@ -487,18 +487,18 @@ EntryLamp.propTypes = {
 }
 
 function Tripod({ map }) {
-  const len = 1.22
-  const r = 0.014
-  const angles = [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]
+  const len = 1.3
+  const r = 0.019
+  const angles = [Math.PI, Math.PI + (Math.PI * 2) / 3, Math.PI + (Math.PI * 4) / 3]
 
   return (
-    <group position={[-0.12, 1.48, 0]}>
+    <group position={[0.62, 1.52, 0.16]} rotation={[0.28, 0, 0]}>
       <mesh>
-        <cylinderGeometry args={[0.032, 0.032, 0.1, 20]} />
+        <cylinderGeometry args={[0.036, 0.036, 0.1, 20]} />
         <Metal map={map} roughness={0.34} metalness={0.82} />
       </mesh>
       <mesh>
-        <sphereGeometry args={[0.042, 16, 12]} />
+        <sphereGeometry args={[0.044, 16, 12]} />
         <Metal map={map} roughness={0.32} metalness={0.84} />
       </mesh>
       {angles.map((angle) => (
