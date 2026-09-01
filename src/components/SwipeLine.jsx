@@ -90,7 +90,7 @@ const Beam = styled.div`
   bottom: 44%;
   height: 16%;
   border-radius: 3px;
-  overflow: hidden;
+  overflow: visible;
 
   @media (max-width: 767px) {
     left: 8%;
@@ -98,25 +98,42 @@ const Beam = styled.div`
     bottom: 42%;
     height: 15%;
   }
+`
 
-  &::after {
-    content: '';
-    position: absolute;
-    left: 8%;
-    right: 14%;
-    top: 32%;
-    height: 28%;
-    border-radius: 5px;
-    background: linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 0.72) 0%,
-      rgba(20, 20, 20, 0.95) 45%,
-      rgba(0, 0, 0, 0.8) 100%
-    );
-    box-shadow:
-      inset 0 3px 4px rgba(0, 0, 0, 0.85),
-      0 1px 0 rgba(255, 255, 255, 0.28);
-  }
+const CssSwipeHead = styled.div`
+  ${metalFill}
+  position: absolute;
+  left: 10%;
+  top: -38%;
+  width: 46%;
+  height: 78%;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 4px 7px 4px 5px;
+  box-sizing: border-box;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.28),
+    0 1px 3px rgba(0, 0, 0, 0.35);
+`
+
+const CssRail = styled.div`
+  ${metalFill}
+  height: 36%;
+  border-radius: 50% / 85%;
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.38),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.4);
+`
+
+const CssGroove = styled.div`
+  height: 18%;
+  margin: 0 12% 0 2%;
+  border-radius: 1px;
+  background: ${SLOT_DARK};
+  clip-path: polygon(0 0, 14% 22%, 100% 22%, 100% 78%, 14% 78%, 0 100%);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.85);
 `
 
 const Arm = styled.div`
@@ -193,52 +210,65 @@ function useRoundedBox(width, height, depth, radius, segments = 3) {
   return geometry
 }
 
-function roundedRect(path, x, y, w, h, r, clockwise = false) {
-  const rad = Math.min(r, w / 2, h / 2)
-  if (clockwise) {
-    path.moveTo(x + rad, y)
-    path.quadraticCurveTo(x, y, x, y + rad)
-    path.lineTo(x, y + h - rad)
-    path.quadraticCurveTo(x, y + h, x + rad, y + h)
-    path.lineTo(x + w - rad, y + h)
-    path.quadraticCurveTo(x + w, y + h, x + w, y + h - rad)
-    path.lineTo(x + w, y + rad)
-    path.quadraticCurveTo(x + w, y, x + w - rad, y)
-    path.closePath()
-    return
-  }
-  path.moveTo(x + rad, y)
-  path.lineTo(x + w - rad, y)
-  path.quadraticCurveTo(x + w, y, x + w, y + rad)
-  path.lineTo(x + w, y + h - rad)
-  path.quadraticCurveTo(x + w, y + h, x + w - rad, y + h)
-  path.lineTo(x + rad, y + h)
-  path.quadraticCurveTo(x, y + h, x, y + h - rad)
-  path.lineTo(x, y + rad)
-  path.quadraticCurveTo(x, y, x + rad, y)
-  path.closePath()
-}
-
-function createReaderShape(len, height, slotLen, slotH) {
+function createRailBodyShape(length, width, chamferLen, chamferWidth) {
   const s = new THREE.Shape()
-  roundedRect(s, -len / 2, -height / 2, len, height, Math.min(0.05, height * 0.22))
-  const hole = new THREE.Path()
-  roundedRect(hole, -slotLen / 2, -slotH / 2, slotLen, slotH, Math.min(0.02, slotH * 0.4), true)
-  s.holes.push(hole)
-  return s
-}
+  const hl = length / 2
+  const corner = Math.min(0.028, width * 0.14)
 
-function createArrowShape() {
-  const s = new THREE.Shape()
-  s.moveTo(-0.38, -0.16)
-  s.lineTo(0.12, -0.16)
-  s.lineTo(0.12, -0.3)
-  s.lineTo(0.52, 0)
-  s.lineTo(0.12, 0.3)
-  s.lineTo(0.12, 0.16)
-  s.lineTo(-0.38, 0.16)
+  s.moveTo(-hl, chamferWidth)
+  s.lineTo(-hl + chamferLen, 0)
+  s.lineTo(hl - corner, 0)
+  s.quadraticCurveTo(hl, 0, hl, corner)
+  s.lineTo(hl, width - corner)
+  s.quadraticCurveTo(hl, width, hl - corner, width)
+  s.lineTo(-hl + corner, width)
+  s.quadraticCurveTo(-hl, width, -hl, width - corner)
+  s.lineTo(-hl, chamferWidth)
   s.closePath()
   return s
+}
+
+function createRailBodyGeometry(length, width, height, chamferLen, chamferWidth) {
+  const shape = createRailBodyShape(length, width, chamferLen, chamferWidth)
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: height,
+    bevelEnabled: false,
+    curveSegments: 6,
+  })
+  geo.rotateX(-Math.PI / 2)
+  geo.computeBoundingBox()
+  const bb = geo.boundingBox
+  geo.translate(
+    -(bb.min.x + bb.max.x) / 2,
+    -bb.min.y,
+    -bb.min.z,
+  )
+  geo.computeVertexNormals()
+  return geo
+}
+
+function mirrorGeometryZ(source) {
+  const geo = source.clone()
+  geo.scale(1, 1, -1)
+  const idx = geo.index
+  if (idx) {
+    const a = idx.array
+    for (let i = 0; i < a.length; i += 3) {
+      const tmp = a[i]
+      a[i] = a[i + 2]
+      a[i + 2] = tmp
+    }
+    idx.needsUpdate = true
+  }
+  geo.computeVertexNormals()
+  return geo
+}
+
+function createRailDomeGeometry(radius, length) {
+  const geo = new THREE.CylinderGeometry(radius, radius, length, 28, 1, false, 0, Math.PI)
+  geo.rotateZ(Math.PI / 2)
+  geo.computeVertexNormals()
+  return geo
 }
 
 function createLampArrow() {
@@ -433,11 +463,95 @@ Tripod.propTypes = {
   map: PropTypes.object,
 }
 
+function SwipeHead({ map, position }) {
+  const wellL = 1.14
+  const wellW = 0.50
+  const wellH = 0.02
+  const plateL = 1.04
+  const plateW = 0.44
+  const plateH = 0.022
+  const railL = 0.94
+  const railW = 0.178
+  const railBodyH = 0.072
+  const grooveW = 0.046
+  const chamferLen = 0.16
+  const chamferWidth = 0.074
+  const domeR = railW * 0.49
+  const domeL = railL - chamferLen * 0.62
+  const railZ = grooveW / 2
+
+  const wellGeo = useRoundedBox(wellL, wellH, wellW, 0.03)
+  const plateGeo = useRoundedBox(plateL, plateH, plateW, 0.024)
+  const nearBody = useMemo(
+    () => createRailBodyGeometry(railL, railW, railBodyH, chamferLen, chamferWidth),
+    [railL, railW, railBodyH, chamferLen, chamferWidth],
+  )
+  const farBody = useMemo(() => mirrorGeometryZ(nearBody), [nearBody])
+  const domeGeo = useMemo(() => createRailDomeGeometry(domeR, domeL), [domeR, domeL])
+
+  useEffect(() => () => {
+    nearBody.dispose()
+    farBody.dispose()
+    domeGeo.dispose()
+  }, [nearBody, farBody, domeGeo])
+
+  const plateTop = wellH + plateH
+  const domeX = chamferLen * 0.18
+  const domeY = plateTop + railBodyH
+  const domeZ = railZ + railW / 2
+
+  return (
+    <group position={position}>
+      <mesh geometry={wellGeo} position={[0, wellH / 2, 0]}>
+        <Metal map={map} roughness={0.4} metalness={0.74} color="#d8d8d8" />
+      </mesh>
+      <mesh geometry={plateGeo} position={[0, wellH + plateH / 2, 0]}>
+        <Metal map={map} roughness={0.34} metalness={0.8} color="#ececec" />
+      </mesh>
+
+      <mesh geometry={nearBody} position={[0, plateTop, railZ]}>
+        <Metal map={map} roughness={0.26} metalness={0.88} color="#f3f3f3" />
+      </mesh>
+      <mesh geometry={farBody} position={[0, plateTop, -railZ]}>
+        <Metal map={map} roughness={0.26} metalness={0.88} color="#f3f3f3" />
+      </mesh>
+
+      <mesh geometry={domeGeo} position={[domeX, domeY, domeZ]}>
+        <Metal map={map} roughness={0.24} metalness={0.9} color="#f6f6f6" />
+      </mesh>
+      <mesh geometry={domeGeo} position={[domeX, domeY, -domeZ]}>
+        <Metal map={map} roughness={0.24} metalness={0.9} color="#f6f6f6" />
+      </mesh>
+
+      <mesh position={[chamferLen * 0.12, plateTop + 0.012, 0]}>
+        <boxGeometry args={[railL * 0.9, 0.028, grooveW * 0.92]} />
+        <meshStandardMaterial
+          color={SLOT_DARK}
+          roughness={0.92}
+          metalness={0.12}
+        />
+      </mesh>
+
+      <pointLight
+        color={GOLDEN}
+        intensity={0.85}
+        distance={1.8}
+        position={[0.05, 0.42, 0.35]}
+      />
+    </group>
+  )
+}
+
+SwipeHead.propTypes = {
+  map: PropTypes.object,
+  position: PropTypes.arrayOf(PropTypes.number).isRequired,
+}
+
 function Turnstile({ isMobile, orbit, reducedMotion }) {
   const source = useLoader(THREE.TextureLoader, '/metal.jpg')
   const pillarMap = useMemo(() => cloneMetal(source, 0.55, 2.1), [source])
   const beamMap = useMemo(() => cloneMetal(source, 2.2, 0.45), [source])
-  const readerMap = useMemo(() => cloneMetal(source, 1.4, 0.45), [source])
+  const readerMap = useMemo(() => cloneMetal(source, 0.9, 0.4), [source])
   const armMap = useMemo(() => cloneMetal(source, 0.35, 1.3), [source])
 
   const pillarW = 0.78
@@ -446,38 +560,16 @@ function Turnstile({ isMobile, orbit, reducedMotion }) {
   const beamW = 2.72
   const beamH = 0.42
   const beamD = 0.56
-  const readerL = 1.78
-  const readerH = 0.4
-  const readerD = 0.4
-  const slotL = 1.52
-  const slotH = 0.085
 
   const pillarGeo = useRoundedBox(pillarW, pillarH, pillarD, 0.045)
   const footGeo = useRoundedBox(0.9, 0.12, 0.72, 0.03)
   const beamGeo = useRoundedBox(beamW, beamH, beamD, 0.04)
-  const readerShape = useMemo(
-    () => createReaderShape(readerL, readerH, slotL, slotH),
-    [readerL, readerH, slotL, slotH],
-  )
-  const readerExtrude = useMemo(() => ({
-    depth: readerD,
-    bevelEnabled: true,
-    bevelThickness: 0.02,
-    bevelSize: 0.02,
-    bevelSegments: 1,
-  }), [readerD])
-  const arrow = useMemo(() => createArrowShape(), [])
-  const arrowExtrude = useMemo(() => ({
-    depth: 0.014,
-    bevelEnabled: false,
-  }), [])
 
   const pillarX = 1.52
   const beamY = 1.18
   const beamX = -0.22
-  const readerX = beamX - 0.12
-  const readerY = beamY + beamH / 2 + readerH / 2 - 0.04
-  const readerZ = beamD / 2 + readerD / 2 - 0.1
+  const beamTop = beamY + beamH / 2
+  const readerX = -0.72
   const scale = isMobile ? 1.02 : 0.95
   const pivot = [0.65, 1.12, 0]
 
@@ -505,37 +597,7 @@ function Turnstile({ isMobile, orbit, reducedMotion }) {
           <Metal map={beamMap} roughness={0.38} metalness={0.76} />
         </mesh>
 
-        <group position={[readerX, readerY, readerZ]}>
-          <mesh position={[0, 0, -readerD / 2]}>
-            <extrudeGeometry args={[readerShape, readerExtrude]} />
-            <Metal map={readerMap} roughness={0.32} metalness={0.82} color="#f0f0f0" />
-          </mesh>
-
-          <mesh>
-            <boxGeometry args={[slotL * 0.98, slotH * 0.92, readerD * 0.78]} />
-            <meshStandardMaterial
-              color={SLOT_DARK}
-              roughness={0.92}
-              metalness={0.14}
-            />
-          </mesh>
-
-          <mesh
-            position={[-readerL / 2 + 0.008, 0, 0]}
-            rotation={[0, Math.PI / 2, 0]}
-          >
-            <planeGeometry args={[readerD * 0.55, slotH]} />
-            <meshBasicMaterial color={SLOT_DARK} />
-          </mesh>
-
-          <mesh
-            position={[0.22, readerH * 0.28, readerD / 2 + 0.006]}
-            scale={0.2}
-          >
-            <extrudeGeometry args={[arrow, arrowExtrude]} />
-            <meshStandardMaterial color="#1a1a1a" roughness={0.55} metalness={0.22} />
-          </mesh>
-        </group>
+        <SwipeHead map={readerMap} position={[readerX, beamTop, 0]} />
 
         <Tripod map={armMap} />
       </OrbitRig>
@@ -558,8 +620,8 @@ function GleamLight({ reducedMotion, isMobile }) {
     const start = isMobile ? -2.4 : -3.1
     const span = isMobile ? 4.6 : 5.6
     light.current.position.x = start + u * span
-    light.current.position.y = 2.05
-    light.current.position.z = 3.1
+    light.current.position.y = 2.35
+    light.current.position.z = 2.8
   })
 
   return (
@@ -582,13 +644,13 @@ function AimCamera({ isMobile }) {
 
   useEffect(() => {
     if (isMobile) {
-      camera.position.set(-0.05, 2.12, 8.7)
+      camera.position.set(-0.2, 2.62, 8.4)
       camera.fov = 34
-      camera.lookAt(-0.2, 1.02, 0)
+      camera.lookAt(-0.5, 1.18, 0)
     } else {
-      camera.position.set(-0.1, 2.35, 9.6)
-      camera.fov = 28
-      camera.lookAt(-0.2, 1.0, 0)
+      camera.position.set(-0.35, 2.95, 8.9)
+      camera.fov = 27
+      camera.lookAt(-0.55, 1.22, 0)
     }
     camera.updateProjectionMatrix()
   }, [camera, isMobile])
@@ -606,6 +668,7 @@ function TurnstileScene({ isMobile, reducedMotion, orbit }) {
       <AimCamera isMobile={isMobile} />
       <ambientLight intensity={0.62} />
       <directionalLight position={[-3.6, 3.2, 7.4]} intensity={2.05} />
+      <directionalLight position={[-0.7, 5.4, 2.6]} intensity={0.85} />
       <directionalLight position={[0.2, 2.4, 8.2]} intensity={0.9} />
       <directionalLight position={[3.2, 4.2, 2.2]} intensity={0.55} />
       <directionalLight position={[-2.2, 0.6, -3.0]} intensity={0.28} />
@@ -625,7 +688,13 @@ function CssTurnstile() {
   return (
     <Fallback>
       <Pillar />
-      <Beam />
+      <Beam>
+        <CssSwipeHead>
+          <CssRail />
+          <CssGroove />
+          <CssRail />
+        </CssSwipeHead>
+      </Beam>
       <Arm $rot={-48} />
       <Arm $rot={8} />
       <Arm $rot={62} />
@@ -642,7 +711,7 @@ export default function SwipeLine() {
   )
   const reducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const orbit = useRef({ yaw: 0, pitch: 0 })
+  const orbit = useRef({ yaw: 0.26, pitch: 0.16 })
   const drag = useRef({
     pointerId: null,
     x: 0,
@@ -709,8 +778,8 @@ export default function SwipeLine() {
               gl={{ alpha: true, antialias: true }}
               dpr={[1, 2]}
               camera={{
-                position: isMobile ? [-0.05, 2.12, 8.7] : [-0.1, 2.35, 9.6],
-                fov: isMobile ? 34 : 28,
+                position: isMobile ? [-0.2, 2.62, 8.4] : [-0.35, 2.95, 8.9],
+                fov: isMobile ? 34 : 27,
               }}
               style={{ width: '100%', height: '100%', background: 'transparent', pointerEvents: 'auto' }}
               onCreated={({ gl }) => {
