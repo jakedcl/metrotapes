@@ -491,6 +491,11 @@ EntryLamp.propTypes = {
   rotation: PropTypes.arrayOf(PropTypes.number),
 }
 
+function rotorArmDirection(thetaDeg) {
+  const t = THREE.MathUtils.degToRad(thetaDeg)
+  return new THREE.Vector3(0, -Math.sin(t), Math.cos(t))
+}
+
 function TripodArm({ map, direction }) {
   const dir = useMemo(() => direction.clone().normalize(), [direction])
   const mid = useMemo(() => dir.clone().multiplyScalar(ARM_LEN / 2), [dir])
@@ -520,8 +525,49 @@ TripodArm.propTypes = {
   direction: PropTypes.instanceOf(THREE.Vector3).isRequired,
 }
 
+// Hub + mount plate + 3 arms at 120° in one plane (axle along local X).
+function TripodAssembly({ map }) {
+  const armDirs = useMemo(
+    () => [0, 120, 240].map((deg) => rotorArmDirection(deg)),
+    [],
+  )
+
+  return (
+    <group>
+      {/* Mount plate flush on mechanism +X face (local YZ plane) */}
+      <mesh position={[0.003, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <boxGeometry args={[0.006, 0.076, 0.052]} />
+        <Metal map={map} roughness={0.4} metalness={0.78} />
+      </mesh>
+
+      {/* Hub drum — axle along -X, protruding into throat */}
+      <group position={[-0.03, 0, 0]}>
+        <mesh rotation={[0, Math.PI / 2, 0]}>
+          <cylinderGeometry args={[HUB_R * 0.82, HUB_R, 0.056, 24]} />
+          <Metal map={map} roughness={0.34} metalness={0.84} />
+        </mesh>
+        <mesh position={[-0.028, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <cylinderGeometry args={[HUB_R, HUB_R * 0.88, 0.018, 24]} />
+          <Metal map={map} roughness={0.36} metalness={0.82} />
+        </mesh>
+        <mesh position={[-0.038, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <cylinderGeometry args={[0.03, 0.036, 0.05, 20]} />
+          <Metal map={map} roughness={0.4} metalness={0.78} />
+        </mesh>
+
+        {armDirs.map((dir, i) => (
+          <TripodArm key={i} map={map} direction={dir} />
+        ))}
+      </group>
+    </group>
+  )
+}
+
+TripodAssembly.propTypes = {
+  map: PropTypes.object,
+}
+
 function Tripod({ map }) {
-  // Match Turnstile() layout — hub on pillar-facing (+X) side of SwipeHead
   const beamY = 1.68
   const beamH = 0.09
   const beamTop = beamY + beamH / 2
@@ -530,35 +576,19 @@ function Tripod({ map }) {
   const wellH = 0.005
   const plateH = 0.007
   const railBodyH = 0.055
+  const housingH = wellH + plateH + railBodyH
 
-  const hubX = readerX + wellL / 2 + 0.024
-  const hubY = beamTop + wellH + plateH + railBodyH * 0.42
-  const hubZ = 0
-
-  const armDirs = useMemo(() => [
-    new THREE.Vector3(0, -1, 0),
-    new THREE.Vector3(0, 0, 1),
-    new THREE.Vector3(0, 0, -1),
-  ], [])
+  // +X face of SwipeHead housing (pillar side), mid-height — hub protrudes into throat
+  const mountX = readerX + wellL / 2
+  const mountY = beamTop + housingH * 0.5
+  const plateTilt = THREE.MathUtils.degToRad(45)
 
   return (
-    <group position={[hubX, hubY, hubZ]}>
-      {/* Bracket plate flush on swiper +X face; axle runs along +X */}
-      <mesh position={[-0.028, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.03, 0.036, 0.054, 20]} />
-        <Metal map={map} roughness={0.4} metalness={0.78} />
-      </mesh>
-      <mesh position={[0.018, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[HUB_R * 0.82, HUB_R, 0.058, 24]} />
-        <Metal map={map} roughness={0.34} metalness={0.84} />
-      </mesh>
-      <mesh position={[0.052, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[HUB_R, HUB_R * 0.88, 0.02, 24]} />
-        <Metal map={map} roughness={0.36} metalness={0.82} />
-      </mesh>
-      {armDirs.map((dir) => (
-        <TripodArm key={`${dir.x}-${dir.y}-${dir.z}`} map={map} direction={dir} />
-      ))}
+    <group
+      position={[mountX, mountY, 0]}
+      rotation={[0, 0, plateTilt]}
+    >
+      <TripodAssembly map={map} />
     </group>
   )
 }
