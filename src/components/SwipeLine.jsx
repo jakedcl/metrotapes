@@ -338,7 +338,7 @@ OrbitRig.propTypes = {
   children: PropTypes.node,
 }
 
-function EntryLamp({ position }) {
+function EntryLamp({ position, rotation = [0, 0, 0] }) {
   const entryMap = useMemo(() => createEntryLabelTexture(), [])
   const lampMap = useMemo(() => createLampFaceTexture(), [])
   const arrow = useMemo(() => createLampArrow(), [])
@@ -358,7 +358,7 @@ function EntryLamp({ position }) {
   }, [entryMap, lampMap])
 
   return (
-    <group position={position}>
+    <group position={position} rotation={rotation}>
       <mesh position={[0, 0.16, 0.01]}>
         <boxGeometry args={[0.44, 0.14, 0.018]} />
         <meshStandardMaterial color="#ececec" roughness={0.48} metalness={0.1} />
@@ -372,10 +372,6 @@ function EntryLamp({ position }) {
         <mesh rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.188, 0.188, 0.036, 32]} />
           <meshStandardMaterial color="#1a1a1a" roughness={0.34} metalness={0.78} />
-        </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.008]}>
-          <torusGeometry args={[0.158, 0.016, 10, 32]} />
-          <meshStandardMaterial color="#2c2c2c" roughness={0.3} metalness={0.82} />
         </mesh>
         <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.01]}>
           <cylinderGeometry args={[0.148, 0.148, 0.022, 32]} />
@@ -407,6 +403,7 @@ function EntryLamp({ position }) {
 
 EntryLamp.propTypes = {
   position: PropTypes.arrayOf(PropTypes.number).isRequired,
+  rotation: PropTypes.arrayOf(PropTypes.number),
 }
 
 function Tripod({ map }) {
@@ -495,7 +492,14 @@ function Turnstile({ isMobile, orbit, reducedMotion }) {
           <Metal map={pillarMap} />
         </mesh>
 
-        <EntryLamp position={[pillarX, 1.7, pillarD / 2 + 0.018]} />
+        <EntryLamp
+          position={[
+            pillarX - pillarW / 2 - 0.018,
+            beamY + beamH / 2 + 0.36,
+            0,
+          ]}
+          rotation={[0, -Math.PI / 2, 0]}
+        />
 
         <mesh geometry={beamGeo} position={[beamX, beamY, 0]}>
           <Metal map={beamMap} roughness={0.38} metalness={0.76} />
