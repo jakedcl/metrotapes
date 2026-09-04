@@ -78,6 +78,13 @@ const POVS = {
     fov: 42,
     ease: 1.35,
   },
+  /** Phone: pull back so the cabinet isn’t a full-bleed white slab */
+  kioskMobile: {
+    position: [0.38, 1.42, -0.72],
+    lookAt: [0.38, 1.12, -4.25],
+    fov: 50,
+    ease: 1.35,
+  },
   cabin: { ...CABIN },
   photo: { ...PHOTO_SEAT },
   video: {
@@ -91,6 +98,16 @@ const POVS = {
 }
 
 const CAM = POVS.kiosk
+
+function isMobileViewport() {
+  return typeof window !== 'undefined' && window.innerWidth < 768
+}
+
+/** Active camera shot — phones use a pulled-back kiosk framing. */
+function resolvePov(key) {
+  if (key === 'kiosk' && isMobileViewport()) return POVS.kioskMobile
+  return POVS[key] ?? CAM
+}
 
 /** Page POVs that live inside the lead car. */
 const CABIN_SHOTS = new Set(['cabin', 'photo', 'video', 'about'])
@@ -981,6 +998,7 @@ const OverlayCam = styled.div`
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
+  transform-origin: 0 0;
   pointer-events: none;
 `
 
@@ -991,6 +1009,7 @@ const OverlayObj = styled.div`
   /* Solid hit shield over the projected screen so the canvas can't steal clicks */
   pointer-events: ${(p) => (p.$live ? 'auto' : 'none')};
   transform-style: preserve-3d;
+  transform-origin: 0 0;
 `
 
 const KioskFrame = styled.div`
@@ -1042,7 +1061,7 @@ function CameraRig({ pov, onArrive, locked = false }) {
 
   useLayoutEffect(() => {
     if (locked) return
-    const shot = POVS[pov] ?? CAM
+    const shot = resolvePov(pov)
     // Fresh canvas mount only — don't snap over an in-flight doorway path
     if (path.current) return
     camera.position.set(...shot.position)
@@ -1068,7 +1087,7 @@ function CameraRig({ pov, onArrive, locked = false }) {
 
     const entering = !isCabinShot(from) && isCabinShot(to)
     const leaving = isCabinShot(from) && !isCabinShot(to)
-    const dest = POVS[to] ?? CAM
+    const dest = resolvePov(to)
 
     if ((entering || leaving) && !reducedMotion) {
       const mid = doorwayWaypoints(entering)
@@ -1103,7 +1122,7 @@ function CameraRig({ pov, onArrive, locked = false }) {
       return
     }
 
-    const shot = POVS[pov] ?? CAM
+    const shot = resolvePov(pov)
     const d = Math.min(dt, 0.05)
     const smooth = (t) => t * t * (3 - 2 * t)
 
@@ -1123,7 +1142,7 @@ function CameraRig({ pov, onArrive, locked = false }) {
       camera.lookAt(look.current)
       camera.updateProjectionMatrix()
       if (u >= 1) {
-        const end = POVS[ride.dest] ?? CAM
+        const end = resolvePov(ride.dest)
         camera.position.set(...end.position)
         look.current.set(...end.lookAt)
         camera.fov = end.fov
@@ -3253,19 +3272,29 @@ function InfoKiosk({ hud, showBoot = true }) {
   const { cabW, cabH, cabD, postH, postW, bezel, screenW, screenH, panelW } = KIOSK
   const yCab = postH + cabH / 2
   const screen = useRef()
-  const { camera, size } = useThree()
+  const { camera, gl } = useThree()
   const camDir = useMemo(() => new THREE.Vector3(), [])
   const toObj = useMemo(() => new THREE.Vector3(), [])
   const pxPerMeter = panelW / screenW
   const lastCam = useRef('')
   const lastObj = useRef('')
   const logoTex = useLoader(THREE.TextureLoader, '/mta-logo.jpg')
+  const metalTex = useLoader(THREE.TextureLoader, '/metal.jpg')
 
   useLayoutEffect(() => {
     logoTex.colorSpace = THREE.SRGBColorSpace
     logoTex.anisotropy = 4
     logoTex.needsUpdate = true
   }, [logoTex])
+
+  useLayoutEffect(() => {
+    metalTex.wrapS = THREE.RepeatWrapping
+    metalTex.wrapT = THREE.RepeatWrapping
+    metalTex.repeat.set(1.5, 2.1)
+    metalTex.colorSpace = THREE.SRGBColorSpace
+    metalTex.anisotropy = 4
+    metalTex.needsUpdate = true
+  }, [metalTex])
 
   // CSS-3D projection only while the live overlay is mounted
   useFrame(() => {
@@ -3286,13 +3315,17 @@ function InfoKiosk({ hud, showBoot = true }) {
       root.style.visibility = 'hidden'
       return
     }
-    const widthHalf = size.width / 2
-    const heightHalf = size.height / 2
-    const fov = camera.projectionMatrix.elements[5] * heightHalf
-    root.style.width = `${size.width}px`
-    root.style.height = `${size.height}px`
-    root.style.perspective = `${fov}px`
-    const camXform = `translateZ(${fov}px)${cssMatrix3d(camera.matrixWorldInverse, CAM_CSS_MUL)}translate(${widthHalf}px,${heightHalf}px)`
+    // Match the *rendered* canvas CSS box (iOS Safari / DPR quirks break R3F `size`)
+    const rect = gl.domElement.getBoundingClientRect()
+    const w = Math.max(1, rect.width)
+    const h = Math.max(1, rect.height)
+    const widthHalf = w / 2
+    const heightHalf = h / 2
+    const perspective = heightHalf / Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5))
+    root.style.width = `${w}px`
+    root.style.height = `${h}px`
+    root.style.perspective = `${perspective}px`
+    const camXform = `translateZ(${perspective}px)${cssMatrix3d(camera.matrixWorldInverse, CAM_CSS_MUL)}translate(${widthHalf}px,${heightHalf}px)`
     const objXform = objectCssMatrix(screen.current.matrixWorld, pxPerMeter)
     // Remounted nodes have empty style — must write even if xform string matches last trip
     if (camXform !== lastCam.current || camEl.style.transform !== camXform) {
@@ -3307,9 +3340,23 @@ function InfoKiosk({ hud, showBoot = true }) {
     root.style.visibility = 'visible'
   })
 
-  const faceZ = cabD / 2 + 0.002
-  const white = { color: '#f2f2f0', roughness: 0.48, metalness: 0.08 }
-  const lip = bezel + 0.012
+  const faceZ = cabD / 2
+  const inset = 0.032
+  const screenZ = faceZ - inset
+  const rimZ = faceZ + 0.004
+  const steel = {
+    map: metalTex,
+    color: '#d4d8dc',
+    roughness: 0.36,
+    metalness: 0.78,
+  }
+  const steelBright = {
+    map: metalTex,
+    color: '#e6e9ec',
+    roughness: 0.3,
+    metalness: 0.82,
+  }
+  const lip = bezel + 0.01
   const logoW = screenW * 0.52
   const logoH = logoW * (144 / 256)
 
@@ -3317,33 +3364,38 @@ function InfoKiosk({ hud, showBoot = true }) {
     <group position={[KIOSK.x, 0, KIOSK.z]}>
       <mesh position={[0, 0.025, 0]}>
         <boxGeometry args={[0.58, 0.05, 0.24]} />
-        <meshStandardMaterial {...white} />
+        <meshStandardMaterial {...steel} />
       </mesh>
       {[-1, 1].map((s) => (
         <mesh key={s} position={[s * 0.2, postH / 2, 0]}>
           <boxGeometry args={[postW, postH, postW]} />
-          <meshStandardMaterial {...white} />
+          <meshStandardMaterial {...steel} />
         </mesh>
       ))}
       <mesh position={[0, yCab, 0]}>
         <boxGeometry args={[cabW, cabH, cabD]} />
-        <meshStandardMaterial {...white} />
+        <meshStandardMaterial {...steel} />
       </mesh>
-      {/* White bezel around the screen */}
+      {/* Dark recessed well so the LCD sits in the cabinet */}
+      <mesh position={[0, yCab, faceZ - inset / 2]}>
+        <boxGeometry args={[screenW + 0.02, screenH + 0.02, inset]} />
+        <meshStandardMaterial color="#16181a" roughness={0.82} metalness={0.35} />
+      </mesh>
+      {/* Raised metal bezel around the opening */}
       {[
-        [0, yCab + (screenH + lip) / 2, faceZ, cabW, lip],
-        [0, yCab - (screenH + lip) / 2, faceZ, cabW, lip],
-        [-(screenW + lip) / 2, yCab, faceZ, lip, screenH + lip * 2],
-        [(screenW + lip) / 2, yCab, faceZ, lip, screenH + lip * 2],
+        [0, yCab + (screenH + lip) / 2, rimZ, cabW * 0.98, lip],
+        [0, yCab - (screenH + lip) / 2, rimZ, cabW * 0.98, lip],
+        [-(screenW + lip) / 2, yCab, rimZ, lip, screenH + lip * 2],
+        [(screenW + lip) / 2, yCab, rimZ, lip, screenH + lip * 2],
       ].map(([x, y, z, w, h], i) => (
         <mesh key={i} position={[x, y, z]}>
           <planeGeometry args={[w, h]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.42} metalness={0.05} />
+          <meshStandardMaterial {...steelBright} />
         </mesh>
       ))}
       {/* Idle screensaver: real mesh in the scene (depth-sorts with MetroCard). No CSS overlay. */}
       {showBoot ? (
-        <group position={[0, yCab, faceZ + 0.001]}>
+        <group position={[0, yCab, screenZ + 0.001]}>
           <mesh>
             <planeGeometry args={[screenW, screenH]} />
             <meshBasicMaterial color="#000000" toneMapped={false} />
@@ -3354,7 +3406,7 @@ function InfoKiosk({ hud, showBoot = true }) {
           </mesh>
         </group>
       ) : null}
-      <object3D ref={screen} position={[0, yCab, faceZ]} />
+      <object3D ref={screen} position={[0, yCab, screenZ]} />
     </group>
   )
 }
@@ -3516,11 +3568,14 @@ function WindCard({ ready, onCameraHome, reducedMotion, driveCamera = true }) {
     look: new THREE.Vector3(0.15, 1.85, 1.0),
     fov: 42,
   }), [])
-  const CAM_KIOSK = useMemo(() => ({
-    pos: new THREE.Vector3(...POVS.kiosk.position),
-    look: new THREE.Vector3(...POVS.kiosk.lookAt),
-    fov: POVS.kiosk.fov,
-  }), [])
+  const CAM_KIOSK = useMemo(() => {
+    const shot = resolvePov('kiosk')
+    return {
+      pos: new THREE.Vector3(...shot.position),
+      look: new THREE.Vector3(...shot.lookAt),
+      fov: shot.fov,
+    }
+  }, [])
   const tmpPos = useMemo(() => new THREE.Vector3(), [])
   const tmpLook = useMemo(() => new THREE.Vector3(), [])
   const tmpEuler = useMemo(() => new THREE.Euler(), [])
@@ -4139,8 +4194,8 @@ export default function StationScene({
               powerPreference: 'high-performance',
             }}
             camera={{
-              position: dimmed ? [0.2, 1.95, 3.6] : (POVS[pov] ?? CAM).position,
-              fov: dimmed ? 42 : (POVS[pov] ?? CAM).fov,
+              position: dimmed ? [0.2, 1.95, 3.6] : resolvePov(pov).position,
+              fov: dimmed ? 42 : resolvePov(pov).fov,
               near: 0.1,
               far: 90,
             }}
@@ -4149,7 +4204,7 @@ export default function StationScene({
             gl.toneMapping = THREE.ACESFilmicToneMapping
               gl.toneMappingExposure = 1.32
               if (dimmed) camera.lookAt(0.15, 1.85, 1.0)
-              else camera.lookAt(...(POVS[pov] ?? CAM).lookAt)
+              else camera.lookAt(...resolvePov(pov).lookAt)
             gl.domElement.addEventListener('webglcontextlost', (event) => {
               event.preventDefault()
               setUse3d(false)

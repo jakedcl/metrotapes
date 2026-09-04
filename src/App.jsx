@@ -3,6 +3,7 @@ import PhotoPage from './pages/PhotoPage'
 import VideoPage from './pages/VideoPage'
 import AboutPage from './pages/AboutPage'
 import Header from './components/Header'
+import BootScreen from './components/BootScreen'
 import StationScene from './components/StationScene'
 import StationIntro from './components/StationIntro'
 import { preloadStationAssets } from './lib/preloadStation'
@@ -137,8 +138,11 @@ function AppContent() {
   const [assetsReady, setAssetsReady] = useState(false)
   const [sceneReady, setSceneReady] = useState(false)
   const [cabinReady, setCabinReady] = useState(false)
+  const [bootLeaving, setBootLeaving] = useState(false)
+  const [bootGone, setBootGone] = useState(skipIntro)
   const booted = assetsReady && sceneReady
   const arriving = atKiosk && !entered
+  const showBoot = arriving && !bootGone
   const shot = arriving ? 'kiosk' : (shotFromRoute || 'kiosk')
   const onPage = Boolean(shotFromRoute && shotFromRoute !== 'kiosk')
   const showPage = onPage && cabinReady
@@ -160,6 +164,25 @@ function AppContent() {
     })
     return () => { alive = false }
   }, [])
+
+  // First visit: hold loading until scene + assets ready, then fade into the intro.
+  // Replays skip the gate once the station is already warm.
+  useEffect(() => {
+    if (!arriving) {
+      setBootGone(true)
+      setBootLeaving(false)
+      return undefined
+    }
+    if (booted) {
+      if (bootGone) return undefined
+      setBootLeaving(true)
+      const t = window.setTimeout(() => setBootGone(true), 560)
+      return () => window.clearTimeout(t)
+    }
+    setBootGone(false)
+    setBootLeaving(false)
+    return undefined
+  }, [arriving, booted, bootGone])
 
   const returnToIntro = () => {
     if (location.pathname !== '/') navigate('/')
@@ -184,7 +207,7 @@ function AppContent() {
             shot={shot}
             kioskLive={atKiosk && entered}
             dimmed={arriving}
-            introReady={booted}
+            introReady={booted && bootGone}
             onIntroComplete={() => setEntered(true)}
             onReady={() => setSceneReady(true)}
             onExit={returnToIntro}
@@ -193,8 +216,11 @@ function AppContent() {
           />
         </StationStage>
       ) : null}
-      {arriving ? (
+      {arriving && booted ? (
         <StationIntro onComplete={() => setEntered(true)} />
+      ) : null}
+      {showBoot ? (
+        <BootScreen leaving={bootLeaving} />
       ) : null}
       <ContentArea $pass={atKiosk || location.pathname === '/photo'}>
         <Routes>
