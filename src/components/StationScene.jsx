@@ -78,11 +78,11 @@ const POVS = {
     fov: 42,
     ease: 1.35,
   },
-  /** Phone: pull back so the cabinet isn’t a full-bleed white slab */
+  /** Phone: closer for readability, still some platform in frame */
   kioskMobile: {
-    position: [0.38, 1.42, -0.72],
-    lookAt: [0.38, 1.12, -4.25],
-    fov: 50,
+    position: [0.38, 1.4, -1.55],
+    lookAt: [0.38, 1.16, -4.25],
+    fov: 46,
     ease: 1.35,
   },
   cabin: { ...CABIN },
