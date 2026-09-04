@@ -4,6 +4,7 @@ export const STATION_ASSETS = [
   '/subwaysign.jpg',
   '/subway-arrow-down.png',
   '/mta-logo.jpg',
+  '/contactless-tap.png',
 ]
 
 function loadImage(src) {
