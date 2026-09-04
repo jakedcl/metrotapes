@@ -80,9 +80,9 @@ const POVS = {
   },
   /** Phone: closer for readability, still some platform in frame */
   kioskMobile: {
-    position: [0.38, 1.4, -1.55],
-    lookAt: [0.38, 1.16, -4.25],
-    fov: 46,
+    position: [0.38, 1.38, -1.88],
+    lookAt: [0.38, 1.17, -4.25],
+    fov: 44,
     ease: 1.35,
   },
   cabin: { ...CABIN },
