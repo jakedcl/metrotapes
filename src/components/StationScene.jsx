@@ -998,7 +998,6 @@ const OverlayCam = styled.div`
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
-  transform-origin: 0 0;
   pointer-events: none;
 `
 
@@ -1009,7 +1008,6 @@ const OverlayObj = styled.div`
   /* Solid hit shield over the projected screen so the canvas can't steal clicks */
   pointer-events: ${(p) => (p.$live ? 'auto' : 'none')};
   transform-style: preserve-3d;
-  transform-origin: 0 0;
 `
 
 const KioskFrame = styled.div`
@@ -3272,7 +3270,7 @@ function InfoKiosk({ hud, showBoot = true }) {
   const { cabW, cabH, cabD, postH, postW, bezel, screenW, screenH, panelW } = KIOSK
   const yCab = postH + cabH / 2
   const screen = useRef()
-  const { camera, gl } = useThree()
+  const { camera, size } = useThree()
   const camDir = useMemo(() => new THREE.Vector3(), [])
   const toObj = useMemo(() => new THREE.Vector3(), [])
   const pxPerMeter = panelW / screenW
@@ -3315,17 +3313,13 @@ function InfoKiosk({ hud, showBoot = true }) {
       root.style.visibility = 'hidden'
       return
     }
-    // Match the *rendered* canvas CSS box (iOS Safari / DPR quirks break R3F `size`)
-    const rect = gl.domElement.getBoundingClientRect()
-    const w = Math.max(1, rect.width)
-    const h = Math.max(1, rect.height)
-    const widthHalf = w / 2
-    const heightHalf = h / 2
-    const perspective = heightHalf / Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5))
-    root.style.width = `${w}px`
-    root.style.height = `${h}px`
-    root.style.perspective = `${perspective}px`
-    const camXform = `translateZ(${perspective}px)${cssMatrix3d(camera.matrixWorldInverse, CAM_CSS_MUL)}translate(${widthHalf}px,${heightHalf}px)`
+    const widthHalf = size.width / 2
+    const heightHalf = size.height / 2
+    const fov = camera.projectionMatrix.elements[5] * heightHalf
+    root.style.width = `${size.width}px`
+    root.style.height = `${size.height}px`
+    root.style.perspective = `${fov}px`
+    const camXform = `translateZ(${fov}px)${cssMatrix3d(camera.matrixWorldInverse, CAM_CSS_MUL)}translate(${widthHalf}px,${heightHalf}px)`
     const objXform = objectCssMatrix(screen.current.matrixWorld, pxPerMeter)
     // Remounted nodes have empty style — must write even if xform string matches last trip
     if (camXform !== lastCam.current || camEl.style.transform !== camXform) {
@@ -3340,10 +3334,7 @@ function InfoKiosk({ hud, showBoot = true }) {
     root.style.visibility = 'visible'
   })
 
-  const faceZ = cabD / 2
-  const inset = 0.032
-  const screenZ = faceZ - inset
-  const rimZ = faceZ + 0.004
+  const faceZ = cabD / 2 + 0.002
   const steel = {
     map: metalTex,
     color: '#d4d8dc',
@@ -3356,7 +3347,7 @@ function InfoKiosk({ hud, showBoot = true }) {
     roughness: 0.3,
     metalness: 0.82,
   }
-  const lip = bezel + 0.01
+  const lip = bezel + 0.012
   const logoW = screenW * 0.52
   const logoH = logoW * (144 / 256)
 
@@ -3376,17 +3367,12 @@ function InfoKiosk({ hud, showBoot = true }) {
         <boxGeometry args={[cabW, cabH, cabD]} />
         <meshStandardMaterial {...steel} />
       </mesh>
-      {/* Dark recessed well so the LCD sits in the cabinet */}
-      <mesh position={[0, yCab, faceZ - inset / 2]}>
-        <boxGeometry args={[screenW + 0.02, screenH + 0.02, inset]} />
-        <meshStandardMaterial color="#16181a" roughness={0.82} metalness={0.35} />
-      </mesh>
-      {/* Raised metal bezel around the opening */}
+      {/* Bezel strips only — no solid plate over the screen hole */}
       {[
-        [0, yCab + (screenH + lip) / 2, rimZ, cabW * 0.98, lip],
-        [0, yCab - (screenH + lip) / 2, rimZ, cabW * 0.98, lip],
-        [-(screenW + lip) / 2, yCab, rimZ, lip, screenH + lip * 2],
-        [(screenW + lip) / 2, yCab, rimZ, lip, screenH + lip * 2],
+        [0, yCab + (screenH + lip) / 2, faceZ, cabW, lip],
+        [0, yCab - (screenH + lip) / 2, faceZ, cabW, lip],
+        [-(screenW + lip) / 2, yCab, faceZ, lip, screenH + lip * 2],
+        [(screenW + lip) / 2, yCab, faceZ, lip, screenH + lip * 2],
       ].map(([x, y, z, w, h], i) => (
         <mesh key={i} position={[x, y, z]}>
           <planeGeometry args={[w, h]} />
@@ -3395,7 +3381,7 @@ function InfoKiosk({ hud, showBoot = true }) {
       ))}
       {/* Idle screensaver: real mesh in the scene (depth-sorts with MetroCard). No CSS overlay. */}
       {showBoot ? (
-        <group position={[0, yCab, screenZ + 0.001]}>
+        <group position={[0, yCab, faceZ + 0.001]}>
           <mesh>
             <planeGeometry args={[screenW, screenH]} />
             <meshBasicMaterial color="#000000" toneMapped={false} />
@@ -3406,7 +3392,7 @@ function InfoKiosk({ hud, showBoot = true }) {
           </mesh>
         </group>
       ) : null}
-      <object3D ref={screen} position={[0, yCab, screenZ]} />
+      <object3D ref={screen} position={[0, yCab, faceZ]} />
     </group>
   )
 }
