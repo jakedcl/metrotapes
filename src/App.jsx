@@ -1,18 +1,18 @@
 import { createGlobalStyle } from 'styled-components'
-import LandingPage from './pages/LandingPage'
-import Home from './pages/Home'
 import PhotoPage from './pages/PhotoPage'
 import VideoPage from './pages/VideoPage'
 import AboutPage from './pages/AboutPage'
 import Header from './components/Header'
-import SubwayBubbles from './components/SubwayBubbles'
-import { useState, useEffect } from 'react'
-import { useTransition, animated } from '@react-spring/web'
-import styled from 'styled-components'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import StationScene from './components/StationScene'
+import StationIntro from './components/StationIntro'
+import { preloadStationAssets } from './lib/preloadStation'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import styled, { keyframes } from 'styled-components'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import Blog from './pages/Blog'
 import { font, station } from './styles/theme'
 import usePageMeta from './hooks/usePageMeta'
+import { KioskLeaveProvider } from './context/KioskLeaveContext'
 
 const GlobalStyle = createGlobalStyle`
   * {
@@ -61,14 +61,14 @@ const GlobalStyle = createGlobalStyle`
 `
 
 const Layout = styled.div`
-  padding-top: 64px; // Height of header
+  padding-top: ${(p) => (p.$pad ? '64px' : '0')};
   position: relative;
   overflow-x: hidden;
   overflow-y: visible;
   min-height: 100vh;
 `
 
-const AnimatedHeaderArea = styled(animated.header)`
+const HeaderArea = styled.header`
   height: 64px;
   position: fixed;
   top: 0;
@@ -76,88 +76,138 @@ const AnimatedHeaderArea = styled(animated.header)`
   right: 0;
   z-index: 100;
   background: ${station};
-  transform-origin: top;
+  opacity: ${(p) => (p.$show ? 1 : 0)};
+  pointer-events: ${(p) => (p.$show ? 'auto' : 'none')};
+  transition: opacity 0.9s ease;
+`
+
+const StationStage = styled.div`
+  position: fixed;
+  inset: 64px 0 0 0;
+  z-index: ${(p) => (p.$front ? 5 : 0)};
+  pointer-events: ${(p) => (p.$hit ? 'auto' : 'none')};
+  transition: z-index 0s;
 `
 
 const ContentArea = styled.main`
   width: 100%;
-  min-height: 90vh;
+  min-height: calc(100vh - 64px);
   position: relative;
   z-index: 1;
+  pointer-events: ${(p) => (p.$pass ? 'none' : 'auto')};
 `
 
-const AnimatedContainer = styled(animated.div)`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  z-index: 200;
+const fadeUp = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
 `
+
+const PageLayer = styled.div`
+  animation: ${fadeUp} 0.55s ease both;
+  background: ${(p) => (p.$clear
+    ? 'transparent'
+    : 'linear-gradient(180deg, rgba(10, 22, 16, 0.12) 0%, rgba(10, 22, 16, 0.55) 32%)')};
+  min-height: calc(100vh - 64px);
+  opacity: ${(p) => (p.$show ? 1 : 0)};
+  pointer-events: ${(p) => {
+    if (!p.$show) return 'none'
+    return p.$clear ? 'none' : 'auto'
+  }};
+  transition: opacity 0.45s ease;
+`
+
+const SHOT = {
+  '/': 'kiosk',
+  '/photo': 'photo',
+  '/video': 'video',
+  '/about': 'about',
+}
 
 function AppContent() {
-  const [isUnlocked, setIsUnlocked] = useState(false)
   const location = useLocation()
-  const isHomePage = location.pathname === '/'
+  const navigate = useNavigate()
+  const shotFromRoute = SHOT[location.pathname]
+  const atKiosk = location.pathname === '/'
+  const skipIntro = useMemo(
+    () => typeof window !== 'undefined'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  )
+  const [entered, setEntered] = useState(skipIntro)
+  const [assetsReady, setAssetsReady] = useState(false)
+  const [sceneReady, setSceneReady] = useState(false)
+  const [cabinReady, setCabinReady] = useState(false)
+  const booted = assetsReady && sceneReady
+  const arriving = atKiosk && !entered
+  const shot = arriving ? 'kiosk' : (shotFromRoute || 'kiosk')
+  const onPage = Boolean(shotFromRoute && shotFromRoute !== 'kiosk')
+  const showPage = onPage && cabinReady
+  const leaveRef = useRef({ tryLeave: () => false })
+  const kioskLeave = useMemo(() => ({
+    tryLeave: (to) => leaveRef.current.tryLeave(to),
+  }), [])
   usePageMeta()
 
-  const transitions = useTransition(!isUnlocked && isHomePage ? true : null, {
-    from: { opacity: 1 },
-    enter: { opacity: 1 },
-    leave: { opacity: 0 },
-    config: {
-      duration: 800,
-      easing: t => t * (2 - t)
-    }
-  })
-
-  const headerTransition = useTransition(isUnlocked || !isHomePage, {
-    from: { opacity: 0, transform: 'translateY(-100%)' },
-    enter: { opacity: 1, transform: 'translateY(0%)' },
-    leave: { opacity: 0, transform: 'translateY(-100%)' },
-    config: {
-      duration: 800,
-      easing: t => t * (2 - t)
-    }
-  })
+  useEffect(() => {
+    // New route → wait for camera to finish flying into the car
+    setCabinReady(!onPage)
+  }, [location.pathname, onPage])
 
   useEffect(() => {
-    if (!isHomePage) {
-      setIsUnlocked(true)
+    let alive = true
+    preloadStationAssets().then(() => {
+      if (alive) setAssetsReady(true)
+    })
+    return () => { alive = false }
+  }, [])
+
+  const returnToIntro = () => {
+    if (location.pathname !== '/') navigate('/')
+    setEntered(false)
+  }
+
+  const handleArrive = (pov) => {
+    if (pov === 'photo' || pov === 'video' || pov === 'about' || pov === 'cabin') {
+      setCabinReady(true)
     }
-  }, [isHomePage])
+  }
 
   return (
-    <Layout>
-      <SubwayBubbles />
-      {headerTransition((style, show) =>
-        show && (
-          <AnimatedHeaderArea style={style}>
-            <Header onShowLanding={() => setIsUnlocked(false)} />
-          </AnimatedHeaderArea>
-        )
-      )}
-      {(isUnlocked || !isHomePage) && (
-        <ContentArea>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/photo" element={<PhotoPage />} />
-            <Route path="/video" element={<VideoPage />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/blog" element={<Blog />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </ContentArea>
-      )}
-      {transitions((style, item) =>
-        item && (
-          <AnimatedContainer style={style}>
-            <LandingPage onUnlock={() => setIsUnlocked(true)} />
-          </AnimatedContainer>
-        )
-      )}
+    <KioskLeaveProvider value={kioskLeave}>
+    <Layout $pad>
+      <HeaderArea $show={entered}>
+        <Header />
+      </HeaderArea>
+      {shotFromRoute || arriving || entered ? (
+        <StationStage $front={arriving} $hit={!arriving && !!shotFromRoute}>
+          <StationScene
+            shot={shot}
+            kioskLive={atKiosk && entered}
+            dimmed={arriving}
+            introReady={booted}
+            onIntroComplete={() => setEntered(true)}
+            onReady={() => setSceneReady(true)}
+            onExit={returnToIntro}
+            onArrive={handleArrive}
+            leaveRef={leaveRef}
+          />
+        </StationStage>
+      ) : null}
+      {arriving ? (
+        <StationIntro onComplete={() => setEntered(true)} />
+      ) : null}
+      <ContentArea $pass={atKiosk || location.pathname === '/photo'}>
+        <Routes>
+          <Route path="/" element={null} />
+          <Route path="/photo" element={<PageLayer $show={showPage} $clear><PhotoPage /></PageLayer>} />
+          <Route path="/video" element={<PageLayer $show={showPage}><VideoPage /></PageLayer>} />
+          <Route path="/about" element={<PageLayer $show={showPage}><AboutPage /></PageLayer>} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ContentArea>
     </Layout>
+    </KioskLeaveProvider>
   )
 }
 

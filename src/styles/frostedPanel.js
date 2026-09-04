@@ -1,6 +1,6 @@
 import { css } from 'styled-components'
 
-/** Matte glass: blurs SubwayBubbles lightly so line colors/shapes stay readable */
+/** Matte glass: light blur over the station behind */
 export const frostedPanel = css`
   -webkit-backdrop-filter: blur(12px) saturate(1.15);
   backdrop-filter: blur(12px) saturate(1.15);

@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unknown-property */
 import styled, { keyframes } from 'styled-components'
 import { useSpring, animated } from '@react-spring/web'
-import { Suspense, useMemo, useRef, useState, forwardRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, forwardRef } from 'react'
 import { Canvas, useFrame, useLoader } from '@react-three/fiber'
 import * as THREE from 'three'
 import PropTypes from 'prop-types'
@@ -198,7 +198,7 @@ CardScene.propTypes = {
   reducedMotion: PropTypes.bool,
 }
 
-const MetroCard = forwardRef(({ onSwipeComplete, className }, ref) => {
+const MetroCard = forwardRef(({ onSwipeComplete, onSwipeEnd, className, autoSwipe = false, swipeDistance }, ref) => {
   const [isAnimating, setIsAnimating] = useState(false)
   const [use3d, setUse3d] = useState(() => hasWebGL())
   const tiltRef = useRef({ x: 0, y: 0 })
@@ -221,17 +221,22 @@ const MetroCard = forwardRef(({ onSwipeComplete, className }, ref) => {
 
     api.start({
       from: { x: 0 },
-      to: { x: window.innerWidth * 1.2 },
+      to: { x: swipeDistance ?? Math.min(window.innerWidth * 1.2, 560) },
       config: {
-        duration: 600,
+        duration: 720,
         easing: t => t * (2 - t)
       },
       onRest: () => {
-        api.start({ x: 0, immediate: true })
-        setIsAnimating(false)
+        onSwipeEnd?.()
       }
     })
   }
+
+  useEffect(() => {
+    if (!autoSwipe) return undefined
+    const id = window.setTimeout(triggerSwipe, reducedMotion ? 0 : 900)
+    return () => window.clearTimeout(id)
+  }, [autoSwipe])
 
   const handlePointerMove = (event) => {
     if (reducedMotion) return
@@ -288,8 +293,11 @@ const MetroCard = forwardRef(({ onSwipeComplete, className }, ref) => {
 })
 
 MetroCard.propTypes = {
-  onSwipeComplete: PropTypes.func.isRequired,
-  className: PropTypes.string
+  onSwipeComplete: PropTypes.func,
+  onSwipeEnd: PropTypes.func,
+  className: PropTypes.string,
+  autoSwipe: PropTypes.bool,
+  swipeDistance: PropTypes.number,
 }
 
 MetroCard.displayName = 'MetroCard'

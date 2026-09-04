@@ -4,10 +4,10 @@ import { css } from 'styled-components'
  * What already exists — not a new look.
  *
  * Layers, back → front:
- *   SubwayBubbles (z 0) → page content → header (z 100) → landing swipe (z 200)
+ *   station scene → page content → header (z 100)
  *
- * Route colors are the ones already on the machine buttons and header pills.
- * Line bullets in SubwayBubbles are the full MTA map; they stay in that file.
+ * Route colors match the machine buttons and header pills.
+ * Line bullets bounce inside the MetroCard machine LCD (LineBounceField).
  */
 export const station = '#1A1A1A'
 
@@ -25,13 +25,14 @@ export const font = '"Helvetica Neue", Helvetica, Arial, sans-serif'
  */
 export const cushy = css`
   cursor: pointer;
-  transition: transform 0.2s ease;
+  transform-origin: center;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 
   &:hover {
     transform: scale(1.05);
   }
 
   &:active {
-    transform: scale(1);
+    transform: scale(0.94);
   }
 `
