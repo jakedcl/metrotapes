@@ -97,14 +97,6 @@ const Fill = styled.div`
   }
 `
 
-const Hint = styled.div`
-  font-family: ${font};
-  font-size: 0.68rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
-`
-
 /** Show a tight set of line bullets — enough vibe, light on phones. */
 const BOOT_LINES = SUBWAY_LINES.filter((l) => (
   ['1', 'A', 'C', 'E', 'B', 'D', 'F', 'N', 'Q', 'R', 'G', 'L', '7'].includes(l.line)
@@ -129,7 +121,6 @@ export default function BootScreen({ leaving = false }) {
       <Bar>
         <Fill />
       </Bar>
-      <Hint>Entering the station</Hint>
     </Root>
   )
 }
