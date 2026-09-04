@@ -1,6 +1,10 @@
 # Dependencies
 /node_modules
+/studio/node_modules
 /.pnp
+
+# Sanity
+/studio/.sanity
 .pnp.js
 
 # Testing
