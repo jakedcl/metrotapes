@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "vite",
     "dev:studio": "npm run dev --prefix studio",
-    "build": "vite build && SANITY_STUDIO_BASEPATH=/studio npm run build --prefix studio",
+    "build": "vite build && npm ci --prefix studio && SANITY_STUDIO_BASEPATH=/studio npm run build --prefix studio",
     "build:site": "vite build",
-    "build:studio": "SANITY_STUDIO_BASEPATH=/studio npm run build --prefix studio",
+    "build:studio": "npm ci --prefix studio && SANITY_STUDIO_BASEPATH=/studio npm run build --prefix studio",
     "lint": "eslint .",
     "preview": "vite preview"
   },
