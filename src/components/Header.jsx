@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCamera, faVideo, faBook, faBars } from '@fortawesome/free-solid-svg-icons'
 import { route, station, cushy } from '../styles/theme'
 import PropTypes from 'prop-types'
+import { useKioskLeave } from '../context/KioskLeaveContext'
 
 const HeaderContainer = styled.header`
   position: fixed;
@@ -235,6 +236,7 @@ export default function Header({ onShowLanding }) {
   const navigate = useNavigate()
   const location = useLocation()
   const isHomePage = location.pathname === '/'
+  const kioskLeave = useKioskLeave()
 
   useEffect(() => {
     const handleResize = () => {
@@ -251,10 +253,6 @@ export default function Header({ onShowLanding }) {
 
   const handleTitleClick = (e) => {
     e.preventDefault()
-    if (isHomePage) {
-      onShowLanding?.()
-      return
-    }
     navigate('/')
   }
 
@@ -264,9 +262,12 @@ export default function Header({ onShowLanding }) {
     setIsOpen(!isOpen)
   }
 
-  const handleNavClick = () => {
+  const handleNavClick = (path) => (e) => {
     if (isMobile) {
       setIsOpen(false)
+    }
+    if (kioskLeave?.tryLeave?.(path)) {
+      e.preventDefault()
     }
   }
 
@@ -277,19 +278,19 @@ export default function Header({ onShowLanding }) {
 
   const renderNavItems = () => (
     <>
-      <NavItem to="/photo" onClick={handleNavClick}>
+      <NavItem to="/photo" onClick={handleNavClick('/photo')}>
         <Circle color={route.photo}>
           <FontAwesomeIcon icon={faCamera} />
         </Circle>
         <NavText>photo</NavText>
       </NavItem>
-      <NavItem to="/video" onClick={handleNavClick}>
+      <NavItem to="/video" onClick={handleNavClick('/video')}>
         <Circle color={route.video}>
           <FontAwesomeIcon icon={faVideo} />
         </Circle>
         <NavText>video</NavText>
       </NavItem>
-      <NavItem to="/about" onClick={handleNavClick}>
+      <NavItem to="/about" onClick={handleNavClick('/about')}>
         <Circle color={route.about}>
           <FontAwesomeIcon icon={faBook} />
         </Circle>
@@ -308,7 +309,7 @@ export default function Header({ onShowLanding }) {
                 <FontAwesomeIcon icon={faBars} size="lg" />
               </MenuButton>
             )}
-            <TitleWrapper type="button" onClick={handleTitleClick} aria-label={isHomePage ? 'Back to entrance' : 'Home'}>
+            <TitleWrapper type="button" onClick={handleTitleClick} aria-label="Home">
               <TitleGroup>
                 <Title>metrotapes</Title>
               </TitleGroup>

@@ -7,6 +7,9 @@
 /studio/.sanity
 .pnp.js
 
+# Sanity
+/studio/.sanity
+
 # Testing
 /coverage
 

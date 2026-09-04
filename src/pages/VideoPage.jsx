@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { frostedPanel, frostedPanelShadow } from '../styles/frostedPanel'
 import FrostNote from '../components/FrostNote'
 import { cushy, station } from '../styles/theme'
+import { client } from '../lib/sanity'
 
 const Container = styled.div`
   min-height: 100vh;
@@ -78,79 +79,72 @@ const VideoIframe = styled.iframe`
 const PlayButton = styled.button`
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0;
   border: none;
-  background: #000;
+  background: none;
+  padding: 0;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `
 
 const Thumbnail = styled.img`
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
+  position: absolute;
 `
 
-const Scrim = styled.span`
+const Scrim = styled.div`
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.28);
-  pointer-events: none;
+  background: rgba(0, 0, 0, 0.4);
 `
 
-const PlayMark = styled.span`
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 0;
-  height: 0;
-  border-style: solid;
-  border-width: 16px 0 16px 26px;
-  border-color: transparent transparent transparent #fff;
-  transform: translate(-35%, -50%);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
-  pointer-events: none;
+const PlayMark = styled.div`
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &::before {
+    content: '';
+    width: 0;
+    height: 0;
+    border-top: 15px solid transparent;
+    border-bottom: 15px solid transparent;
+    border-left: 20px solid white;
+    margin-left: 5px;
+  }
 `
 
 export default function VideoPage() {
   const [videos, setVideos] = useState([])
   const [status, setStatus] = useState('loading')
-  const [statusDetail, setStatusDetail] = useState('')
   const [playingId, setPlayingId] = useState(null)
 
   useEffect(() => {
     const fetchVideos = async () => {
-      setStatus('loading')
-      setStatusDetail('')
-      setPlayingId(null)
-
       try {
-        const response = await fetch('/api/videos')
-        const data = await response.json().catch(() => ({}))
-
-        if (!response.ok) {
-          setVideos([])
-          setStatus('error')
-          setStatusDetail(data.detail || `Could not load videos (${response.status}).`)
-          return
-        }
-
-        if (!data.videos?.length) {
-          setVideos([])
+        const data = await client.fetch(`*[_type == "video" && defined(videoId)]|order(publishDate desc) {
+          ...,
+          "_id": _id,
+          "title": title,
+          "videoId": videoId,
+        }`)
+        if (data?.length) {
+          setVideos(data)
+          setStatus('ready')
+        } else {
           setStatus('empty')
-          setStatusDetail(data.detail || 'No videos to show.')
-          return
         }
-
-        setVideos(data.videos)
-        setStatus('ready')
       } catch (error) {
         console.error('Error fetching videos:', error)
-        setVideos([])
         setStatus('error')
-        setStatusDetail(error?.message || 'Could not load videos.')
       }
     }
 
@@ -159,22 +153,9 @@ export default function VideoPage() {
 
   return (
     <Container>
-      {status === 'loading' && (
-        <FrostNote>Loading playlist…</FrostNote>
-      )}
-      {(status === 'empty' || status === 'error') && (
-        <FrostNote>
-          {status === 'error' ? 'Could not load videos.' : 'No videos to show.'}
-          {statusDetail ? (
-            <>
-              {' '}
-              <span style={{ display: 'block', marginTop: '0.75rem', opacity: 0.8, fontSize: '0.95rem' }}>
-                {statusDetail}
-              </span>
-            </>
-          ) : null}
-        </FrostNote>
-      )}
+      {status === 'loading' && <FrostNote>Loading videos…</FrostNote>}
+      {status === 'empty' && <FrostNote>No videos yet.</FrostNote>}
+      {status === 'error' && <FrostNote>Could not load videos.</FrostNote>}
       {status === 'ready' && (
         <VideoGrid>
           {videos.map(video => {
