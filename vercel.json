@@ -1,7 +1,15 @@
 {
   "rewrites": [
     {
-      "source": "/((?!api/|robots\\.txt|sitemap\\.xml).*)",
+      "source": "/studio",
+      "destination": "/studio/index.html"
+    },
+    {
+      "source": "/studio/:path*",
+      "destination": "/studio/index.html"
+    },
+    {
+      "source": "/((?!api/|studio(?:/|$)|robots\\.txt|sitemap\\.xml).*)",
       "destination": "/index.html"
     }
   ]

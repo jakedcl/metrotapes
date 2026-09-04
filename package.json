@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && SANITY_STUDIO_BASEPATH=/studio npm run build --prefix studio",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:studio": "npm run dev --prefix studio",
+    "build:site": "vite build",
+    "build:studio": "SANITY_STUDIO_BASEPATH=/studio npm run build --prefix studio"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^6.7.2",

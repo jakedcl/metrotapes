@@ -1,0 +1,8 @@
+# Local Studio — same project/dataset as https://metrotapes.sanity.studio
+# Production URL after deploy: https://metrotapes.com/studio
+#
+# Content lives in Sanity Content Lake (project l3itmzli / production).
+# Hosting Studio on your domain does NOT migrate or delete data.
+#
+# Dev:   npm run dev:studio   → http://localhost:3333/studio
+# Build: included in root `npm run build` → dist/studio
