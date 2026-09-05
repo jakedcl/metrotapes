@@ -1,5 +1,4 @@
 export const STATION_ASSETS = [
-  '/metal.jpg',
   '/metrocard.png',
   '/subwaysign.jpg',
   '/subway-arrow-down.png',
