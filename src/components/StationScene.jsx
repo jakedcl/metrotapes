@@ -3277,22 +3277,12 @@ function InfoKiosk({ hud, showBoot = true }) {
   const lastCam = useRef('')
   const lastObj = useRef('')
   const logoTex = useLoader(THREE.TextureLoader, '/mta-logo.jpg')
-  const metalTex = useLoader(THREE.TextureLoader, '/metal.jpg')
 
   useLayoutEffect(() => {
     logoTex.colorSpace = THREE.SRGBColorSpace
     logoTex.anisotropy = 4
     logoTex.needsUpdate = true
   }, [logoTex])
-
-  useLayoutEffect(() => {
-    metalTex.wrapS = THREE.RepeatWrapping
-    metalTex.wrapT = THREE.RepeatWrapping
-    metalTex.repeat.set(1.5, 2.1)
-    metalTex.colorSpace = THREE.SRGBColorSpace
-    metalTex.anisotropy = 4
-    metalTex.needsUpdate = true
-  }, [metalTex])
 
   // CSS-3D projection only while the live overlay is mounted
   useFrame(() => {
@@ -3335,18 +3325,7 @@ function InfoKiosk({ hud, showBoot = true }) {
   })
 
   const faceZ = cabD / 2 + 0.002
-  const steel = {
-    map: metalTex,
-    color: '#d4d8dc',
-    roughness: 0.36,
-    metalness: 0.78,
-  }
-  const steelBright = {
-    map: metalTex,
-    color: '#e6e9ec',
-    roughness: 0.3,
-    metalness: 0.82,
-  }
+  const white = { color: '#f2f2f0', roughness: 0.48, metalness: 0.08 }
   const lip = bezel + 0.012
   const logoW = screenW * 0.52
   const logoH = logoW * (144 / 256)
@@ -3355,19 +3334,19 @@ function InfoKiosk({ hud, showBoot = true }) {
     <group position={[KIOSK.x, 0, KIOSK.z]}>
       <mesh position={[0, 0.025, 0]}>
         <boxGeometry args={[0.58, 0.05, 0.24]} />
-        <meshStandardMaterial {...steel} />
+        <meshStandardMaterial {...white} />
       </mesh>
       {[-1, 1].map((s) => (
         <mesh key={s} position={[s * 0.2, postH / 2, 0]}>
           <boxGeometry args={[postW, postH, postW]} />
-          <meshStandardMaterial {...steel} />
+          <meshStandardMaterial {...white} />
         </mesh>
       ))}
       <mesh position={[0, yCab, 0]}>
         <boxGeometry args={[cabW, cabH, cabD]} />
-        <meshStandardMaterial {...steel} />
+        <meshStandardMaterial {...white} />
       </mesh>
-      {/* Bezel strips only — no solid plate over the screen hole */}
+      {/* White bezel around the screen */}
       {[
         [0, yCab + (screenH + lip) / 2, faceZ, cabW, lip],
         [0, yCab - (screenH + lip) / 2, faceZ, cabW, lip],
@@ -3376,7 +3355,7 @@ function InfoKiosk({ hud, showBoot = true }) {
       ].map(([x, y, z, w, h], i) => (
         <mesh key={i} position={[x, y, z]}>
           <planeGeometry args={[w, h]} />
-          <meshStandardMaterial {...steelBright} />
+          <meshStandardMaterial color="#ffffff" roughness={0.42} metalness={0.05} />
         </mesh>
       ))}
       {/* Idle screensaver: real mesh in the scene (depth-sorts with MetroCard). No CSS overlay. */}
