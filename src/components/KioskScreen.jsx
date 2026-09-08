@@ -1,11 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { useEffect, useRef, useState } from 'react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCamera, faVideo, faBook } from '@fortawesome/free-solid-svg-icons'
 import { font, route } from '../styles/theme'
 import MetroMachineFace from './MetroMachineFace'
-import { KIOSK_PANEL_W, KIOSK_PANEL_H } from '../lib/kioskSize'
+import { KIOSK_PANEL_W, KIOSK_PANEL_H, KIOSK_RADIUS_PX } from '../lib/kioskSize'
 import { useKioskLeave } from '../context/KioskLeaveContext'
 
 const Panel = styled.div`
@@ -17,7 +15,7 @@ const Panel = styled.div`
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: ${KIOSK_RADIUS_PX}px;
   pointer-events: ${(p) => (p.$live ? 'auto' : 'none')};
   box-sizing: border-box;
 `
@@ -147,6 +145,7 @@ const RecentList = styled.div`
   gap: 5px;
   padding: 0 14px 4px;
   flex: 0 0 auto;
+  min-height: 0;
 `
 
 const Clip = styled.button`
@@ -174,6 +173,24 @@ const Thumb = styled.img`
   /* Landscape thumbs — frees ~40px vs square for the machine face */
   aspect-ratio: 16 / 10;
   object-fit: cover;
+`
+
+const ghostPulse = keyframes`
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.72; }
+`
+
+const ThumbGhost = styled.div`
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 3px;
+  background: #061018;
+  animation: ${ghostPulse} 1.35s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    opacity: 0.5;
+  }
 `
 
 const ClipMeta = styled.div`
@@ -218,22 +235,13 @@ const More = styled(Link)`
 
 const Destinations = styled.div`
   flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 6px 12px 10px;
-  gap: 6px;
-  background: rgba(0, 0, 0, 0.28);
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  min-height: 0;
-`
-
-const DestLabel = styled.div`
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #fccc0a;
-  padding: 1px 4px 2px;
+  padding: 5px 10px 8px 16px;
+  gap: 3px;
+  background: #050505;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 `
 
 const DestBtn = styled.button`
@@ -241,63 +249,116 @@ const DestBtn = styled.button`
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 10px 12px;
   margin: 0;
-  text-decoration: none;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 4px 10px 4px 12px;
+  border: 0;
   border-radius: 0;
-  min-height: 52px;
+  min-height: 48px;
   flex: 1 1 0;
   cursor: pointer;
   text-align: left;
-  font: inherit;
-  /* Background-only hover — transform scales inside CSS 3D overlay cause enter/leave spam */
-  transition: background 0.15s ease, border-color 0.15s ease;
+  color: #fff;
+  overflow: hidden;
+  background-color: #070708;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.14) 0.7px, transparent 1px);
+  background-size: 4px 4px;
+  background-position: 0 0;
+  /* Background-only hover — transforms inside the CSS-3D overlay flicker hits */
+  transition: background-color 0.15s ease;
 
-  &:hover {
-    background: rgba(255, 255, 255, 0.16);
-    border-color: rgba(255, 255, 255, 0.28);
-  }
-  &:active {
-    background: rgba(255, 255, 255, 0.22);
-  }
+  &:hover { background-color: #101012; }
+  &:active { background-color: #161618; }
 `
 
-const Bullet = styled.span`
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
+const DestBullet = styled.span`
+  position: relative;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: ${(p) => p.$color};
-  color: #fff;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-
-  svg {
-    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
-  }
+  background:
+    radial-gradient(circle, rgba(0, 0, 0, 0.28) 0.65px, transparent 0.9px),
+    ${(p) => p.$color};
+  background-size: 3.5px 3.5px, auto;
+  box-shadow: 0 0 10px ${(p) => p.$color}99;
 `
 
-const Dest = styled.div`
-  min-width: 0;
-  strong {
-    display: block;
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    text-transform: uppercase;
-    line-height: 1;
+const PITCH = 4
+const LED_R = 1.25
+
+const GLYPHS = {
+  A: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
+  B: ['11110', '10001', '10001', '11110', '10001', '10001', '11110'],
+  D: ['11110', '10001', '10001', '10001', '10001', '10001', '11110'],
+  E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
+  H: ['10001', '10001', '10001', '11111', '10001', '10001', '10001'],
+  I: ['01110', '00100', '00100', '00100', '00100', '00100', '01110'],
+  O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
+  P: ['11110', '10001', '10001', '11110', '10000', '10000', '10000'],
+  T: ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
+  U: ['10001', '10001', '10001', '10001', '10001', '10001', '01110'],
+  V: ['10001', '10001', '10001', '10001', '10001', '01010', '00100'],
+}
+
+function LedDots({ rows, color, pitch = PITCH, r = LED_R }) {
+  const h = rows.length
+  const w = rows[0]?.length || 0
+  const dots = []
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (rows[y][x] !== '#' && rows[y][x] !== '1') continue
+      dots.push(
+        <circle
+          key={`${x}-${y}`}
+          cx={x * pitch + pitch / 2}
+          cy={y * pitch + pitch / 2}
+          r={r}
+          fill={color}
+        />,
+      )
+    }
   }
-`
+  return (
+    <svg
+      width={w * pitch}
+      height={h * pitch}
+      viewBox={`0 0 ${w * pitch} ${h * pitch}`}
+      aria-hidden="true"
+      style={{ display: 'block', overflow: 'visible', filter: `drop-shadow(0 0 2px ${color})` }}
+    >
+      {dots}
+    </svg>
+  )
+}
+
+function LedWord({ text }) {
+  const letters = text.toUpperCase().split('')
+  const cols = letters.reduce((n, ch, i) => {
+    const g = GLYPHS[ch]
+    return n + (g ? g[0].length : 0) + (i < letters.length - 1 ? 1 : 0)
+  }, 0)
+  const rows = Array.from({ length: 7 }, () => ''.padEnd(cols, '0'))
+  let x = 0
+  letters.forEach((ch, i) => {
+    const g = GLYPHS[ch]
+    if (g) {
+      g.forEach((line, y) => {
+        rows[y] = `${rows[y].slice(0, x)}${line}${rows[y].slice(x + line.length)}`
+      })
+      x += g[0].length
+    }
+    if (i < letters.length - 1) x += 1
+  })
+  return <LedDots rows={rows} color="#f4f6f8" />
+}
 
 const DESTINATIONS = [
-  { icon: faCamera, color: route.photo, title: 'Photo', to: '/photo' },
-  { icon: faVideo, color: route.video, title: 'Video', to: '/video' },
-  { icon: faBook, color: route.about, title: 'About', to: '/about' },
+  { color: route.photo, title: 'Photo', to: '/photo' },
+  { color: route.video, title: 'Video', to: '/video' },
+  { color: route.about, title: 'About', to: '/about' },
 ]
 
 function WeatherGlyph({ code }) {
@@ -378,7 +439,7 @@ function useNycWeather() {
 }
 
 function useRecentVideos() {
-  const [clips, setClips] = useState([])
+  const [clips, setClips] = useState(null)
   useEffect(() => {
     let alive = true
     fetch('/api/videos')
@@ -440,7 +501,11 @@ export default function KioskScreen({ live = false }) {
       </ScreenHead>
       <SectionLabel>Recent work</SectionLabel>
       <RecentList>
-        {clips.map((video) => {
+        {Array.from({ length: 3 }, (_, i) => {
+          const video = clips?.[i]
+          if (!video) {
+            return <ThumbGhost key={`ghost-${i}`} aria-hidden />
+          }
           const playing = playingId === video.videoId
           return (
             <Clip
@@ -479,19 +544,22 @@ export default function KioskScreen({ live = false }) {
       </More>
       <MetroMachineFace />
       <Destinations>
-        <DestLabel>Go</DestLabel>
         {DESTINATIONS.map((row) => (
           <DestBtn
             key={row.to}
             type="button"
             onClick={() => goTo(row.to)}
+            aria-label={row.title}
           >
-            <Bullet $color={row.color}>
-              <FontAwesomeIcon icon={row.icon} />
-            </Bullet>
-            <Dest>
-              <strong>{row.title}</strong>
-            </Dest>
+            <DestBullet $color={row.color}>
+              <LedDots
+                rows={GLYPHS[row.title[0].toUpperCase()]}
+                color="#fff"
+                pitch={3.6}
+                r={1.15}
+              />
+            </DestBullet>
+            <LedWord text={row.title} />
           </DestBtn>
         ))}
       </Destinations>

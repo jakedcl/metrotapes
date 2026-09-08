@@ -24,13 +24,14 @@ const C = {
 
 const Face = styled.div`
   position: relative;
-  /* Only a tad shorter than before — leave room for GO */
-  flex: 1 1 auto;
-  min-height: 168px;
+  /* Cap height so dest buttons get the leftover, not this LCD */
+  flex: 0 0 auto;
+  height: 232px;
+  min-height: 232px;
   margin: 4px 12px 5px;
   padding: 5px 5px 15px;
   display: grid;
-  grid-template-columns: 0.92fr 1.7fr 0.48fr;
+  grid-template-columns: 0.74fr 1.88fr 0.48fr;
   grid-template-rows: 1fr;
   gap: 4px;
   border-radius: 3px;
@@ -84,7 +85,7 @@ const Blue = styled(Block)`
 
 const Red = styled(Block)`
   flex: 0 0 auto;
-  height: 36px;
+  height: 40px;
   background: ${C.red};
   display: flex;
   flex-direction: column;
@@ -432,7 +433,7 @@ const Right = styled.div`
 `
 
 const Payphone = styled(Block)`
-  flex: 1.35 1 0;
+  flex: 0.9 1 0;
   overflow: visible;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 40%),
@@ -565,7 +566,7 @@ const PhoneLabel = styled.div`
 `
 
 const Keypad = styled(Block)`
-  flex: 0.72 1 0;
+  flex: 1.25 1 0;
   background: linear-gradient(160deg, #3a3e44, #1c1e22);
   padding: 4px 5px;
   display: grid;
@@ -583,7 +584,7 @@ const Key = styled.div`
     inset 0 -1px 0 rgba(0, 0, 0, 0.45),
     0 1px 1px rgba(0, 0, 0, 0.3);
   color: #e8eaec;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.02em;
   display: flex;

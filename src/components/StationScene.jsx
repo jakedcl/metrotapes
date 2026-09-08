@@ -4,15 +4,12 @@ import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import { BloomEffect, EffectComposer, EffectPass, FXAAEffect, RenderPass } from 'postprocessing'
 import styled from 'styled-components'
 import KioskZapScreen from './KioskZapScreen'
-import { KIOSK_CAB_H, KIOSK_CAB_W, KIOSK_POST_H, KIOSK_BEZEL, KIOSK_PANEL_W, KIOSK_PANEL_H, KIOSK_SCREEN_W, KIOSK_SCREEN_H } from '../lib/kioskSize'
-import { client, urlFor } from '../lib/sanity'
-import { openCabinPhoto } from '../lib/cabinGallery'
-
-RectAreaLightUniformsLib.init()
+import { KIOSK_CAB_H, KIOSK_CAB_W, KIOSK_POST_H, KIOSK_BEZEL, KIOSK_PANEL_W, KIOSK_PANEL_H, KIOSK_SCREEN_W, KIOSK_SCREEN_H, KIOSK_RADIUS_PX, KIOSK_RADIUS_M } from '../lib/kioskSize'
+import { WALL_BEZEL, layoutWallFace, getWallFace, setWallFace } from '../lib/wallSize'
+import { useGfx } from '../lib/gfxTier'
 
 /**
  * 3D platform. Intro: one continuous MetroCard wind-flight onto litter, then kiosk home.
@@ -46,22 +43,63 @@ const TRACK_CX = TRACK_X0 + 2.05
 const RAIL_HALF = 0.72
 const PLAT_W = TRACK_X0 - WALL_X
 const TRAIN_Z = -8.4
-const TRAIN_REV = 22
+const TRAIN_REV = 24
 const TRAIN_Y = TRACK_Y + 0.14
-/** Standing in the aisle looking toward the rear of the car. */
-const CABIN = {
-  position: [TRACK_CX, TRAIN_Y + 1.58, TRAIN_Z - 2.15],
-  lookAt: [TRACK_CX, TRAIN_Y + 1.38, TRAIN_Z - 11.2],
-  fov: 58,
-  ease: 0.62,
+const WALL_BOARD_Z0 = -3.2
+
+function isMobileViewport() {
+  return typeof window !== 'undefined' && window.innerWidth < 768
 }
 
-/** Seated on the left bank, looking across at the photo bulletin on the right wall. */
-const PHOTO_SEAT = {
-  position: [TRACK_CX - 0.58, TRAIN_Y + 1.28, TRAIN_Z - 5.05],
-  lookAt: [TRACK_CX + 1.22, TRAIN_Y + 1.42, TRAIN_Z - 5.55],
-  fov: 46,
-  ease: 0.72,
+function isWallPov(key) {
+  return key === 'photo' || key === 'video' || key === 'about'
+}
+
+function wallBoardZ(key) {
+  const { pitch } = getWallFace()
+  if (key === 'photo') return WALL_BOARD_Z0
+  if (key === 'video') return WALL_BOARD_Z0 - pitch
+  return WALL_BOARD_Z0 - pitch * 2
+}
+
+function viewAspect() {
+  if (typeof window === 'undefined') return 16 / 9
+  const h = Math.max(1, window.innerHeight - 64)
+  return window.innerWidth / h
+}
+
+/** World-space center of the live CSS page on a wall board. */
+function wallContentOrigin(z) {
+  const wall = getWallFace()
+  return {
+    x: WALL_X + 0.04 + 0.038 + 0.004,
+    y: (Number.isFinite(wall.boardY) ? wall.boardY : 1.72) + wall.contentY,
+    z,
+  }
+}
+
+/**
+ * Park looking straight at the page so it covers the canvas.
+ * Cover (not contain): no tile wall around the edges. The overlay then
+ * goes fullscreen so you're on the page, not staring at a poster.
+ */
+function pageShot(z, aspect) {
+  const wall = getWallFace()
+  const a = Number.isFinite(aspect) && aspect > 0.25 ? aspect : viewAspect()
+  const o = wallContentOrigin(z)
+  const fov = isMobileViewport() ? 34 : 28
+  const vFov = THREE.MathUtils.degToRad(fov)
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * a)
+  const dist = Math.min(
+    (wall.contentH / 2) / Math.tan(vFov / 2),
+    (wall.contentW / 2) / Math.tan(hFov / 2),
+  ) * 0.985
+  return {
+    position: [o.x + dist, o.y, o.z],
+    lookAt: [o.x, o.y, o.z],
+    fov,
+    ease: 1.35,
+  }
 }
 
 const POVS = {
@@ -72,92 +110,85 @@ const POVS = {
     ease: 0.82,
   },
   kiosk: {
-    // Readable screen, still some platform breathing room
-    position: [0.38, 1.38, -2.11],
-    lookAt: [0.38, 1.18, -4.25],
-    fov: 42,
+    // Standing in front, slightly above the screen, looking down
+    position: [0.38, 1.54, -2.18],
+    lookAt: [0.38, 1.08, -4.28],
+    fov: 52,
     ease: 1.35,
   },
-  /** Phone: closer for readability, still some platform in frame */
   kioskMobile: {
-    position: [0.38, 1.38, -1.88],
-    lookAt: [0.38, 1.17, -4.25],
-    fov: 44,
+    position: [0.38, 1.48, -2.0],
+    lookAt: [0.38, 1.1, -4.35],
+    fov: 54,
     ease: 1.35,
   },
-  cabin: { ...CABIN },
-  photo: { ...PHOTO_SEAT },
-  video: {
-    ...CABIN,
-    lookAt: [TRACK_CX, TRAIN_Y + 1.35, TRAIN_Z - 11.6],
+  // Over the tracks, near the far wall — train + trench + rat, stairs back-left
+  kioskWideRight: {
+    position: [5.78, 1.72, -2.55],
+    lookAt: [2.62, 0.78, -7.85],
+    fov: 50,
+    ease: 1.18,
   },
-  about: {
-    ...CABIN,
-    lookAt: [TRACK_CX + 0.35, TRAIN_Y + 1.4, TRAIN_Z - 10.1],
+  // Portrait hFOV is tight — stand further back so the car stays in frame
+  kioskWideRightMobile: {
+    position: [5.52, 1.92, 0.42],
+    lookAt: [3.12, 0.62, -8.05],
+    fov: 80,
+    ease: 1.18,
+  },
+  // In front of the kiosk, toward the wall — cabinet off the right edge.
+  kioskWideLeft: {
+    position: [-1.48, 1.46, -2.02],
+    lookAt: [-3.52, 1.34, -5.85],
+    fov: 88,
+    ease: 1.18,
+  },
+  // Portrait: pulled back so PHOTO / VIDEO / ABOUT all fit
+  kioskWideLeftMobile: {
+    position: [-0.15, 1.6, -0.28],
+    lookAt: [-3.48, 1.4, -5.15],
+    fov: 82,
+    ease: 1.18,
   },
 }
 
 const CAM = POVS.kiosk
 
-function isMobileViewport() {
-  return typeof window !== 'undefined' && window.innerWidth < 768
+function isLandscapeZoom(zoom) {
+  return zoom === 'left' || zoom === 'right' || zoom === 'wide'
+}
+
+/** NDC X from an R3F pointer event or a raw canvas click. Left is -1. */
+function ndcXFromEvent(e) {
+  if (typeof e?.pointer?.x === 'number') return e.pointer.x
+  const t = e?.target
+  if (!t?.getBoundingClientRect || e.clientX == null) return null
+  const rect = t.getBoundingClientRect()
+  if (!rect.width) return null
+  return ((e.clientX - rect.left) / rect.width) * 2 - 1
 }
 
 /** Active camera shot — phones use a pulled-back kiosk framing. */
-function resolvePov(key) {
-  if (key === 'kiosk' && isMobileViewport()) return POVS.kioskMobile
+function resolvePov(key, aspect, kioskZoom = 'close') {
+  if (key === 'kiosk') {
+    if (kioskZoom === 'left') {
+      return aspect < 0.85 ? POVS.kioskWideLeftMobile : POVS.kioskWideLeft
+    }
+    if (kioskZoom === 'right' || kioskZoom === 'wide') {
+      return aspect < 0.85 ? POVS.kioskWideRightMobile : POVS.kioskWideRight
+    }
+    return isMobileViewport() ? POVS.kioskMobile : POVS.kiosk
+  }
+  if (isWallPov(key)) return pageShot(wallBoardZ(key), aspect)
   return POVS[key] ?? CAM
 }
 
-/** Page POVs that live inside the lead car. */
-const CABIN_SHOTS = new Set(['cabin', 'photo', 'video', 'about'])
-const isCabinShot = (p) => CABIN_SHOTS.has(p)
-
-/**
- * Doorway path into / out of the lead car.
- * Entering: platform → door → aisle beat (see the car) → settle into dest seat/look.
- */
-const TRAIN_CAR_W = 2.9
-const DOOR_LOCAL_Z = -3.15
-function doorwayWaypoints(entering) {
-  const doorZ = TRAIN_Z + DOOR_LOCAL_Z
-  const standY = TRAIN_Y + 1.55
-  const sitY = PHOTO_SEAT.position[1]
-  const outerX = TRACK_CX - TRAIN_CAR_W * 0.5 - 0.42
-  const threshX = TRACK_CX - TRAIN_CAR_W * 0.5 + 0.2
-  // Past kiosk → door → pause down the aisle → peel toward seat
-  const pos = [
-    new THREE.Vector3(0.55, 1.48, -4.6),
-    new THREE.Vector3(1.05, 1.5, -7.8),
-    new THREE.Vector3(outerX, standY, doorZ + 0.15),
-    new THREE.Vector3(threshX, standY, doorZ),
-    new THREE.Vector3(TRACK_CX, standY, doorZ + 0.2),
-    new THREE.Vector3(TRACK_CX, standY - 0.02, TRAIN_Z - 5.8),
-    new THREE.Vector3(TRACK_CX - 0.15, sitY + 0.12, TRAIN_Z - 4.4),
-  ]
-  const look = [
-    new THREE.Vector3(1.2, 1.25, -9.5),
-    new THREE.Vector3(outerX + 0.4, 1.2, doorZ),
-    new THREE.Vector3(TRACK_CX, 1.3, doorZ - 1.2),
-    new THREE.Vector3(TRACK_CX, 1.35, TRAIN_Z - 10),
-    new THREE.Vector3(TRACK_CX, 1.4, TRAIN_Z - 14),
-    new THREE.Vector3(TRACK_CX + 0.35, 1.38, TRAIN_Z - 11),
-    new THREE.Vector3(TRACK_CX, 1.35, TRAIN_Z - 8),
-  ]
-  if (!entering) {
-    pos.reverse()
-    look.reverse()
-  }
-  return { pos, look }
-}
-
 const COL = {
-  ceiling: '#121416',
   end: '#0e1012',
   steel: '#2a2e32',
-  wood: '#6b4a2c',
-  woodDark: '#4a301c',
-  clear: '#101214',
+  wood: '#d8b07a',
+  woodDark: '#c49a62',
+  clear: '#1a1f24',
   tube: '#f3f6ff',
   fixture: '#1c1c1f',
 }
@@ -173,9 +204,15 @@ const STAIR_N = 14
 const STAIR_RISE = 0.16
 const STAIR_RUN = 0.27
 const PILLAR_X = EDGE_X - 0.22
-const FONT = 'Helvetica, "Helvetica Neue", Arial, sans-serif'
+const FONT = 'Helvetica, "Helvetica Neue", "Arial Black", Arial, sans-serif'
 const EXIT_RED = '#C60C30'
 const SIGN_REV = 13
+
+function hash01(i) {
+  let n = Math.imul((i | 0) ^ 0x9e3779b9, 0x85ebca6b)
+  n = Math.imul(n ^ (n >>> 13), 0xc2b2ae35)
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967296
+}
 
 function makeCanvasTexture(paint, size, colorSpace) {
   const canvas = document.createElement('canvas')
@@ -371,6 +408,158 @@ function paintConcrete(ctx, n) {
   }
 }
 
+function paintCeiling(ctx, n) {
+  const img = ctx.createImageData(n, n)
+  const { data } = img
+  for (let i = 0; i < n * n; i += 1) {
+    const j = i * 4
+    const x = i % n
+    const y = (i / n) | 0
+    const a = hash01(i)
+    const b = hash01(i * 3 + x * 17)
+    const c = hash01(y * 91 + x * 13 + 7)
+    const blotch = hash01((x >> 3) * 131 + (y >> 4) * 197) * 22 - 8
+    const v = Math.max(8, Math.min(58, 16 + a * 28 + b * 10 + blotch + c * 6))
+    data[j] = v + 8
+    data[j + 1] = v + 1
+    data[j + 2] = Math.max(6, v - 7)
+    data[j + 3] = 255
+  }
+  ctx.putImageData(img, 0, 0)
+
+  for (let k = 0; k < 22; k += 1) {
+    const x = Math.floor(hash01(k * 19 + 3) * n)
+    const len = Math.floor(n * (0.25 + hash01(k * 41) * 0.75))
+    const y0 = Math.floor(hash01(k * 73 + 11) * (n - len))
+    const w = 1 + (k % 4)
+    const g = ctx.createLinearGradient(x, y0, x, y0 + len)
+    g.addColorStop(0, `rgba(${70 + (k % 40)}, ${36 + (k % 18)}, 16, ${0.28 + hash01(k) * 0.3})`)
+    g.addColorStop(1, 'rgba(18, 12, 8, 0)')
+    ctx.fillStyle = g
+    ctx.fillRect(x, y0, w, len)
+  }
+  for (let k = 0; k < 28; k += 1) {
+    const cx = Math.floor(hash01(k * 29 + 5) * n)
+    const cy = Math.floor(hash01(k * 47 + 9) * n)
+    const r = 10 + hash01(k * 11) * 36
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
+    g.addColorStop(0, `rgba(4, 4, 5, ${0.35 + hash01(k * 3) * 0.35})`)
+    g.addColorStop(1, 'rgba(8, 8, 8, 0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.fillStyle = 'rgba(160, 120, 82, 0.14)'
+  for (let k = 0; k < 90; k += 1) {
+    ctx.fillRect(Math.floor(hash01(k * 53) * n), Math.floor(hash01(k * 71 + 2) * n), 1 + (k % 2), 1)
+  }
+}
+
+function paintSteel(ctx, n) {
+  const img = ctx.createImageData(n, n)
+  const { data } = img
+  for (let i = 0; i < n * n; i += 1) {
+    const j = i * 4
+    const a = hash01(i)
+    const b = hash01(i * 5 + 11)
+    const v = 28 + a * 22 + b * 10
+    data[j] = v + 8
+    data[j + 1] = v
+    data[j + 2] = Math.max(16, v - 8)
+    data[j + 3] = 255
+  }
+  ctx.putImageData(img, 0, 0)
+
+  for (let k = 0; k < 16; k += 1) {
+    const x = Math.floor(hash01(k * 23) * n)
+    const h = Math.floor(n * (0.35 + hash01(k * 17) * 0.65))
+    const y = Math.floor(hash01(k * 31 + 4) * (n - h * 0.2))
+    ctx.fillStyle = `rgba(${100 + (k % 50)}, ${42 + (k % 20)}, 12, ${0.18 + hash01(k) * 0.28})`
+    ctx.fillRect(x, y, 1 + (k % 3), h)
+  }
+  for (let k = 0; k < 18; k += 1) {
+    const cx = Math.floor(hash01(k * 43) * n)
+    const cy = Math.floor(hash01(k * 59) * n)
+    const r = 4 + hash01(k * 7) * 14
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
+    g.addColorStop(0, 'rgba(128, 44, 14, 0.62)')
+    g.addColorStop(1, 'rgba(60, 28, 12, 0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  for (let k = 0; k < 10; k += 1) {
+    ctx.fillStyle = `rgba(6, 6, 8, ${0.12 + hash01(k * 9) * 0.18})`
+    ctx.fillRect(
+      Math.floor(hash01(k * 37) * n),
+      Math.floor(hash01(k * 41 + 1) * n),
+      12 + (k % 14),
+      3 + (k % 6),
+    )
+  }
+}
+
+function paintRiser(ctx, n) {
+  const img = ctx.createImageData(n, n)
+  const { data } = img
+  for (let i = 0; i < n * n; i += 1) {
+    const j = i * 4
+    const x = i % n
+    const y = (i / n) | 0
+    const a = hash01(i)
+    const b = hash01((y >> 2) * 67 + (x >> 3) * 19)
+    const v = Math.max(18, Math.min(62, 30 + a * 22 + b * 12 - 6))
+    data[j] = v + 6
+    data[j + 1] = v
+    data[j + 2] = Math.max(14, v - 8)
+    data[j + 3] = 255
+  }
+  ctx.putImageData(img, 0, 0)
+
+  for (let k = 0; k < 18; k += 1) {
+    const x = Math.floor(hash01(k * 21 + 8) * n)
+    const g = ctx.createLinearGradient(x, 0, x, n)
+    g.addColorStop(0, `rgba(${80 + (k % 30)}, ${40 + (k % 12)}, 16, ${0.35 + hash01(k) * 0.25})`)
+    g.addColorStop(0.55, 'rgba(30, 20, 12, 0.18)')
+    g.addColorStop(1, 'rgba(12, 10, 8, 0)')
+    ctx.fillStyle = g
+    ctx.fillRect(x, 0, 2 + (k % 3), n)
+  }
+  for (let k = 0; k < 14; k += 1) {
+    const cy = Math.floor(hash01(k * 33) * n * 0.55)
+    const cx = Math.floor(hash01(k * 51 + 2) * n)
+    const r = 12 + hash01(k * 13) * 28
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
+    g.addColorStop(0, 'rgba(8, 8, 8, 0.5)')
+    g.addColorStop(1, 'rgba(8, 8, 8, 0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
+function paintTactile(ctx, n) {
+  const img = ctx.createImageData(n, n)
+  const { data } = img
+  for (let i = 0; i < n * n; i += 1) {
+    const j = i * 4
+    const grit = hash01(i) * 18 - 8
+    const speck = hash01(i * 5 + 3) > 0.92 ? -14 : 0
+    data[j] = Math.max(186, Math.min(228, 214 + grit + speck))
+    data[j + 1] = Math.max(148, Math.min(190, 172 + grit * 0.7))
+    data[j + 2] = Math.max(8, Math.min(32, 16 + grit * 0.15))
+    data[j + 3] = 255
+  }
+  ctx.putImageData(img, 0, 0)
+  for (let k = 0; k < 10; k += 1) {
+    ctx.fillStyle = `rgba(40, 32, 12, ${0.04 + hash01(k) * 0.05})`
+    ctx.fillRect(0, Math.floor(hash01(k * 47) * n), n, 1)
+  }
+}
+
 function rr(ctx, x, y, w, h, r) {
   const rad = Math.min(r, w / 2, h / 2)
   ctx.beginPath()
@@ -423,7 +612,7 @@ const TRAIN_LINES = [
 
 const TRAIN_CAR_N = 3
 const TRAIN_CAR_L = 15.6
-const TRAIN_COUPLE = 0.42
+const TRAIN_COUPLE = 0.08
 const TRAIN_UNIT = TRAIN_CAR_L + TRAIN_COUPLE
 const TRAIN_DEPART_Z = 52
 const TRAIN_ARRIVE_Z = TRAIN_Z - 78
@@ -908,6 +1097,8 @@ function paintExitSign(ctx, w, h, metalImg, arrowImg) {
   ctx.fillRect(0, bot, w, lineH)
 }
 
+const STATION_MAP_REV = 6
+
 function useStationMaps() {
   const maps = useMemo(() => {
     const wallMap = makeColumnTexture(
@@ -937,19 +1128,45 @@ function useStationMaps() {
     const floorMap = makeCanvasTexture(paintConcrete, 256, THREE.SRGBColorSpace)
     floorMap.repeat.set(FLOOR_W / 1.8, LEN / 1.8)
 
+    const ceilingMap = makeCanvasTexture(paintCeiling, 512, THREE.SRGBColorSpace)
+    ceilingMap.repeat.set(FLOOR_W / 7.2, LEN / 13)
+    ceilingMap.offset.set(0.17, 0.31)
+
+    const steelMap = makeCanvasTexture(paintSteel, 256, THREE.SRGBColorSpace)
+    steelMap.repeat.set(1.15, 0.9)
+
+    const riserMap = makeCanvasTexture(paintRiser, 256, THREE.SRGBColorSpace)
+    riserMap.repeat.set(LEN / 4.8, 1.15)
+
+    const ballastMap = makeCanvasTexture(paintBallast, 256, THREE.SRGBColorSpace)
+    ballastMap.repeat.set(TRACK_W / 2.2, LEN / 3.4)
+
+    const yellowMap = makeCanvasTexture(paintTactile, 256, THREE.SRGBColorSpace)
+    yellowMap.repeat.set(1.1, LEN / 2.6)
+
     return {
       wallMap,
       wallBump,
       wallRough,
       floorMap,
+      ceilingMap,
+      steelMap,
+      riserMap,
+      ballastMap,
+      yellowMap,
       dispose() {
         wallMap.dispose()
         wallBump.dispose()
         wallRough.dispose()
         floorMap.dispose()
+        ceilingMap.dispose()
+        steelMap.dispose()
+        riserMap.dispose()
+        ballastMap.dispose()
+        yellowMap.dispose()
       },
     }
-  }, [])
+  }, [STATION_MAP_REV])
 
   useLayoutEffect(() => () => maps.dispose(), [maps])
   return maps
@@ -964,6 +1181,16 @@ const GRAIN_SVG = encodeURIComponent(
   </svg>`,
 )
 
+const GLASS_SMUDGE_SVG = encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="384">
+    <filter id="s">
+      <feTurbulence type="fractalNoise" baseFrequency="0.028" numOctaves="3" seed="6" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0"/>
+    </filter>
+    <rect width="100%" height="100%" filter="url(#s)"/>
+  </svg>`,
+)
+
 const Layer = styled.div`
   position: absolute;
   inset: 0;
@@ -975,6 +1202,8 @@ const Layer = styled.div`
     display: block;
     width: 100%;
     height: 100%;
+    opacity: ${(p) => (p.$page ? 0 : 1)};
+    transition: opacity 0.35s ease;
   }
 `
 
@@ -985,20 +1214,39 @@ const SceneWrap = styled.div`
 
 const Overlay = styled.div`
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
   z-index: 3;
   pointer-events: none;
-  overflow: hidden;
-  transform-style: preserve-3d;
-  /* Hidden until InfoKiosk writes CSS-3D transforms (remount after cabin) */
+  overflow: ${(p) => (p.$page || p.$clip ? 'hidden' : 'visible')};
+  transform-style: ${(p) => (p.$page ? 'flat' : 'preserve-3d')};
+  background: ${(p) => (p.$page ? '#0c0e10' : 'transparent')};
+  /* Hidden until CSS-3D transforms land. Fullscreen pages skip that loop. */
   visibility: hidden;
+  ${(p) => p.$hide && `
+    display: none !important;
+  `}
+  ${(p) => p.$page && `
+    visibility: visible !important;
+    perspective: none !important;
+    right: 0;
+    bottom: 0;
+    width: 100% !important;
+    height: 100% !important;
+  `}
 `
 
 const OverlayCam = styled.div`
   position: absolute;
-  inset: 0;
-  transform-style: preserve-3d;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform-style: ${(p) => (p.$page ? 'flat' : 'preserve-3d')};
   pointer-events: none;
+  ${(p) => p.$page && `
+    transform: none !important;
+  `}
 `
 
 const OverlayObj = styled.div`
@@ -1006,8 +1254,22 @@ const OverlayObj = styled.div`
   top: 0;
   left: 0;
   /* Solid hit shield over the projected screen so the canvas can't steal clicks */
-  pointer-events: ${(p) => (p.$live ? 'auto' : 'none')};
-  transform-style: preserve-3d;
+  pointer-events: ${(p) => (p.$live || p.$catch ? 'auto' : 'none')};
+  cursor: ${(p) => (p.$catch && !p.$live ? 'pointer' : 'inherit')};
+  transform-style: ${(p) => (p.$fill ? 'flat' : 'preserve-3d')};
+  ${(p) => p.$off && `
+    visibility: hidden !important;
+  `}
+  ${(p) => !p.$live && `
+    * { pointer-events: none !important; }
+  `}
+  ${(p) => p.$fill && `
+    visibility: visible !important;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: none !important;
+  `}
 `
 
 const KioskFrame = styled.div`
@@ -1015,21 +1277,123 @@ const KioskFrame = styled.div`
   width: ${KIOSK_PANEL_W}px;
   height: ${KIOSK_PANEL_H}px;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: ${KIOSK_RADIUS_PX}px;
   /* Inherit from OverlayObj — don't re-enable hits while intro has live=false */
   pointer-events: inherit;
+`
+
+/** LCD glass: gasket + glare. No RGB subpixel mesh — that read as a screen door. */
+const KioskGlass = styled.div`
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(6, 8, 10, 0.72),
+    inset 0 0 0 3px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 8px 14px rgba(0, 0, 0, 0.16);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      radial-gradient(ellipse 90% 70% at 50% 40%, transparent 62%, rgba(0, 0, 0, 0.1) 100%);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      radial-gradient(ellipse 46% 15% at 90% 14%, rgba(255, 248, 232, 0.22) 0%, transparent 64%),
+      radial-gradient(ellipse 68% 18% at 24% -6%, rgba(255, 255, 255, 0.1) 0%, transparent 70%),
+      radial-gradient(ellipse 28% 10% at 78% 58%, rgba(255, 255, 255, 0.04), transparent 70%),
+      radial-gradient(ellipse 22% 8% at 16% 88%, rgba(255, 255, 255, 0.05), transparent 72%);
+  }
+`
+
+const KioskGlassDirt = styled.div`
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.08;
+  background-image:
+    url("data:image/svg+xml,${GLASS_SMUDGE_SVG}"),
+    radial-gradient(ellipse 38% 16% at 70% 18%, rgba(255, 255, 255, 0.22), transparent 68%),
+    radial-gradient(ellipse 26% 12% at 22% 74%, rgba(255, 255, 255, 0.14), transparent 70%);
+  background-size: 180px 270px, 100% 100%, 100% 100%;
+`
+
+const WallFrame = styled.div`
+  position: relative;
+  width: ${(p) => (p.$fill ? '100%' : `${p.$w}px`)};
+  height: ${(p) => (p.$fill ? '100%' : `${p.$h}px`)};
+  overflow: hidden;
+  border-radius: 0;
+  pointer-events: inherit;
+  background: #0c0e10;
+  contain: ${(p) => (p.$fill ? 'none' : 'strict')};
+  ${(p) => !p.$fill && `
+    * { pointer-events: none !important; }
+  `}
 `
 
 const Grain = styled.div`
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 5;
+  z-index: 1;
   opacity: 0.1;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,${GRAIN_SVG}");
   background-size: 128px 128px;
 `
+
+const NoWebGL = styled.div`
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+`
+
+function GfxWatch() {
+  const { drop, tier } = useGfx()
+  const acc = useRef({ t: 0, n: 0, warm: 0 })
+  useFrame((_, dt) => {
+    if (tier !== 'high') return
+    acc.current.warm += dt
+    if (acc.current.warm < 4) return
+    acc.current.t += dt
+    acc.current.n += 1
+    if (acc.current.t < 2) return
+    const fps = acc.current.n / acc.current.t
+    acc.current.t = 0
+    acc.current.n = 0
+    if (fps < 40) drop()
+  })
+  return null
+}
+
+function ToneMap() {
+  const { gl } = useThree()
+  const { settings } = useGfx()
+  useLayoutEffect(() => {
+    gl.toneMappingExposure = settings.exposure
+  }, [gl, settings.exposure])
+  return null
+}
 
 function hasWebGL() {
   try {
@@ -1040,28 +1404,38 @@ function hasWebGL() {
   }
 }
 
-function CameraRig({ pov, onArrive, locked = false }) {
-  const { camera } = useThree()
+function smootherstep(t) {
+  const x = THREE.MathUtils.clamp(t, 0, 1)
+  return x * x * x * (x * (x * 6 - 15) + 10)
+}
+
+const WALL_FLY_SEC = 1.28
+
+function CameraRig({ pov, kioskZoom = 'close', onArrive, locked = false }) {
+  const { camera, size } = useThree()
   const look = useRef(new THREE.Vector3(...CAM.lookAt))
   const goalPos = useMemo(() => new THREE.Vector3(), [])
   const goalLook = useMemo(() => new THREE.Vector3(), [])
-  const tmpPos = useMemo(() => new THREE.Vector3(), [])
-  const tmpLook = useMemo(() => new THREE.Vector3(), [])
   const arrivedFor = useRef(null)
   const wasLocked = useRef(locked)
-  const prevPov = useRef(pov)
-  const path = useRef(null) // { posCurve, lookCurve, age, dur, dest, fov0, fov1 }
+  const lastPov = useRef(pov)
+  const flyFrom = useMemo(() => new THREE.Vector3(), [])
+  const flyLookFrom = useMemo(() => new THREE.Vector3(), [])
+  const flyFovFrom = useRef(CAM.fov)
+  const flyT = useRef(1)
   const reducedMotion = useMemo(
     () => typeof window !== 'undefined'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     [],
   )
+  const aspect = size.width / Math.max(1, size.height)
+  const shotId = pov === 'kiosk'
+    ? `kiosk:${kioskZoom}:${aspect < 0.85 ? 'tall' : 'wide'}`
+    : pov
 
   useLayoutEffect(() => {
     if (locked) return
-    const shot = resolvePov(pov)
-    // Fresh canvas mount only — don't snap over an in-flight doorway path
-    if (path.current) return
+    const shot = resolvePov(pov, aspect, kioskZoom)
     camera.position.set(...shot.position)
     look.current.set(...shot.lookAt)
     camera.fov = shot.fov
@@ -1073,46 +1447,22 @@ function CameraRig({ pov, onArrive, locked = false }) {
   useLayoutEffect(() => {
     if (locked) {
       arrivedFor.current = null
-      path.current = null
-      prevPov.current = pov
+      lastPov.current = pov
       return
     }
-
-    const from = prevPov.current
-    const to = pov
-    prevPov.current = to
     arrivedFor.current = null
-
-    const entering = !isCabinShot(from) && isCabinShot(to)
-    const leaving = isCabinShot(from) && !isCabinShot(to)
-    const dest = resolvePov(to)
-
-    if ((entering || leaving) && !reducedMotion) {
-      const mid = doorwayWaypoints(entering)
-      const posPts = [
-        camera.position.clone(),
-        ...mid.pos,
-        new THREE.Vector3(...dest.position),
-      ]
-      const lookPts = [
-        look.current.clone(),
-        ...mid.look,
-        new THREE.Vector3(...dest.lookAt),
-      ]
-      path.current = {
-        posCurve: new THREE.CatmullRomCurve3(posPts, false, 'catmullrom', 0.28),
-        lookCurve: new THREE.CatmullRomCurve3(lookPts, false, 'catmullrom', 0.28),
-        age: 0,
-        dur: entering ? (to === 'photo' ? 5.4 : 4.4) : 2.9,
-        dest: to,
-        fov0: camera.fov,
-        fov1: dest.fov,
-      }
-      return
+    if (isWallPov(pov)) {
+      flyT.current = 0
+      flyFrom.copy(camera.position)
+      flyLookFrom.copy(look.current)
+      flyFovFrom.current = camera.fov
     }
+  }, [pov, kioskZoom, locked, camera, flyFrom, flyLookFrom])
 
-    path.current = null
-  }, [pov, locked, reducedMotion, camera, look])
+  useLayoutEffect(() => {
+    if (locked) return
+    arrivedFor.current = null
+  }, [size.width, size.height, locked])
 
   useFrame((_, dt) => {
     if (locked) {
@@ -1120,79 +1470,189 @@ function CameraRig({ pov, onArrive, locked = false }) {
       return
     }
 
-    const shot = resolvePov(pov)
+    const shot = resolvePov(pov, aspect, kioskZoom)
     const d = Math.min(dt, 0.05)
-    const smooth = (t) => t * t * (3 - 2 * t)
-
-    // Doorway ride: one curve into / out of the car
-    const ride = path.current
-    if (ride) {
-      wasLocked.current = false
-      ride.age += d
-      const u = Math.min(1, ride.age / ride.dur)
-      // Ease in-out so the “sit down” softens at the end
-      const e = smooth(u)
-      ride.posCurve.getPoint(e, tmpPos)
-      ride.lookCurve.getPoint(e, tmpLook)
-      camera.position.copy(tmpPos)
-      look.current.copy(tmpLook)
-      camera.fov = THREE.MathUtils.lerp(ride.fov0, ride.fov1, e)
-      camera.lookAt(look.current)
-      camera.updateProjectionMatrix()
-      if (u >= 1) {
-        const end = resolvePov(ride.dest)
-        camera.position.set(...end.position)
-        look.current.set(...end.lookAt)
-        camera.fov = end.fov
-        camera.lookAt(look.current)
-        camera.updateProjectionMatrix()
-        arrivedFor.current = ride.dest
-        path.current = null
-        onArrive?.(ride.dest)
-      }
-      return
-    }
+    const fromWall = pov === 'kiosk' && isWallPov(lastPov.current)
 
     // Already settled on this POV — freeze so the CSS kiosk overlay
     // isn't rewritten every frame (that breaks button hit-testing).
-    if (arrivedFor.current === pov) return
+    if (arrivedFor.current === shotId) return
+
+    // Intro handoff — seed look so nothing pops
+    if (wasLocked.current) {
+      look.current.set(...shot.lookAt)
+      wasLocked.current = false
+    }
 
     goalPos.set(...shot.position)
     goalLook.set(...shot.lookAt)
 
-    // Intro just handed off — seed look so nothing pops
-    if (wasLocked.current) {
-      look.current.copy(goalLook)
-      wasLocked.current = false
-    }
-
-    if (reducedMotion) {
-      camera.position.copy(goalPos)
-      look.current.copy(goalLook)
-      camera.fov = shot.fov
-    } else {
-      const k = 1 - Math.exp(-(shot.ease ?? 1.25) * d)
-      camera.position.lerp(goalPos, k)
-      look.current.lerp(goalLook, k)
-      camera.fov = THREE.MathUtils.lerp(camera.fov, shot.fov, k)
-    }
-    camera.lookAt(look.current)
-    camera.updateProjectionMatrix()
-
-    const close = camera.position.distanceTo(goalPos) < 0.12
-      && look.current.distanceTo(goalLook) < 0.2
-    if (close || reducedMotion) {
+    const settle = () => {
       camera.position.copy(goalPos)
       look.current.copy(goalLook)
       camera.fov = shot.fov
       camera.lookAt(look.current)
       camera.updateProjectionMatrix()
-      arrivedFor.current = pov
+      arrivedFor.current = shotId
+      lastPov.current = pov
       onArrive?.(pov)
     }
+
+    if (reducedMotion) {
+      settle()
+      return
+    }
+
+    if (isWallPov(pov)) {
+      flyT.current = Math.min(1, flyT.current + d / WALL_FLY_SEC)
+      const u = smootherstep(flyT.current)
+      camera.position.lerpVectors(flyFrom, goalPos, u)
+      look.current.lerpVectors(flyLookFrom, goalLook, u)
+      camera.fov = THREE.MathUtils.lerp(flyFovFrom.current, shot.fov, u)
+      camera.lookAt(look.current)
+      camera.updateProjectionMatrix()
+      if (flyT.current >= 1) settle()
+      return
+    }
+
+    let k = 1 - Math.exp(-(shot.ease ?? 1.25) * d)
+    if (fromWall) {
+      const rem = camera.position.distanceTo(goalPos)
+      const cruise = 0.017
+      const finish = 0.055
+      const t = 1 - THREE.MathUtils.smoothstep(rem, 0.55, 2.4)
+      k = Math.max(k, THREE.MathUtils.lerp(cruise, finish, t))
+    }
+    camera.position.lerp(goalPos, k)
+    look.current.lerp(goalLook, k)
+    camera.fov = THREE.MathUtils.lerp(camera.fov, shot.fov, k)
+    camera.lookAt(look.current)
+    camera.updateProjectionMatrix()
+
+    const closeDist = fromWall ? 0.12 : 0.08
+    const closeLook = fromWall ? 0.14 : 0.08
+    const closeFov = fromWall ? 0.7 : 0.4
+    const close = camera.position.distanceTo(goalPos) < closeDist
+      && look.current.distanceTo(goalLook) < closeLook
+      && Math.abs(camera.fov - shot.fov) < closeFov
+    if (close) settle()
   })
 
   return null
+}
+
+const ChromeBar = styled.div`
+  position: absolute;
+  left: 50%;
+  bottom: max(1.1rem, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  pointer-events: auto;
+`
+
+const ChromeBtn = styled.button`
+  margin: 0;
+  padding: 0;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  animation: chromePulse 2.1s ease-in-out infinite;
+
+  &:hover { color: rgba(255, 255, 255, 0.95); }
+  &:active { color: rgba(255, 255, 255, 0.8); }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+
+  @keyframes chromePulse {
+    0%, 100% {
+      transform: scale(1);
+      color: rgba(255, 255, 255, 0.45);
+    }
+    50% {
+      transform: scale(1.1);
+      color: rgba(255, 255, 255, 0.95);
+    }
+  }
+`
+
+function LivePhotoIcon() {
+  const dashes = 26
+  const r = 13.15
+  return (
+    <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden>
+      <circle cx="16" cy="16" r="4" fill="none" stroke="currentColor" strokeWidth="1.85" />
+      <circle cx="16" cy="16" r="7.35" fill="none" stroke="currentColor" strokeWidth="1.85" />
+      {Array.from({ length: dashes }, (_, i) => {
+        const a = (i / dashes) * Math.PI * 2
+        const x = 16 + Math.cos(a) * r
+        const y = 16 + Math.sin(a) * r
+        return (
+          <rect
+            key={i}
+            x={x - 0.7}
+            y={y - 1.55}
+            width="1.4"
+            height="3.1"
+            rx="0.7"
+            fill="currentColor"
+            transform={`rotate(${(a * 180) / Math.PI} ${x} ${y})`}
+          />
+        )
+      })}
+    </svg>
+  )
+}
+
+function PanArrow({ dir }) {
+  const d = dir === 'left'
+    ? 'M25 8 L13 20 L25 32'
+    : 'M15 8 L27 20 L15 32'
+  return (
+    <svg viewBox="0 0 40 40" width="34" height="34" aria-hidden>
+      <path
+        d={d}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function HomeIcon() {
+  return (
+    <svg viewBox="0 0 40 40" width="30" height="30" aria-hidden>
+      <path
+        d="M8 19 L20 8 L32 19"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13 18.5 V31 H27 V18.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
 }
 
 function TiledWall({ maps, x, rotY, z, len }) {
@@ -1248,7 +1708,7 @@ function Shell({ maps }) {
       <TiledWall maps={maps} x={WALL_X} rotY={Math.PI / 2} z={MID_Z} len={LEN} />
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[WALL_X + FLOOR_W / 2, HEIGHT, MID_Z]}>
         <planeGeometry args={[FLOOR_W, LEN]} />
-        <meshStandardMaterial color={COL.ceiling} roughness={0.96} metalness={0} />
+        <meshStandardMaterial map={maps.ceilingMap} roughness={0.97} metalness={0} />
       </mesh>
       <mesh position={[WALL_X + FLOOR_W / 2, TRACK_Y + endH / 2, MID_Z - LEN / 2]}>
         <planeGeometry args={[FLOOR_W, endH]} />
@@ -1289,21 +1749,32 @@ const CEIL_BEAM_N = 34
 const CEIL_BEAM_GAP = 1.55
 const CEIL_BEAM_Z0 = 6.2
 
-function CeilingBeams() {
+function CeilingBeams({ maps }) {
   const mesh = useRef()
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const geometry = useMemo(() => createCeilingBeamGeometry(FLOOR_W + 0.32), [])
+  const steel = {
+    map: maps.steelMap,
+    color: '#c4b8a8',
+    roughness: 0.78,
+    metalness: 0.28,
+  }
 
   useLayoutEffect(() => {
     const inst = mesh.current
     if (!inst) return
     const x = WALL_X + FLOOR_W / 2 - 0.08
+    const tint = new THREE.Color()
     for (let i = 0; i < CEIL_BEAM_N; i += 1) {
       dummy.position.set(x, HEIGHT, CEIL_BEAM_Z0 - i * CEIL_BEAM_GAP)
       dummy.updateMatrix()
       inst.setMatrixAt(i, dummy.matrix)
+      const n = hash01(i * 19 + 4)
+      tint.setRGB(0.62 + n * 0.28, 0.52 + n * 0.18, 0.4 + n * 0.12)
+      inst.setColorAt(i, tint)
     }
     inst.instanceMatrix.needsUpdate = true
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true
   }, [dummy, geometry])
 
   useLayoutEffect(() => () => geometry.dispose(), [geometry])
@@ -1311,15 +1782,20 @@ function CeilingBeams() {
   return (
     <group>
       <instancedMesh ref={mesh} args={[geometry, null, CEIL_BEAM_N]}>
-        <meshStandardMaterial color={COL.steel} roughness={0.42} metalness={0.62} />
+        <meshStandardMaterial
+          map={maps.steelMap}
+          color="#ffffff"
+          roughness={0.78}
+          metalness={0.28}
+        />
       </instancedMesh>
       <mesh position={[WALL_X + 0.06, HEIGHT - 0.1, MID_Z]}>
         <boxGeometry args={[0.14, 0.22, LEN]} />
-        <meshStandardMaterial color={COL.steel} roughness={0.42} metalness={0.62} />
+        <meshStandardMaterial {...steel} />
       </mesh>
       <mesh position={[PILLAR_X, HEIGHT - 0.12, MID_Z]} rotation={[0, Math.PI / 2, 0]}>
         <boxGeometry args={[LEN, 0.18, 0.22]} />
-        <meshStandardMaterial color={COL.steel} roughness={0.42} metalness={0.62} />
+        <meshStandardMaterial {...steel} />
       </mesh>
     </group>
   )
@@ -1329,28 +1805,34 @@ function Pillars() {
   const mesh = useRef()
   const geometry = useMemo(() => createIBeamGeometry(HEIGHT), [])
   const dummy = useMemo(() => new THREE.Object3D(), [])
+  // Keep I-beams down the platform; skip the one in the kiosk / zoom-out sightline.
+  const zs = useMemo(
+    () => Array.from({ length: PILLAR_N }, (_, i) => PILLAR_Z0 - i * PILLAR_GAP).filter((z) => z < -4),
+    [],
+  )
 
   useLayoutEffect(() => {
     const inst = mesh.current
     if (!inst) return
-    for (let i = 0; i < PILLAR_N; i += 1) {
-      dummy.position.set(PILLAR_X, HEIGHT / 2, PILLAR_Z0 - i * PILLAR_GAP)
+    zs.forEach((z, i) => {
+      dummy.position.set(PILLAR_X, HEIGHT / 2, z)
       dummy.updateMatrix()
       inst.setMatrixAt(i, dummy.matrix)
-    }
+    })
     inst.instanceMatrix.needsUpdate = true
-  }, [dummy, geometry, PILLAR_Z0])
+    inst.count = zs.length
+  }, [dummy, geometry, zs])
 
   useLayoutEffect(() => () => geometry.dispose(), [geometry])
 
   return (
-    <instancedMesh ref={mesh} args={[geometry, null, PILLAR_N]}>
+    <instancedMesh ref={mesh} args={[geometry, null, zs.length]}>
       <meshStandardMaterial color={COL.steel} roughness={0.42} metalness={0.62} />
     </instancedMesh>
   )
 }
 
-function YellowStrip() {
+function YellowStrip({ maps }) {
   const mesh = useRef()
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const stripW = 0.42
@@ -1361,6 +1843,19 @@ function YellowStrip() {
   const dome = useMemo(() => {
     const geo = new THREE.SphereGeometry(0.042, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2)
     geo.scale(1, 0.52, 1)
+    const pos = geo.attributes.position
+    const colors = new Float32Array(pos.count * 3)
+    const top = 0.042 * 0.52
+    for (let i = 0; i < pos.count; i += 1) {
+      const t = Math.max(0, Math.min(1, pos.getY(i) / top))
+      const grit = hash01(i * 13 + 8) * 0.06
+      // Dirt collects at the rim; crown stays yellow
+      const k = 0.78 + t * 0.22 - grit
+      colors[i * 3] = 0.89 * k
+      colors[i * 3 + 1] = 0.70 * k
+      colors[i * 3 + 2] = 0.06 * k
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     return geo
   }, [])
 
@@ -1387,10 +1882,14 @@ function YellowStrip() {
     <group>
     <mesh position={[EDGE_X, 0.012, MID_Z]}>
         <boxGeometry args={[stripW, 0.024, LEN]} />
-        <meshStandardMaterial color="#e2b40f" roughness={0.62} metalness={0.04} />
+        <meshStandardMaterial
+          map={maps.yellowMap}
+          roughness={0.86}
+          metalness={0}
+        />
     </mesh>
-      <instancedMesh ref={mesh} args={[dome, null, count]}>
-        <meshStandardMaterial color="#d4a50e" roughness={0.5} metalness={0.06} />
+      <instancedMesh key={STATION_MAP_REV} ref={mesh} args={[dome, null, count]}>
+        <meshStandardMaterial vertexColors roughness={0.84} metalness={0} />
       </instancedMesh>
     </group>
   )
@@ -1401,56 +1900,56 @@ function paintBallast(ctx, n) {
   const { data } = img
   for (let i = 0; i < n * n; i += 1) {
     const j = i * 4
-    const noise = ((i * 16807) >>> 8) % 48
-    const grit = ((i * 48271) >>> 11) % 22
-    const v = 28 + noise + grit
+    const x = i % n
+    const y = (i / n) | 0
+    const a = hash01(i)
+    const stone = hash01((x >> 2) * 89 + (y >> 2) * 47)
+    const grit = hash01(i * 7 + 3)
+    const v = 14 + a * 26 + stone * 12 + grit * 8
     data[j] = v + 10
-    data[j + 1] = v + 4
-    data[j + 2] = v
+    data[j + 1] = v + 2
+    data[j + 2] = Math.max(8, v - 6)
     data[j + 3] = 255
   }
   ctx.putImageData(img, 0, 0)
-  // Oil / wet patches
-  for (let k = 0; k < 22; k += 1) {
-    const x = (k * 97) % n
-    const y = (k * 53) % n
-    ctx.fillStyle = `rgba(8,6,4,${0.18 + (k % 5) * 0.06})`
+  for (let k = 0; k < 28; k += 1) {
+    const x = Math.floor(hash01(k * 17) * n)
+    const y = Math.floor(hash01(k * 29 + 4) * n)
+    ctx.fillStyle = `rgba(8,6,4,${0.2 + hash01(k) * 0.22})`
     ctx.beginPath()
-    ctx.ellipse(x, y, 8 + (k % 7), 4 + (k % 4), (k % 5) * 0.4, 0, Math.PI * 2)
+    ctx.ellipse(x, y, 6 + (k % 10), 3 + (k % 6), hash01(k * 3) * 2, 0, Math.PI * 2)
     ctx.fill()
   }
-  // Light trash flecks
-  ctx.fillStyle = 'rgba(210,205,190,0.35)'
-  for (let k = 0; k < 40; k += 1) {
-    ctx.fillRect((k * 131) % n, (k * 89) % n, 1 + (k % 2), 1)
+  ctx.fillStyle = 'rgba(92, 68, 42, 0.22)'
+  for (let k = 0; k < 50; k += 1) {
+    ctx.fillRect(Math.floor(hash01(k * 61) * n), Math.floor(hash01(k * 43 + 2) * n), 1 + (k % 2), 1)
   }
 }
 
-function Tracks() {
-  const ballast = useMemo(() => {
-    const map = makeCanvasTexture(paintBallast, 256, THREE.SRGBColorSpace)
-    map.repeat.set(TRACK_W / 1.4, LEN / 1.4)
-    return map
-  }, [])
-  useLayoutEffect(() => () => ballast.dispose(), [ballast])
-
+function Tracks({ maps }) {
   const tieMesh = useRef()
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const tieGap = 0.55
   const tieN = Math.floor(LEN / tieGap)
   const tieGeo = useMemo(() => new THREE.BoxGeometry(2.55, 0.12, 0.22), [])
+  const riserH = -TRACK_Y
 
   useLayoutEffect(() => {
     const inst = tieMesh.current
     if (!inst) return
     const z0 = MID_Z + LEN / 2 - tieGap * 0.5
+    const tint = new THREE.Color()
     for (let i = 0; i < tieN; i += 1) {
       dummy.position.set(TRACK_CX, TRACK_Y + 0.06, z0 - i * tieGap)
       dummy.rotation.y = ((i * 17) % 7 - 3) * 0.008
       dummy.updateMatrix()
       inst.setMatrixAt(i, dummy.matrix)
+      const n = hash01(i * 11 + 2)
+      tint.setRGB(0.62 + n * 0.22, 0.48 + n * 0.16, 0.32 + n * 0.1)
+      inst.setColorAt(i, tint)
     }
     inst.instanceMatrix.needsUpdate = true
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true
   }, [dummy, tieN])
 
   useLayoutEffect(() => () => tieGeo.dispose(), [tieGeo])
@@ -1462,18 +1961,32 @@ function Tracks() {
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[TRACK_X0 + TRACK_W / 2, TRACK_Y, MID_Z]}>
         <planeGeometry args={[TRACK_W, LEN]} />
         <meshStandardMaterial
-          map={ballast}
-          color="#3a2e24"
+          map={maps.ballastMap}
+          color="#6a5340"
           roughness={0.98}
           metalness={0}
         />
       </mesh>
-      <mesh position={[TRACK_X0, TRACK_Y / 2, MID_Z]}>
-        <boxGeometry args={[0.12, -TRACK_Y, LEN]} />
-        <meshStandardMaterial color="#1a1612" roughness={0.95} metalness={0} />
+      <mesh position={[TRACK_X0 + 0.015, TRACK_Y + riserH / 2, MID_Z]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[LEN, riserH]} />
+        <meshStandardMaterial map={maps.riserMap} roughness={0.96} metalness={0} />
       </mesh>
+      <mesh position={[TRACK_X0, -0.03, MID_Z]}>
+        <boxGeometry args={[0.18, 0.08, LEN]} />
+        <meshStandardMaterial map={maps.riserMap} color="#9a9080" roughness={0.9} metalness={0} />
+      </mesh>
+      {[0.22, 0.48].map((yOff, i) => (
+        <mesh key={i} position={[TRACK_X0 + 0.05, TRACK_Y + yOff, MID_Z]}>
+          <boxGeometry args={[0.055, 0.038, LEN]} />
+          <meshStandardMaterial
+            color={i ? '#4a3424' : '#2e281c'}
+            roughness={0.72}
+            metalness={0.32}
+          />
+        </mesh>
+      ))}
       <instancedMesh ref={tieMesh} args={[tieGeo, null, tieN]}>
-        <meshStandardMaterial color="#2a1c12" roughness={0.92} metalness={0} />
+        <meshStandardMaterial color="#2c1a0e" roughness={0.94} metalness={0} />
       </instancedMesh>
       {[-RAIL_HALF, RAIL_HALF].map((x) => (
         <group key={x} position={[TRACK_CX + x, railY, MID_Z]}>
@@ -1487,7 +2000,6 @@ function Tracks() {
           </mesh>
         </group>
       ))}
-      {/* Third rail — dark cover + contact strip toward wall side of tracks */}
       <mesh position={[TRACK_CX + RAIL_HALF + 0.55, TRACK_Y + 0.2, MID_Z]}>
         <boxGeometry args={[0.12, 0.08, LEN]} />
         <meshStandardMaterial color="#141210" roughness={0.7} metalness={0.4} />
@@ -1582,610 +2094,156 @@ function paintRoofRibs(ctx, n) {
 }
 
 function paintWood(ctx, n) {
-  ctx.fillStyle = '#5c3c24'
-  ctx.fillRect(0, 0, n, n)
-  for (let y = 0; y < n; y += 1) {
-    const band = Math.sin(y * 0.045) * 10 + Math.sin(y * 0.19) * 5
-    const v = 78 + band + ((y * 11) % 7)
-    ctx.fillStyle = `rgb(${v + 18},${Math.round(v * 0.62)},${Math.round(v * 0.34)})`
-    ctx.fillRect(0, y, n, 1)
+  const img = ctx.createImageData(n, n)
+  const { data } = img
+  for (let i = 0; i < n * n; i += 1) {
+    const j = i * 4
+    const y = (i / n) | 0
+    const x = i % n
+    const stripe = Math.sin(y * 0.07) * 32 + Math.sin(y * 0.22 + x * 0.012) * 14
+    const pore = hash01(i) * 18 - 8
+    const band = hash01((y >> 3) * 23) * 16 - 7
+    const v = 112 + stripe + pore + band
+    data[j] = Math.max(78, Math.min(210, v + 34))
+    data[j + 1] = Math.max(58, Math.min(158, v - 2))
+    data[j + 2] = Math.max(22, Math.min(72, v - 68))
+    data[j + 3] = 255
   }
+  ctx.putImageData(img, 0, 0)
   ctx.lineCap = 'round'
-  for (let k = 0; k < 22; k += 1) {
+  for (let k = 0; k < 14; k += 1) {
     const x = 8 + (k * 41) % (n - 16)
-    ctx.strokeStyle = `rgba(38, 20, 10, ${0.14 + (k % 4) * 0.05})`
-    ctx.lineWidth = 1.2 + (k % 3)
+    ctx.strokeStyle = `rgba(62, 34, 12, ${0.18 + (k % 5) * 0.07})`
+    ctx.lineWidth = 1.4 + (k % 4) * 0.9
     ctx.beginPath()
     ctx.moveTo(x, 0)
     for (let y = 0; y <= n; y += 6) {
-      ctx.lineTo(x + Math.sin(y * 0.035 + k * 0.7) * 5.5, y)
+      ctx.lineTo(x + Math.sin(y * 0.022 + k * 1.1) * 5.5, y)
     }
     ctx.stroke()
   }
-  ctx.fillStyle = 'rgba(20, 10, 6, 0.16)'
-  for (let i = 0; i < 9; i += 1) {
-    ctx.fillRect((i * 53) % n, (i * 29) % n, 18 + (i % 4) * 10, 2)
+  for (let k = 0; k < 9; k += 1) {
+    const cx = Math.floor(hash01(k * 41) * n)
+    const cy = Math.floor(hash01(k * 17 + 3) * n)
+    const r = 8 + hash01(k * 7) * 14
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
+    g.addColorStop(0, 'rgba(52, 30, 12, 0.55)')
+    g.addColorStop(0.4, 'rgba(96, 58, 24, 0.28)')
+    g.addColorStop(1, 'rgba(110, 72, 32, 0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.ellipse(cx, cy, r * 0.5, r, hash01(k) * 2, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.fillStyle = 'rgba(228, 190, 118, 0.2)'
+  for (let k = 0; k < 12; k += 1) {
+    ctx.fillRect(Math.floor(hash01(k * 19) * n), Math.floor(hash01(k * 31) * n), 28 + (k % 18), 3 + (k % 4))
   }
 }
 
-function paintWoodRough(ctx, n) {
-  ctx.fillStyle = '#9a9a9a'
+/** Painted kiosk plastic — grain + scuffs, not a photo wrap. */
+function paintKioskPlastic(ctx, n) {
+  ctx.fillStyle = '#b7b8b2'
   ctx.fillRect(0, 0, n, n)
-  for (let k = 0; k < 18; k += 1) {
-    const x = (k * 43) % n
-    ctx.strokeStyle = k % 2 ? '#7a7a7a' : '#b8b8b8'
-    ctx.lineWidth = 1 + (k % 2)
+  const img = ctx.getImageData(0, 0, n, n)
+  const d = img.data
+  for (let i = 0; i < d.length; i += 4) {
+    const speckle = (Math.random() - 0.5) * 28
+    d[i] = Math.max(0, Math.min(255, d[i] + speckle))
+    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + speckle))
+    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + speckle * 0.8))
+  }
+  ctx.putImageData(img, 0, 0)
+  ctx.lineCap = 'round'
+  for (let k = 0; k < 22; k += 1) {
+    ctx.strokeStyle = `rgba(24,24,22,${0.07 + (k % 4) * 0.035})`
+    ctx.lineWidth = 0.6 + (k % 3) * 0.45
+    const x = (k * 37) % n
     ctx.beginPath()
     ctx.moveTo(x, 0)
     for (let y = 0; y <= n; y += 8) {
-      ctx.lineTo(x + Math.sin(y * 0.04 + k) * 4, y)
+      ctx.lineTo(x + Math.sin(y * 0.045 + k) * 3.2, y)
     }
     ctx.stroke()
   }
 }
 
-const SEAT_ORANGE = ['#e87828', '#f0a030', '#d45818', '#e89028', '#c84810', '#e87020']
-
-function makeCabinFloorMap() {
-  const n = 128
-  const canvas = document.createElement('canvas')
-  canvas.width = canvas.height = n
-  const ctx = canvas.getContext('2d')
-  ctx.fillStyle = '#1c1e22'
+function paintKioskRough(ctx, n) {
+  ctx.fillStyle = '#8c8c88'
   ctx.fillRect(0, 0, n, n)
-  for (let i = 0; i < 900; i += 1) {
-    const x = (Math.sin(i * 12.9898) * 43758.5453) % 1
-    const y = (Math.sin(i * 78.233) * 93758.1234) % 1
-    const v = 28 + ((i * 17) % 40)
-    ctx.fillStyle = `rgb(${v},${v + 2},${v + 4})`
-    ctx.fillRect((x * n) | 0, (y * n) | 0, 1, 1)
+  for (let i = 0; i < 1400; i += 1) {
+    const light = Math.random() > 0.45
+    ctx.fillStyle = light
+      ? `rgba(230,230,224,${0.08 + Math.random() * 0.12})`
+      : `rgba(22,22,20,${0.1 + Math.random() * 0.14})`
+    ctx.fillRect(Math.random() * n, Math.random() * n, 1 + Math.random() * 3, 1)
   }
-  const tex = new THREE.CanvasTexture(canvas)
-  tex.colorSpace = THREE.SRGBColorSpace
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-  tex.repeat.set(14, 28)
-  tex.anisotropy = 2
-  return tex
-}
-
-function makeCabinMapTex() {
-  const w = 512
-  const h = 360
-  const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
-  const ctx = canvas.getContext('2d')
-  ctx.fillStyle = '#0e1a2e'
-  ctx.fillRect(0, 0, w, h)
-  ctx.fillStyle = '#1a3a5c'
-  ctx.fillRect(18, 18, w - 36, h - 36)
-  // Fake route spaghetti
-  const lines = [
-    ['#EE352E', 40, 80, 460, 90],
-    ['#00933C', 50, 140, 440, 200],
-    ['#0039A6', 60, 220, 420, 120],
-    ['#FF6319', 80, 280, 400, 250],
-    ['#FCCC0A', 100, 100, 380, 300],
-    ['#B933AD', 120, 260, 360, 80],
-  ]
-  ctx.lineWidth = 4
-  lines.forEach(([c, x0, y0, x1, y1], i) => {
-    ctx.strokeStyle = c
+  for (let k = 0; k < 28; k += 1) {
+    ctx.strokeStyle = `rgba(18,18,16,${0.16 + (k % 3) * 0.1})`
+    ctx.lineWidth = 0.5
+    const x = (k * 29) % n
     ctx.beginPath()
-    ctx.moveTo(x0, y0)
-    ctx.bezierCurveTo(x0 + 80, y0 + (i % 2 ? 40 : -30), x1 - 60, y1, x1, y1)
+    ctx.moveTo(x, 0)
+    ctx.lineTo(x + (k % 5 - 2) * 10, n)
     ctx.stroke()
-  })
-  ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  ctx.font = 'bold 22px Helvetica, Arial, sans-serif'
-  ctx.fillText('New York City Subway', 28, 48)
-  const tex = new THREE.CanvasTexture(canvas)
-  tex.colorSpace = THREE.SRGBColorSpace
-  tex.anisotropy = 2
-  return tex
+  }
 }
 
-/**
- * Small metal frames on the right wall — each holds a Sanity photo.
- * Click opens the PhotoPage modal via cabinGallery event.
- */
-function PhotoFrames({ innerW, floorY, active }) {
-  const [frames, setFrames] = useState([])
-  const photosRef = useRef([])
+const HOSE = { color: '#2c1c12', roughness: 0.78, metalness: 0.22 }
 
-  useEffect(() => {
-    if (!active) return undefined
-    let alive = true
-    client.fetch(`*[_type == "photos"][0].images`).then(async (data) => {
-      if (!alive || !data?.length) return
-      photosRef.current = data
-      const loader = new THREE.TextureLoader()
-      const built = await Promise.all(data.slice(0, 18).map((photo, i) => (
-        new Promise((resolve) => {
-          const url = urlFor(photo).width(640).height(480).fit('crop').url()
-          if (!url) {
-            resolve(null)
-            return
-          }
-          loader.load(
-            url,
-            (tex) => {
-              tex.colorSpace = THREE.SRGBColorSpace
-              tex.anisotropy = 2
-              // Mix of landscape / portrait-ish frame sizes
-              const landscape = i % 3 !== 1
-              resolve({
-                photo,
-                tex,
-                w: landscape ? 0.52 : 0.38,
-                h: landscape ? 0.36 : 0.48,
-              })
-            },
-            undefined,
-            () => resolve(null),
-          )
-        })
-      )))
-      if (!alive) {
-        built.forEach((f) => f?.tex?.dispose())
-        return
-      }
-      setFrames(built.filter(Boolean))
-    }).catch(() => {})
-    return () => {
-      alive = false
-      document.body.style.cursor = ''
-      setFrames((prev) => {
-        prev.forEach((f) => f.tex?.dispose())
-        return []
-      })
-    }
-  }, [active])
-
-  if (!active || frames.length === 0) return null
-
-  // Two rows along the right wall, facing the aisle (−X)
-  const wallX = innerW * 0.468
-  const z0 = -3.55
-  const gap = 0.62
-  const rowY = [floorY + 1.62, floorY + 1.12]
-
+function CarHardware({ carL, lead, tail }) {
   return (
     <group>
-      {frames.map((f, i) => {
-        const row = i % 2
-        const col = (i / 2) | 0
-        const z = z0 - col * gap - (row === 1 ? 0.12 : 0)
-        const y = rowY[row] + ((col % 2) * 0.04 - 0.02)
-        const frameW = f.w + 0.04
-        const frameH = f.h + 0.04
-        return (
-          <group
-            key={f.photo.asset?._ref || i}
-            position={[wallX, y, z]}
-            rotation={[0, -Math.PI / 2, 0]}
-          >
-            {/* Frame back */}
-            <mesh position={[0, 0, -0.012]}>
-              <boxGeometry args={[frameW, frameH, 0.028]} />
-              <meshStandardMaterial color="#9aa0a6" roughness={0.35} metalness={0.7} />
-            </mesh>
-            {/* Mat */}
-            <mesh position={[0, 0, 0.004]}>
-              <planeGeometry args={[f.w + 0.02, f.h + 0.02]} />
-              <meshStandardMaterial color="#efe8dc" roughness={0.85} metalness={0.02} />
-            </mesh>
-            {/* Photo — clickable */}
+      {lead ? (
+        <group>
+          <mesh position={[0, 0.4, 0.42]}>
+            <boxGeometry args={[0.3, 0.22, 0.4]} />
+            <meshStandardMaterial color="#2a2e32" roughness={0.48} metalness={0.68} />
+          </mesh>
+          {[-0.22, 0.22].map((x) => (
             <mesh
-              position={[0, 0, 0.01]}
-              onClick={(e) => {
-                e.stopPropagation()
-                openCabinPhoto(f.photo, photosRef.current)
-              }}
+              key={`hose-${x}`}
+              position={[x, 0.28, 0.32]}
+              rotation={[Math.PI / 2.2, 0, x > 0 ? 0.4 : -0.4]}
             >
-              <planeGeometry args={[f.w, f.h]} />
-              <meshStandardMaterial
-                map={f.tex}
-                roughness={0.55}
-                metalness={0.05}
-                toneMapped={false}
-              />
+              <torusGeometry args={[0.12, 0.024, 6, 10, Math.PI]} />
+              <meshStandardMaterial {...HOSE} />
             </mesh>
-          </group>
-        )
-      })}
-      <pointLight position={[wallX - 0.35, floorY + 1.4, -5.2]} color="#fff2dc" intensity={1.4} distance={4} decay={2} />
-    </group>
-  )
-}
-
-/** After seated, wheel pans gaze along the photo wall. */
-function PhotoSeatPan({ enabled }) {
-  const { camera } = useThree()
-  const offset = useRef(0)
-  const look = useRef(new THREE.Vector3(...PHOTO_SEAT.lookAt))
-  const target = useMemo(() => new THREE.Vector3(), [])
-  const targetLook = useMemo(() => new THREE.Vector3(), [])
-
-  useEffect(() => {
-    if (!enabled) {
-      offset.current = 0
-      return undefined
-    }
-    const onWheel = (e) => {
-      offset.current = THREE.MathUtils.clamp(offset.current + e.deltaY * 0.0032, -3.2, 2.4)
-    }
-    window.addEventListener('wheel', onWheel, { passive: true })
-    return () => window.removeEventListener('wheel', onWheel)
-  }, [enabled])
-
-  useFrame((_, dt) => {
-    if (!enabled) return
-    const k = 1 - Math.exp(-5.5 * Math.min(dt, 0.05))
-    target.set(
-      PHOTO_SEAT.position[0],
-      PHOTO_SEAT.position[1],
-      PHOTO_SEAT.position[2] + offset.current,
-    )
-    targetLook.set(
-      PHOTO_SEAT.lookAt[0],
-      PHOTO_SEAT.lookAt[1],
-      PHOTO_SEAT.lookAt[2] + offset.current,
-    )
-    camera.position.lerp(target, k)
-    look.current.lerp(targetLook, k)
-    camera.lookAt(look.current)
-  })
-
-  return null
-}
-
-/**
- * Lead-car cabin — R62A aisle view (fresh rebuild from reference).
- * Local space: origin at car front, −Z toward the rear.
- */
-function CarInterior({ carL, carW, carH, arch, openEntry = false, showPhotos = false }) {
-  const floorY = 0.28
-  const wallTop = carH - arch
-  const ceilY = wallTop - 0.06
-  const innerW = carW - 0.2
-  const aisleW = 0.98
-  const seatD = (innerW - aisleW) * 0.5
-  const seatH = 0.44
-  const seatPitch = 0.48
-  const baseH = 0.2
-  const railY = floorY + 1.68
-  const adY = railY + 0.38
-  const winY = floorY + 1.42
-  const doorZs = useMemo(() => [-3.15, -6.75, -10.35, -13.55], [])
-  const doorSpan = 1.32
-
-  const floorMap = useMemo(() => makeCabinFloorMap(), [])
-  const mapTex = useMemo(() => makeCabinMapTex(), [])
-  const seatGeo = useMemo(() => new THREE.BoxGeometry(0.42, seatH, 0.44), [seatH])
-  const poleGeo = useMemo(
-    () => new THREE.CylinderGeometry(0.026, 0.026, ceilY - floorY - 0.06, 10),
-    [ceilY, floorY],
-  )
-  const railGeo = useMemo(() => new THREE.CylinderGeometry(0.016, 0.016, 1, 8), [])
-
-  useLayoutEffect(() => () => {
-    floorMap.dispose()
-    mapTex.dispose()
-    seatGeo.dispose()
-    poleGeo.dispose()
-    railGeo.dispose()
-  }, [floorMap, mapTex, seatGeo, poleGeo, railGeo])
-
-  const banks = useMemo(() => {
-    const edges = [-0.5, ...doorZs.flatMap((z) => [z + doorSpan * 0.5, z - doorSpan * 0.5]), -carL + 0.5]
-    const out = []
-    for (let i = 0; i < edges.length - 1; i += 2) {
-      const zFront = edges[i]
-      const zRear = edges[i + 1]
-      const len = zFront - zRear
-      if (len < 0.75) continue
-      out.push({ z: (zFront + zRear) * 0.5, len, zFront, zRear })
-    }
-    return out
-  }, [carL, doorZs, doorSpan])
-
-  const steel = { color: '#c4c8cc', roughness: 0.28, metalness: 0.82 }
-  const steelDark = { color: '#9aa0a6', roughness: 0.34, metalness: 0.72 }
-  const cream = { color: '#e4dcc8', roughness: 0.78, metalness: 0.04 }
-  const seatPlastic = (color) => ({ color, roughness: 0.42, metalness: 0.06 })
-
-  return (
-    <group>
-      {/* Floor */}
-      <mesh position={[0, floorY, -carL * 0.5]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[innerW, carL * 0.97]} />
-        <meshStandardMaterial map={floorMap} roughness={0.9} metalness={0.05} />
-      </mesh>
-
-      {/* Ceiling + center recess */}
-      <mesh position={[0, ceilY, -carL * 0.5]} rotation={[Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[innerW * 0.98, carL * 0.95]} />
-        <meshStandardMaterial color="#ddd6c8" roughness={0.7} metalness={0.12} />
-      </mesh>
-      <mesh position={[0, ceilY - 0.04, -carL * 0.5]}>
-        <boxGeometry args={[0.55, 0.06, carL * 0.9]} />
-        <meshStandardMaterial color="#cfc8ba" roughness={0.65} metalness={0.15} />
-      </mesh>
-      {[-3.5, -6.2, -9.0, -11.8, -14.2].map((z) => (
-        <mesh key={`vent-${z}`} position={[0, ceilY - 0.075, z]} rotation={[Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.12, 14]} />
-          <meshStandardMaterial color="#8a8680" roughness={0.5} metalness={0.4} />
-        </mesh>
-      ))}
-
-      {/* Side fluorescent strips */}
-      {[-1, 1].map((side) => (
-        <mesh key={`tube-${side}`} position={[side * (innerW * 0.4), ceilY - 0.05, -carL * 0.5]}>
-          <boxGeometry args={[0.11, 0.04, carL * 0.9]} />
-          <meshStandardMaterial
-            color="#fff8e8"
-            emissive="#ffe9b8"
-            emissiveIntensity={1.7}
-            roughness={0.35}
-            metalness={0.05}
-          />
-        </mesh>
-      ))}
-      <pointLight position={[0, ceilY - 0.4, -carL * 0.22]} color="#fff3dc" intensity={4.6} distance={11} decay={2} />
-      <pointLight position={[0, ceilY - 0.4, -carL * 0.5]} color="#fff3dc" intensity={4.4} distance={11} decay={2} />
-      <pointLight position={[0, ceilY - 0.4, -carL * 0.78]} color="#fff3dc" intensity={4.2} distance={11} decay={2} />
-
-      {/* Front bulkhead (behind seated camera) */}
-      <mesh position={[0, (floorY + wallTop) * 0.5, -0.32]}>
-        <boxGeometry args={[innerW * 0.98, wallTop - floorY - 0.08, 0.07]} />
-        <meshStandardMaterial {...steelDark} />
-      </mesh>
-      {/* Rear bulkhead */}
-      <mesh position={[0, (floorY + wallTop) * 0.5, -carL + 0.28]}>
-        <boxGeometry args={[innerW * 0.98, wallTop - floorY - 0.08, 0.07]} />
-        <meshStandardMaterial {...steelDark} />
-      </mesh>
-
-      {/* Wall segments between doors: cream upper + window + stainless kick */}
-      {banks.map((bank, bi) => (
-        [-1, 1].map((side) => {
-          const x = side * (innerW * 0.5 - 0.015)
-          const rotY = side * Math.PI / 2
-          const winH = 0.72
-          const creamH = wallTop - (winY + winH * 0.5) - 0.08
-          return (
-            <group key={`wall-${bi}-${side}`}>
-              {/* Kick / lower stainless */}
-              <mesh position={[x, floorY + 0.38, bank.z]} rotation={[0, rotY, 0]}>
-                <planeGeometry args={[bank.len * 0.96, 0.76]} />
-                <meshStandardMaterial {...steel} side={THREE.DoubleSide} />
-              </mesh>
-              {/* Window (tunnel dark) */}
-              <mesh position={[x, winY, bank.z]} rotation={[0, rotY, 0]}>
-                <planeGeometry args={[bank.len * 0.88, winH]} />
-                <meshStandardMaterial
-                  color="#0a0c10"
-                  roughness={0.15}
-                  metalness={0.55}
-                  side={THREE.DoubleSide}
-                />
-              </mesh>
-              {/* Window frame */}
-              <mesh position={[side * (innerW * 0.5 - 0.04), winY, bank.z]}>
-                <boxGeometry args={[0.03, winH + 0.1, bank.len * 0.92]} />
-                <meshStandardMaterial {...steelDark} />
-              </mesh>
-              {/* Cream upper panel */}
-              <mesh
-                position={[x, winY + winH * 0.5 + creamH * 0.5 + 0.02, bank.z]}
-                rotation={[0, rotY, 0]}
-              >
-                <planeGeometry args={[bank.len * 0.96, Math.max(0.2, creamH)]} />
-                <meshStandardMaterial {...cream} side={THREE.DoubleSide} />
-              </mesh>
-              {/* Ad card (angled under lights) */}
-              <mesh
-                position={[side * (innerW * 0.46), adY, bank.z]}
-                rotation={[0.42, rotY, 0]}
-              >
-                <planeGeometry args={[bank.len * 0.82, 0.3]} />
-                <meshStandardMaterial
-                  color={['#2a4060', '#5a2828', '#1a4a3a', '#4a2a50', '#3a3a28'][bi % 5]}
-                  roughness={0.62}
-                  metalness={0.05}
-                />
-              </mesh>
-            </group>
-          )
-        })
-      ))}
-
-      {/* Seat banks */}
-      {banks.map((bank, bi) => (
-        [-1, 1].map((side) => {
-          const n = Math.max(2, Math.floor(bank.len / seatPitch))
-          const pitch = bank.len / n
-          const bankX = side * (aisleW * 0.5 + seatD * 0.5)
-          return (
-            <group key={`seats-${bi}-${side}`} position={[bankX, 0, bank.z]}>
-              {/* Continuous seat base */}
-              <mesh position={[0, floorY + baseH * 0.5, 0]}>
-                <boxGeometry args={[seatD * 0.94, baseH, bank.len * 0.92]} />
-                <meshStandardMaterial color="#ebe6dc" roughness={0.55} metalness={0.08} />
-              </mesh>
-              {/* Stainless kick under seats toward aisle */}
-              <mesh position={[side * -seatD * 0.42, floorY + baseH * 0.55, 0]}>
-                <boxGeometry args={[0.04, baseH * 0.9, bank.len * 0.9]} />
-                <meshStandardMaterial {...steel} />
-              </mesh>
-              {Array.from({ length: n }, (_, si) => {
-                const z = bank.len * 0.5 - pitch * (si + 0.5)
-                const color = SEAT_ORANGE[(bi * 2 + si + (side > 0 ? 1 : 0)) % SEAT_ORANGE.length]
-                return (
-                  <mesh
-                    key={si}
-                    geometry={seatGeo}
-                    position={[side * 0.015, floorY + baseH + seatH * 0.5, z]}
-                  >
-                    <meshStandardMaterial {...seatPlastic(color)} />
-                  </mesh>
-                )
-              })}
-              {/* Seat-back handrail */}
-              <mesh
-                geometry={railGeo}
-                position={[side * -0.06, railY - 0.55, 0]}
-                rotation={[Math.PI / 2, 0, 0]}
-                scale={[1, bank.len * 0.86, 1]}
-              >
-                <meshStandardMaterial {...steel} />
-              </mesh>
-              {/* Overhead longitudinal rail */}
-              <mesh
-                geometry={railGeo}
-                position={[side * -0.1, railY, 0]}
-                rotation={[Math.PI / 2, 0, 0]}
-                scale={[1, bank.len * 0.88, 1]}
-              >
-                <meshStandardMaterial {...steel} />
-              </mesh>
-            </group>
-          )
-        })
-      ))}
-
-      {/* Door bays + stanchions */}
-      {doorZs.map((z, i) => (
-        <group key={`door-${i}`} position={[0, 0, z]}>
-          {[-1, 1].map((side) => {
-            const entryOpen = openEntry && i === 0 && side === -1
-            return (
-              <group key={side}>
-                {entryOpen ? null : (
-                  <>
-                    {/* Double-leaf door slab */}
-                    <mesh position={[side * (innerW * 0.5 - 0.035), floorY + 1.12, 0]}>
-                      <boxGeometry args={[0.06, 2.16, doorSpan * 0.94]} />
-                      <meshStandardMaterial {...steelDark} />
-                    </mesh>
-                    {/* Seam */}
-                    <mesh position={[side * (innerW * 0.5 - 0.005), floorY + 1.12, 0]}>
-                      <boxGeometry args={[0.02, 2.05, 0.04]} />
-                      <meshStandardMaterial color="#7a8086" roughness={0.4} metalness={0.65} />
-                    </mesh>
-                    {/* Door windows */}
-                    {[-0.28, 0.28].map((dz) => (
-                      <mesh key={dz} position={[side * (innerW * 0.5 - 0.01), floorY + 1.55, dz]}>
-                        <boxGeometry args={[0.02, 0.5, 0.2]} />
-                        <meshStandardMaterial
-                          color="#f5ecd0"
-                          emissive="#ffe2a8"
-                          emissiveIntensity={0.7}
-                          roughness={0.25}
-                          metalness={0.1}
-                        />
-                      </mesh>
-                    ))}
-                  </>
-                )}
-                {/* Door-end poles */}
-                <mesh
-                  geometry={poleGeo}
-                  position={[side * (aisleW * 0.44), floorY + (ceilY - floorY) * 0.5 - 0.03, doorSpan * 0.46]}
-                >
-                  <meshStandardMaterial {...steel} />
-                </mesh>
-                <mesh
-                  geometry={poleGeo}
-                  position={[side * (aisleW * 0.44), floorY + (ceilY - floorY) * 0.5 - 0.03, -doorSpan * 0.46]}
-                >
-                  <meshStandardMaterial {...steel} />
-                </mesh>
-              </group>
-            )
-          })}
-          {/* Center aisle stanchion */}
-          <mesh geometry={poleGeo} position={[0, floorY + (ceilY - floorY) * 0.5 - 0.03, 0]}>
-            <meshStandardMaterial {...steel} />
-          </mesh>
+          ))}
+          {[-0.42, 0.42].map((x) => (
+            <mesh key={`shackle-${x}`} position={[x, 0.38, 0.24]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[0.07, 0.016, 6, 10]} />
+              <meshStandardMaterial color="#3a3834" roughness={0.45} metalness={0.7} />
+            </mesh>
+          ))}
         </group>
-      ))}
-
-      {/* Extra mid-bank aisle poles (reference rhythm) */}
-      {banks.map((bank, bi) => (
-        bi % 2 === 0 ? (
-          <mesh
-            key={`aisle-pole-${bi}`}
-            geometry={poleGeo}
-            position={[0, floorY + (ceilY - floorY) * 0.5 - 0.03, bank.z]}
-          >
-            <meshStandardMaterial {...steel} />
+      ) : null}
+      {!tail ? (
+        <group position={[0, 0.5, -carL - TRAIN_COUPLE * 0.5]}>
+          <mesh>
+            <boxGeometry args={[0.28, 0.22, Math.max(0.12, TRAIN_COUPLE)]} />
+            <meshStandardMaterial color="#2a2c2e" roughness={0.55} metalness={0.65} />
           </mesh>
-        ) : null
-      ))}
-
-      {/* Subway map — left wall, first long bank */}
-      <mesh position={[-innerW * 0.485, floorY + 1.55, -5.15]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[1.2, 0.88]} />
-        <meshStandardMaterial {...steelDark} />
-      </mesh>
-      <mesh position={[-innerW * 0.478, floorY + 1.55, -5.15]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[1.08, 0.76]} />
-        <meshStandardMaterial map={mapTex} roughness={0.55} metalness={0.05} />
-      </mesh>
-
-      {/* Framed photos on the right wall (photo route) */}
-      <PhotoFrames innerW={innerW} floorY={floorY} active={showPhotos} />
-
-      {/* LED destination strip */}
-      <mesh position={[-innerW * 0.47, floorY + 2.05, -4.35]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[0.85, 0.14]} />
-        <meshStandardMaterial color="#0a0a0a" roughness={0.45} metalness={0.2} />
-      </mesh>
-      <mesh position={[-innerW * 0.465, floorY + 2.05, -4.35]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[0.78, 0.09]} />
-        <meshStandardMaterial
-          color="#1a0808"
-          emissive="#c01818"
-          emissiveIntensity={0.55}
-          roughness={0.4}
-          metalness={0.1}
-        />
-      </mesh>
+          {[-0.15, 0.15].map((x) => (
+            <mesh
+              key={x}
+              position={[x, -0.06, 0]}
+              rotation={[Math.PI / 2, 0, x > 0 ? 0.45 : -0.45]}
+            >
+              <torusGeometry args={[0.1, 0.018, 6, 12, Math.PI]} />
+              <meshStandardMaterial {...HOSE} />
+            </mesh>
+          ))}
+        </group>
+      ) : null}
     </group>
   )
 }
 
-function TrainCar({
-  maps,
-  body,
-  frontGeo,
-  roofGeo,
-  carL,
-  carW,
-  carH,
-  arch,
-  wallTop,
-  zOffset,
-  lead,
-  tail,
-  headLights,
-  showInterior = false,
-  showPhotos = false,
-}) {
+function TrainCar({ maps, body, frontGeo, roofGeo, carL, carW, carH, arch, wallTop, zOffset, lead, tail, headLights }) {
+  const { settings } = useGfx()
   return (
     <group position={[0, 0, zOffset]}>
-      {lead && showInterior ? (
-        <CarInterior
-          carL={carL}
-          carW={carW}
-          carH={carH}
-          arch={arch}
-          openEntry
-          showPhotos={showPhotos}
-        />
-      ) : null}
       <mesh geometry={body} position={[0, 0, -0.03]}>
         <meshStandardMaterial color="#c8ced3" roughness={0.48} metalness={0.34} />
       </mesh>
@@ -2220,13 +2278,25 @@ function TrainCar({
         <boxGeometry args={[carW * 0.96, wallTop * 0.92, 0.08]} />
         <meshStandardMaterial color="#aeb4ba" roughness={0.42} metalness={0.4} />
       </mesh>
+      {!tail ? (
+        <mesh position={[0, wallTop * 0.5, -carL - TRAIN_COUPLE * 0.5]}>
+          <boxGeometry args={[carW * 0.98, wallTop * 0.96, TRAIN_COUPLE + 0.22]} />
+          <meshStandardMaterial color="#c4cad0" roughness={0.48} metalness={0.3} />
+        </mesh>
+      ) : null}
+      {lead ? [-1, 1].map((side) => (
+        <mesh key={`nose-${side}`} position={[side * (carW / 2), wallTop * 0.5, 0.04]}>
+          <boxGeometry args={[0.08, wallTop, 0.14]} />
+          <meshStandardMaterial color="#c8ced3" roughness={0.48} metalness={0.34} />
+        </mesh>
+      )) : null}
       {[-1, 1].map((side) => (
         <mesh
           key={side}
-          position={[side * (carW / 2 + 0.015), wallTop * 0.5, -carL / 2]}
+          position={[side * (carW / 2 + 0.01), wallTop * 0.5, -carL / 2 + 0.02]}
           rotation={[0, side * Math.PI / 2, 0]}
         >
-          <planeGeometry args={[carL * 0.985, wallTop * 0.98]} />
+          <planeGeometry args={[carL + 0.08, wallTop]} />
           <meshStandardMaterial
             map={side === -1 ? maps.sidePlatform : maps.side}
             roughness={0.46}
@@ -2239,13 +2309,8 @@ function TrainCar({
         <boxGeometry args={[carW * 1.02, 0.26, carL * 0.98]} />
         <meshStandardMaterial color="#1a1c1e" roughness={0.88} metalness={0.12} />
       </mesh>
-      {!tail ? (
-        <mesh position={[0, 0.55, -carL - TRAIN_COUPLE * 0.5]}>
-          <boxGeometry args={[0.28, 0.22, TRAIN_COUPLE * 0.85]} />
-          <meshStandardMaterial color="#2a2c2e" roughness={0.55} metalness={0.65} />
-        </mesh>
-      ) : null}
-      {lead
+      <CarHardware carL={carL} lead={lead} tail={tail} />
+      {lead && settings.extras
         ? [-0.62, 0.62].map((x, i) => (
           <pointLight
             key={x}
@@ -2262,7 +2327,8 @@ function TrainCar({
   )
 }
 
-function Train({ showInterior = false, showPhotos = false }) {
+function Train({ invite = false }) {
+  const { startSettings, settings } = useGfx()
   const root = useRef()
   const glowLight = useRef()
   const headLights = useRef([])
@@ -2285,21 +2351,21 @@ function Train({ showInterior = false, showPhotos = false }) {
   const maps = useMemo(() => {
     const front = makeLabelTexture(
       (ctx, w, h) => paintCarFront(ctx, w, h, line),
-      1024,
-      1024,
+      startSettings.trainFront,
+      startSettings.trainFront,
     )
-    const side = makeLabelTexture(paintCarSide, 3072, 768)
+    const side = makeLabelTexture(paintCarSide, startSettings.trainSide[0], startSettings.trainSide[1])
     const sidePlatform = makeLabelTexture(
       (ctx, w, h) => paintCarSide(ctx, w, h, { reverse: true }),
-      3072,
-      768,
+      startSettings.trainSide[0],
+      startSettings.trainSide[1],
     )
     const roof = makeCanvasTexture(paintRoofRibs, 256, THREE.SRGBColorSpace)
     roof.wrapS = THREE.RepeatWrapping
     roof.wrapT = THREE.RepeatWrapping
     roof.repeat.set(8, 1)
     return { front, side, sidePlatform, roof }
-  }, [line, TRAIN_REV])
+  }, [line, TRAIN_REV, startSettings])
 
   const carL = TRAIN_CAR_L
   const carW = 2.9
@@ -2340,14 +2406,15 @@ function Train({ showInterior = false, showPhotos = false }) {
     const wantHover = hoverTarget.current > 0 && parked
     hover.current = THREE.MathUtils.lerp(hover.current, wantHover ? 1 : 0, 1 - Math.exp(-10 * d))
     const h = hover.current
-    const idle = parked ? 0.5 + 0.5 * Math.sin(t * 1.35) : 0
-    const s = 1 + h * 0.028 + idle * 0.008
+    const call = invite && parked
+    const idle = parked ? 0.5 + 0.5 * Math.sin(t * (call ? 1.15 : 1.35)) : 0
+    const s = 1 + h * 0.028 + idle * (call ? 0.018 : 0.008)
     root.current.scale.set(s, s, s)
     if (glowLight.current) {
-      glowLight.current.intensity = (parked ? 0.55 + idle * 0.85 : 0) + h * 3.4
+      glowLight.current.intensity = (parked ? (call ? 1.25 : 0.55) + idle * (call ? 1.7 : 0.85) : 0) + h * 3.4
     }
     headLights.current.forEach((light) => {
-      if (light) light.intensity = 3.6 + (parked ? idle * 1.0 : 0) + h * 2.2
+      if (light) light.intensity = 3.6 + (parked ? idle * (call ? 1.85 : 1.0) : 0) + h * 2.2
     })
 
     if (m.phase === 'departing') {
@@ -2408,7 +2475,9 @@ function Train({ showInterior = false, showPhotos = false }) {
         document.body.style.cursor = 'auto'
       }}
     >
-      <pointLight position={[-2.4, 2.1, 1.6]} color="#e4ebf2" intensity={5.5} distance={14} decay={2} />
+      {settings.extras ? (
+        <pointLight position={[-2.4, 2.1, 1.6]} color="#e4ebf2" intensity={5.5} distance={14} decay={2} />
+      ) : null}
       <pointLight
         ref={glowLight}
         position={[0, 1.4, 1.1]}
@@ -2433,8 +2502,6 @@ function Train({ showInterior = false, showPhotos = false }) {
           lead={i === 0}
           tail={i === TRAIN_CAR_N - 1}
           headLights={i === 0 ? headLights : null}
-          showInterior={showInterior && i === 0}
-          showPhotos={showPhotos && i === 0}
         />
       ))}
       <mesh position={[0, carH * 0.45, -trainLen * 0.45]}>
@@ -2454,31 +2521,18 @@ const FIXTURE_Z0    = 2.0
 const FIXTURE_STEP  = 3.8
 
 // One cross-ceiling fluorescent row
-function CeilingFixture({ z, index, lit = true }) {
+function CeilingFixture({ z, index, lit = true, flicker, gain = 5.4 }) {
   const tubeRef  = useRef()
   const diffuserRef = useRef()
   const lightRef = useRef()
 
-  const wait = useRef(2 + index * 0.7 + Math.random() * 4)
-  const dip = useRef(0)
-
-  useFrame((_, dt) => {
-    // Distant unlit rows: skip flicker work — emissive meshes stay static
+  useFrame(() => {
     if (!lit && index > 3) return
-    wait.current -= dt
-    let level = 1
-    if (dip.current > 0) {
-      dip.current -= dt
-      level = 0.92
-      if (dip.current <= 0) wait.current = 2.5 + Math.random() * 5
-    } else if (wait.current <= 0) {
-      dip.current = 0.07 + Math.random() * 0.08
-      level = 0.92
-    }
-
+    const pulse = flicker?.current
+    const level = pulse && pulse.index === index ? pulse.mul : 1
     if (tubeRef.current) tubeRef.current.material.emissiveIntensity = level * 10
     if (diffuserRef.current) diffuserRef.current.material.emissiveIntensity = level * 2.2
-    if (lightRef.current) lightRef.current.intensity = level * 5.4
+    if (lightRef.current) lightRef.current.intensity = level * gain
   })
 
   const y = HEIGHT - 0.34
@@ -2517,7 +2571,7 @@ function CeilingFixture({ z, index, lit = true }) {
         <pointLight
         ref={lightRef}
           color={FIXTURE_COLOR}
-          intensity={5.4}
+          intensity={gain}
           distance={6.5}
           decay={2}
           position={[0, -0.35, 0]}
@@ -2528,6 +2582,59 @@ function CeilingFixture({ z, index, lit = true }) {
 }
 
 function Fluorescents() {
+  const { settings } = useGfx()
+  const reducedMotion = useMemo(
+    () => typeof window !== 'undefined'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  )
+  // One nearby tube, every ~5–6s: two tiny dips so it reads as a ballast stutter.
+  const flicker = useRef({
+    index: -1,
+    mul: 1,
+    wait: 5.2,
+    hold: 0,
+    stage: 0,
+  })
+
+  useFrame((_, dt) => {
+    const f = flicker.current
+    if (reducedMotion) {
+      f.index = -1
+      f.mul = 1
+      return
+    }
+    const d = Math.min(dt, 0.05)
+    if (f.hold > 0) {
+      f.hold -= d
+      if (f.stage === 1) f.mul = 0.78
+      else if (f.stage === 2) f.mul = 1
+      else if (f.stage === 3) f.mul = 0.84
+      if (f.hold > 0) return
+      if (f.stage === 1) {
+        f.stage = 2
+        f.hold = 0.04
+        f.mul = 1
+      } else if (f.stage === 2) {
+        f.stage = 3
+        f.hold = 0.055 + Math.random() * 0.035
+        f.mul = 0.84
+      } else {
+        f.stage = 0
+        f.index = -1
+        f.mul = 1
+        f.wait = 5.05 + Math.random() * 1.15
+      }
+      return
+    }
+    f.wait -= d
+    if (f.wait > 0) return
+    f.index = 1 + Math.floor(Math.random() * 3)
+    f.stage = 1
+    f.hold = 0.048 + Math.random() * 0.03
+    f.mul = 0.78
+  })
+
   return (
     <group>
       {Array.from({ length: FIXTURE_COUNT }, (_, i) => (
@@ -2535,14 +2642,16 @@ function Fluorescents() {
           key={i}
           index={i}
           z={FIXTURE_Z0 - i * FIXTURE_STEP}
-          lit={i < 5}
+          lit={i < settings.lights}
+          gain={settings.tube}
+          flicker={flicker}
         />
       ))}
     </group>
   )
 }
 
-function StationBloom({ enabled = true }) {
+function StationBloom() {
   const { gl, scene, camera, size } = useThree()
   const composer = useMemo(() => {
     const next = new EffectComposer(gl, {
@@ -2574,12 +2683,13 @@ function StationBloom({ enabled = true }) {
 }
 
 function Atmosphere() {
+  const { settings } = useGfx()
   return (
     <>
       <color attach="background" args={[COL.clear]} />
-      <fogExp2 attach="fog" args={[COL.clear, 0.032]} />
-      <hemisphereLight args={['#e8e4dc', '#3a3632', 0.52]} />
-      <ambientLight intensity={0.22} color="#f0ebe4" />
+      <fogExp2 attach="fog" args={[COL.clear, settings.fog]} />
+      <hemisphereLight args={['#e8e4dc', '#3a3632', settings.hemi]} />
+      <ambientLight intensity={settings.ambient} color="#f0ebe4" />
       <Fluorescents />
     </>
   )
@@ -2817,7 +2927,7 @@ function TrainSteam() {
   )
 }
 
-function Signage({ onExit, locked = false }) {
+function Signage({ locked = false }) {
   const [metal, arrowTex] = useLoader(THREE.TextureLoader, [
     '/subwaysign.jpg',
     '/subway-arrow-down.png',
@@ -2851,49 +2961,49 @@ function Signage({ onExit, locked = false }) {
   const unit = useRef()
   const hoverAmt = useRef(0)
   const hovering = useRef(false)
-  const leaving = useRef(false)
-  const exitAt = useRef(0)
+  const kickZ = useRef(0)
+  const kickVZ = useRef(0)
+  const kickX = useRef(0)
+  const kickVX = useRef(0)
   const reducedMotion = useMemo(
     () => typeof window !== 'undefined'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     [],
   )
 
-  useEffect(() => {
-    if (!locked) {
-      leaving.current = false
-      exitAt.current = 0
-    }
-  }, [locked])
+  const kickDirZ = useRef(1)
+  const kickDirX = useRef(-1)
 
   useFrame((state, dt) => {
     if (!unit.current) return
     const d = Math.min(dt, 0.05)
     const t = state.clock.elapsedTime
-    const want = hovering.current && !locked && !leaving.current && !reducedMotion
+    const want = hovering.current && !locked && !reducedMotion
     hoverAmt.current = THREE.MathUtils.lerp(hoverAmt.current, want ? 1 : 0, 1 - Math.exp(-10 * d))
     const h = hoverAmt.current
 
-    // Always a soft sway to invite clicks; hover grows it a bit
-    const live = !locked && !leaving.current && !reducedMotion
-    const sway = live ? 1 : 0
-    const s = 1 + h * 0.07
-    unit.current.scale.set(s, s, s)
-    unit.current.rotation.z = Math.sin(t * 1.55) * 0.028 * sway * (1 + h * 0.35)
-    unit.current.rotation.x = Math.sin(t * 1.15) * 0.01 * sway
+    kickVZ.current += -kickZ.current * 52 * d
+    kickVZ.current *= Math.exp(-8.5 * d)
+    kickZ.current = THREE.MathUtils.clamp(kickZ.current + kickVZ.current * d, -0.045, 0.045)
+    kickVX.current += -kickX.current * 48 * d
+    kickVX.current *= Math.exp(-8.2 * d)
+    kickX.current = THREE.MathUtils.clamp(kickX.current + kickVX.current * d, -0.04, 0.04)
 
-    if (leaving.current && exitAt.current && performance.now() >= exitAt.current) {
-      exitAt.current = 0
-      onExit?.()
-    }
+    const live = !locked && !reducedMotion
+    const sway = live ? 1 : 0
+    const s = 1 + h * 0.035
+    unit.current.scale.set(s, s, s)
+    unit.current.rotation.z = Math.sin(t * 1.15) * 0.012 * sway + kickZ.current
+    unit.current.rotation.x = Math.sin(t * 0.88) * 0.011 * sway + kickX.current
   })
 
   const onHit = (event) => {
     event.stopPropagation()
-    if (locked || leaving.current || reducedMotion) return
-    leaving.current = true
-    hovering.current = false
-    exitAt.current = performance.now() + 220
+    if (locked || reducedMotion) return
+    kickDirZ.current *= -1
+    kickDirX.current *= Math.random() > 0.3 ? -1 : 1
+    kickVZ.current += kickDirZ.current * (0.65 + Math.random() * 0.45)
+    kickVX.current += kickDirX.current * (0.6 + Math.random() * 0.5)
   }
 
   return (
@@ -2904,7 +3014,7 @@ function Signage({ onExit, locked = false }) {
         onClick={onHit}
         onPointerOver={(e) => {
           e.stopPropagation()
-          if (locked || leaving.current) return
+          if (locked) return
           hovering.current = true
           document.body.style.cursor = 'pointer'
         }}
@@ -2952,112 +3062,272 @@ function Signage({ onExit, locked = false }) {
   )
 }
 
-// Green lamp color for the cap and light tint
-const LAMP_GREEN = '#2d6e4e'
-const LAMP_LIGHT_COLOR = '#2d6e4e'  // exact same dark green as the pole
-const LAMP_GLOBE_EMISSIVE = '#e8f4ec' // very slightly greenish white glow
-
-// Single lamp post: pole + arm + green cap + white globe + lights
-function LampPost({ position }) {
-  const poleH = 2.5
-  const armLen = 0.55
-  const globeY = poleH + 0.18
-
-  return (
-    <group position={position}>
-      {/* Vertical pole */}
-      <mesh position={[0, poleH / 2, 0]}>
-        <cylinderGeometry args={[0.028, 0.036, poleH, 10]} />
-        <meshStandardMaterial color="#2a2a2c" roughness={0.55} metalness={0.7} />
-      </mesh>
-
-      {/* Horizontal arm extending toward platform center */}
-      <mesh
-        position={[-armLen / 2, poleH, 0]}
-        rotation={[0, 0, -Math.PI / 2]}
-      >
-        <cylinderGeometry args={[0.018, 0.022, armLen, 8]} />
-        <meshStandardMaterial color="#2a2a2c" roughness={0.55} metalness={0.7} />
-      </mesh>
-
-      {/* Green lamp cap / hood */}
-      <mesh position={[-armLen, poleH + 0.06, 0]}>
-        <cylinderGeometry args={[0.14, 0.06, 0.18, 12, 1, true]} />
-        <meshStandardMaterial
-          color={LAMP_GREEN}
-          roughness={0.45}
-          metalness={0.3}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      {/* Cap top disc */}
-      <mesh position={[-armLen, poleH + 0.15, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.14, 12]} />
-        <meshStandardMaterial color={LAMP_GREEN} roughness={0.45} metalness={0.3} />
-      </mesh>
-
-      {/* White globe — high emissive to fake bloom glow */}
-      <mesh position={[-armLen, globeY, 0]}>
-        <sphereGeometry args={[0.085, 16, 16]} />
-        <meshPhysicalMaterial
-          color="#ffffff"
-          emissive={LAMP_GLOBE_EMISSIVE}
-          emissiveIntensity={8}
-          roughness={0.05}
-          metalness={0}
-          transmission={0.6}
-          thickness={0.1}
-          transparent
-          opacity={0.92}
-        />
-      </mesh>
-      {/* Halo sphere — slightly larger, transparent, fakes a bloom corona */}
-      <mesh position={[-armLen, globeY, 0]}>
-        <sphereGeometry args={[0.085 * 1.15, 16, 16]} />
-        <meshBasicMaterial
-          color={LAMP_GLOBE_EMISSIVE}
-          transparent
-          opacity={0.18}
-          depthWrite={false}
-          side={THREE.BackSide}
-        />
-      </mesh>
-
-      {/* Downward spill — keep local, less green soup */}
-      <group position={[-armLen, globeY - 0.06, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <spotLight
-          color="#4a7a5c"
-          intensity={9}
-          distance={5.5}
-          angle={Math.PI / 5}
-          penumbra={0.55}
-          decay={2}
-          castShadow={false}
-        />
-      </group>
-      <pointLight
-        position={[-armLen, globeY - 0.1, 0]}
-        color="#d8e0d4"
-        intensity={1.4}
-        distance={3.2}
-        decay={2.5}
-      />
-    </group>
-  )
+function wallBoardList() {
+  const { pitch } = getWallFace()
+  return [
+    { id: 'photo', z: WALL_BOARD_Z0, title: 'PHOTO', accent: '#0039A6' },
+    { id: 'video', z: WALL_BOARD_Z0 - pitch, title: 'VIDEO', accent: '#00933C' },
+    { id: 'about', z: WALL_BOARD_Z0 - pitch * 2, title: 'ABOUT', accent: '#996633' },
+  ]
 }
 
-// Place lamps every other pillar along the platform edge
-const LAMP_POSITIONS = Array.from({ length: 6 }, (_, i) => [
-  PILLAR_X + 0.12,            // just beside the pillar toward platform
-  0,                          // on the floor
-  PILLAR_Z0 - i * PILLAR_GAP * 2,  // every 2nd pillar gap
-])
+function makeBoardLabel(title, accent) {
+  const w = 512
+  const h = 96
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#111'
+  ctx.fillRect(0, 0, w, h)
+  ctx.fillStyle = accent
+  ctx.fillRect(0, 0, 10, h)
+  ctx.fillStyle = '#fff'
+  ctx.font = `bold 48px ${FONT}`
+  ctx.letterSpacing = '-2px'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(title, 28, h * 0.54)
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 4
+  tex.needsUpdate = true
+  return tex
+}
 
-function LampPosts() {
+function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSelect, invite = false, projectHtml = true }) {
+  const face = wall || getWallFace()
+  const boards = wallBoardList()
+  const labels = useMemo(
+    () => Object.fromEntries(wallBoardList().map((b) => [b.id, makeBoardLabel(b.title, b.accent)])),
+    [],
+  )
+  const screens = useRef({})
+  const glowMats = useRef({})
+  const glowLights = useRef({})
+  const inviteRef = useRef(invite)
+  inviteRef.current = invite
+  const { camera, size, scene } = useThree()
+  const camDir = useMemo(() => new THREE.Vector3(), [])
+  const toObj = useMemo(() => new THREE.Vector3(), [])
+  const ray = useMemo(() => new THREE.Raycaster(), [])
+  const lastCam = useRef('')
+  const lastObj = useRef({ photo: '', video: '', about: '' })
+  const reducedMotion = useMemo(
+    () => typeof window !== 'undefined'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  )
+
+  useLayoutEffect(() => () => {
+    Object.values(labels).forEach((t) => t.dispose())
+  }, [labels])
+
+  useFrame((state) => {
+    const liveBoards = wallBoardList()
+    const pulse = inviteRef.current && !reducedMotion && !immersed
+      ? 0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 1.2)
+      : 0
+    liveBoards.forEach((b) => {
+      const mat = glowMats.current[b.id]
+      if (mat) mat.opacity = pulse ? 0.05 + pulse * 0.14 : 0
+      const light = glowLights.current[b.id]
+      if (light) light.intensity = pulse ? 0.12 + pulse * 0.28 : 0
+    })
+
+    const { panelW, panelH, contentW } = getWallFace()
+    const pxPerMeter = panelW / contentW
+    const root = wallHuds?.current?.root || document.querySelector('[data-wall-hud="root"]')
+    const camEl = wallHuds?.current?.cam || document.querySelector('[data-wall-hud="cam"]')
+    if (!root || !camEl) return
+
+    if (!projectHtml && !(immersed && isWallPov(immersedId))) {
+      root.style.visibility = 'hidden'
+      liveBoards.forEach((b) => {
+        const objEl = wallHuds.current.obj?.[b.id] || document.querySelector(`[data-wall-hud="obj-${b.id}"]`)
+        if (objEl) objEl.style.visibility = 'hidden'
+      })
+      return
+    }
+
+    if (immersed && isWallPov(immersedId)) {
+      root.style.visibility = 'visible'
+      root.style.perspective = 'none'
+      root.style.width = `${size.width}px`
+      root.style.height = `${size.height}px`
+      camEl.style.transform = 'none'
+      lastCam.current = ''
+      liveBoards.forEach((b) => {
+        const objEl = wallHuds.current.obj?.[b.id] || document.querySelector(`[data-wall-hud="obj-${b.id}"]`)
+        if (!objEl) return
+        if (b.id === immersedId) {
+          objEl.style.transform = 'none'
+          objEl.style.visibility = 'visible'
+          lastObj.current[b.id] = ''
+        } else {
+          objEl.style.visibility = 'hidden'
+        }
+      })
+      return
+    }
+
+    camera.updateMatrixWorld()
+    const widthHalf = size.width / 2
+    const heightHalf = size.height / 2
+    const fov = camera.projectionMatrix.elements[5] * heightHalf
+    camera.getWorldDirection(camDir)
+
+    root.style.width = `${size.width}px`
+    root.style.height = `${size.height}px`
+    root.style.perspective = `${fov}px`
+    root.style.perspectiveOrigin = '50% 50%'
+    const camXform = `translateZ(${fov}px)${cssMatrix3d(camera.matrixWorldInverse, CAM_CSS_MUL)}translate(${widthHalf}px,${heightHalf}px)`
+    if (camXform !== lastCam.current || camEl.style.transform !== camXform) {
+      lastCam.current = camXform
+      camEl.style.transform = camXform
+    }
+
+    let closestId = null
+    let closestDist = Infinity
+    const facing = []
+    liveBoards.forEach((b) => {
+      const objEl = wallHuds.current.obj?.[b.id] || document.querySelector(`[data-wall-hud="obj-${b.id}"]`)
+      const mesh = screens.current[b.id]
+      if (!objEl || !mesh) return
+
+      mesh.updateWorldMatrix(true, false)
+      toObj.setFromMatrixPosition(mesh.matrixWorld).sub(camera.position)
+      const dist = toObj.length()
+      const seen = toObj.angleTo(camDir) <= Math.PI / 2
+      facing.push({ b, objEl, mesh, dist, seen })
+      if (seen && dist < closestDist) {
+        closestDist = dist
+        closestId = b.id
+      }
+    })
+
+    const closeup = closestDist < 2.2
+    const kiosk = scene.getObjectByName('kiosk-occlude')
+    const pillars = scene.getObjectByName('pillar-occlude')
+    let anyFacing = false
+    facing.forEach(({ b, objEl, mesh, dist, seen }) => {
+      let show = seen && (!closeup || b.id === closestId)
+      if (show && dist > 0.2) {
+        toObj.setFromMatrixPosition(mesh.matrixWorld).sub(camera.position)
+        ray.set(camera.position, toObj.normalize())
+        ray.far = dist - 0.1
+        const hitKiosk = dist < 3.6 && kiosk && ray.intersectObject(kiosk, true).length
+        const hitPillar = pillars && ray.intersectObject(pillars, true).length
+        if (hitKiosk || hitPillar) show = false
+      }
+      if (!show) {
+        objEl.style.visibility = 'hidden'
+        return
+      }
+
+      const objXform = objectCssMatrix(mesh.matrixWorld, pxPerMeter, panelW, panelH)
+      if (objXform !== lastObj.current[b.id] || objEl.style.transform !== objXform) {
+        lastObj.current[b.id] = objXform
+        objEl.style.transform = objXform
+      }
+      objEl.style.visibility = 'visible'
+      anyFacing = true
+    })
+    root.style.visibility = anyFacing ? 'visible' : 'hidden'
+  })
+
+  const x = WALL_X + 0.04
+  const faceX = 0.035
+  const contentX = 0.038
+  const lip = WALL_BEZEL
+  const frameD = 0.032
+  const chrome = { color: '#e8ebef', roughness: 0.2, metalness: 0.86 }
+  const { boardW, boardH, boardY, contentW, contentH, contentY, titleY, titleH } = face
+  const y = Number.isFinite(boardY) ? boardY : 1.72
+
   return (
     <group>
-      {LAMP_POSITIONS.map((pos, i) => (
-        <LampPost key={i} position={pos} />
+      {boards.map((b) => (
+        <group key={`${b.id}-${boardW.toFixed(2)}-${boardH.toFixed(2)}-${y.toFixed(2)}`} position={[x, y, b.z]}>
+          <mesh position={[0.018, (boardH + lip) / 2, 0]}>
+            <boxGeometry args={[frameD, lip, boardW + lip * 2]} />
+            <meshStandardMaterial {...chrome} />
+          </mesh>
+          <mesh position={[0.018, -(boardH + lip) / 2, 0]}>
+            <boxGeometry args={[frameD, lip, boardW + lip * 2]} />
+            <meshStandardMaterial {...chrome} />
+          </mesh>
+          <mesh position={[0.018, 0, (boardW + lip) / 2]}>
+            <boxGeometry args={[frameD, boardH, lip]} />
+            <meshStandardMaterial {...chrome} />
+          </mesh>
+          <mesh position={[0.018, 0, -(boardW + lip) / 2]}>
+            <boxGeometry args={[frameD, boardH, lip]} />
+            <meshStandardMaterial {...chrome} />
+          </mesh>
+          <mesh position={[faceX, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+            <planeGeometry args={[boardW + lip * 0.6, boardH + lip * 0.6]} />
+            <meshBasicMaterial color="#0c0e10" toneMapped={false} />
+          </mesh>
+          <pointLight
+            ref={(n) => { glowLights.current[b.id] = n }}
+            position={[0.28, 0, 0]}
+            color={b.accent}
+            intensity={0}
+            distance={2.6}
+            decay={2}
+          />
+          <mesh position={[faceX + 0.012, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+            <planeGeometry args={[boardW + 0.12, boardH + 0.12]} />
+            <meshBasicMaterial
+              ref={(n) => { glowMats.current[b.id] = n }}
+              color={b.accent}
+              transparent
+              opacity={0}
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+              toneMapped={false}
+            />
+          </mesh>
+          <mesh position={[faceX + 0.002, titleY, 0]} rotation={[0, Math.PI / 2, 0]}>
+            <planeGeometry args={[boardW + lip * 0.4, titleH]} />
+            <meshBasicMaterial map={labels[b.id]} toneMapped={false} />
+          </mesh>
+          <mesh
+            position={[contentX, contentY, 0]}
+            rotation={[0, Math.PI / 2, 0]}
+          >
+            <planeGeometry args={[contentW, contentH]} />
+            <meshBasicMaterial color="#0c0e10" toneMapped={false} />
+          </mesh>
+          {immersed ? null : (
+            <mesh
+              position={[contentX + 0.02, 0, 0]}
+              rotation={[0, Math.PI / 2, 0]}
+              onClick={(e) => {
+                e.stopPropagation()
+                onSelect?.(b.id)
+              }}
+              onPointerOver={(e) => {
+                e.stopPropagation()
+                document.body.style.cursor = 'pointer'
+              }}
+              onPointerOut={() => {
+                document.body.style.cursor = 'auto'
+              }}
+            >
+              <planeGeometry args={[boardW, boardH]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+          )}
+        </group>
+      ))}
+      {boards.map((b) => (
+        <object3D
+          key={`${b.id}-screen`}
+          ref={(n) => { screens.current[b.id] = n }}
+          position={[x + contentX + 0.004, y + contentY, b.z]}
+          rotation={[0, Math.PI / 2, 0]}
+        />
       ))}
     </group>
   )
@@ -3065,59 +3335,63 @@ function LampPosts() {
 
 function Benches() {
   const maps = useMemo(() => {
-    const wood = makeCanvasTexture(paintWood, 256, THREE.SRGBColorSpace)
-    wood.wrapS = THREE.RepeatWrapping
-    wood.wrapT = THREE.RepeatWrapping
+    const wood = makeCanvasTexture(paintWood, 512, THREE.SRGBColorSpace)
     wood.anisotropy = 8
-    wood.repeat.set(1.4, 3.4)
-    const rough = makeCanvasTexture(paintWoodRough, 256, THREE.NoColorSpace)
-    rough.wrapS = THREE.RepeatWrapping
-    rough.wrapT = THREE.RepeatWrapping
-    rough.repeat.set(1.4, 3.4)
-    return { wood, rough }
+    wood.repeat.set(0.45, 2.2)
+    return { wood }
   }, [])
 
   useLayoutEffect(() => () => {
     maps.wood.dispose()
-    maps.rough.dispose()
   }, [maps])
 
-  const len = 2.15
-  const depth = 0.5
-  const seatY = 0.44
-  const x = WALL_X + depth * 0.5 + 0.05
+  const len = 2.35
+  const depth = 0.52
+  const seatT = 0.09
+  const seatTop = 0.42
+  const seatY = seatTop - seatT / 2
+  const gap = 0.13
+  const backH = 0.19
+  const backT = 0.07
+  const nDiv = 6
+  const divW = 0.07
+  const x = WALL_X + depth * 0.5 + 0.06
   const zs = [-3.4, -5.8]
-  const wood = {
-    map: maps.wood,
-    roughnessMap: maps.rough,
-    roughness: 0.78,
-    metalness: 0.02,
-  }
+  const oak = { map: maps.wood, roughness: 0.72, metalness: 0.02 }
 
   return (
     <group>
       {zs.map((z) => (
         <group key={z} position={[x, 0, z]}>
-          {[-len * 0.32, len * 0.32].map((dz) => (
-            <mesh key={dz} position={[0, 0.2, dz]}>
-              <boxGeometry args={[depth * 0.7, 0.4, 0.26]} />
-              <meshStandardMaterial {...wood} color="#9a6d3f" />
-            </mesh>
-          ))}
-          <mesh position={[0, seatY, 0]}>
-            <boxGeometry args={[depth, 0.09, len]} />
-            <meshStandardMaterial {...wood} color="#c2945d" />
-          </mesh>
-          <mesh position={[-depth * 0.42, seatY + 0.28, 0]}>
-            <boxGeometry args={[0.07, 0.52, len]} />
-            <meshStandardMaterial {...wood} color="#c2945d" />
-          </mesh>
-          {Array.from({ length: 5 }, (_, i) => {
-            const dz = -len * 0.46 + (i / 4) * len * 0.92
+          {[1, 4].map((i) => {
+            const dz = -len / 2 + (i / (nDiv - 1)) * len
             return (
-              <mesh key={i} position={[0.02, seatY + 0.16, dz]}>
-                <boxGeometry args={[depth * 0.82, 0.3, 0.09]} />
-                <meshStandardMaterial {...wood} color="#9a6d3f" />
+              <mesh key={dz} position={[-0.05, seatY - seatT / 2 - 0.155, dz]}>
+                <boxGeometry args={[depth * 0.52, 0.31, 0.09]} />
+                <meshStandardMaterial {...oak} />
+              </mesh>
+            )
+          })}
+          <mesh position={[0, seatY, 0]}>
+            <boxGeometry args={[depth, seatT, len]} />
+            <meshStandardMaterial {...oak} />
+          </mesh>
+          <mesh
+            position={[-depth / 2 - backT / 2 - 0.022, seatTop + gap + backH / 2, 0]}
+          >
+            <boxGeometry args={[backT, backH, len]} />
+            <meshStandardMaterial {...oak} />
+          </mesh>
+          {Array.from({ length: nDiv }, (_, i) => {
+            const end = i === 0 || i === nDiv - 1
+            const divD = end ? depth * 0.48 : depth * 0.34
+            const divH = end ? 0.135 : 0.118
+            const dz = -len / 2 + (i / (nDiv - 1)) * len
+            const dx = -depth / 2 + divD / 2 + 0.08
+            return (
+              <mesh key={i} position={[dx, seatTop + divH / 2, dz]}>
+                <boxGeometry args={[divD, divH, divW]} />
+                <meshStandardMaterial {...oak} />
               </mesh>
             )
           })}
@@ -3127,7 +3401,7 @@ function Benches() {
   )
 }
 
-function Stairwell() {
+function Stairwell({ maps }) {
   // Chambers-style: freestanding on the platform, facing camera, climbing away (−Z)
   const stepsDepth = STAIR_N * STAIR_RUN
   const topZ = STAIR_Z0 - stepsDepth
@@ -3154,7 +3428,11 @@ function Stairwell() {
       {/* Yellow strip at bottom landing */}
       <mesh position={[0, 0.02, STAIR_Z0 + 0.32]}>
         <boxGeometry args={[STAIR_W + 0.2, 0.04, 0.42]} />
-        <meshStandardMaterial color="#e2b40f" roughness={0.55} metalness={0.04} />
+        <meshStandardMaterial
+          map={maps.yellowMap}
+          roughness={0.86}
+          metalness={0}
+        />
       </mesh>
       {/* Steps — each further from camera and higher */}
       {Array.from({ length: STAIR_N }, (_, i) => {
@@ -3170,7 +3448,11 @@ function Stairwell() {
             {isEdge ? (
               <mesh position={[0, y + STAIR_RISE * 0.52, z + STAIR_RUN * 0.28]}>
                 <boxGeometry args={[STAIR_W, 0.022, 0.055]} />
-                <meshStandardMaterial color="#e2b40f" roughness={0.5} metalness={0.04} />
+                <meshStandardMaterial
+                  map={maps.yellowMap}
+                  roughness={0.84}
+                  metalness={0}
+                />
               </mesh>
             ) : null}
           </group>
@@ -3183,7 +3465,11 @@ function Stairwell() {
       </mesh>
       <mesh position={[0, topY + 0.09, topZ - 0.05]}>
         <boxGeometry args={[STAIR_W + 0.08, 0.025, 0.08]} />
-        <meshStandardMaterial color="#e2b40f" roughness={0.5} metalness={0.04} />
+        <meshStandardMaterial
+          map={maps.yellowMap}
+          roughness={0.84}
+          metalness={0}
+        />
       </mesh>
       {/* Dark mouth above landing — exit up */}
       <mesh position={[0, topY + 1.05, topZ - 0.95]}>
@@ -3235,7 +3521,7 @@ const KIOSK = {
   z: -4.35,
   cabW: KIOSK_CAB_W,
   cabH: KIOSK_CAB_H,
-  cabD: 0.28,
+  cabD: 0.36,
   postH: KIOSK_POST_H,
   postW: 0.09,
   bezel: KIOSK_BEZEL,
@@ -3257,17 +3543,77 @@ function cssMatrix3d(matrix, multipliers, prepend = '') {
 
 const CAM_CSS_MUL = [1, -1, 1, 1, 1, -1, 1, 1, 1, -1, 1, 1, 1, -1, 1, 1]
 
-function objectCssMatrix(matrix, factor) {
+function objectCssMatrix(matrix, factor, panelW, panelH) {
   const f = factor
+  // Pixel origin — iOS treats translate(-50%,-50%) as a % of the viewport in 3D,
+  // which slides the kiosk HTML down the white cabinet.
   return cssMatrix3d(
     matrix,
     [1 / f, 1 / f, 1 / f, 1, -1 / f, -1 / f, -1 / f, -1, 1 / f, 1 / f, 1 / f, 1, 1, 1, 1, 1],
-    'translate(-50%,-50%)',
+    `translate(${-panelW / 2}px,${-panelH / 2}px)`,
   )
 }
 
-function InfoKiosk({ hud, showBoot = true }) {
-  const { cabW, cabH, cabD, postH, postW, bezel, screenW, screenH, panelW } = KIOSK
+function roundedRectShape(w, h, r) {
+  const rad = Math.min(r, w / 2, h / 2)
+  const x = -w / 2
+  const y = -h / 2
+  const s = new THREE.Shape()
+  s.moveTo(x + rad, y)
+  s.lineTo(x + w - rad, y)
+  s.quadraticCurveTo(x + w, y, x + w, y + rad)
+  s.lineTo(x + w, y + h - rad)
+  s.quadraticCurveTo(x + w, y + h, x + w - rad, y + h)
+  s.lineTo(x + rad, y + h)
+  s.quadraticCurveTo(x, y + h, x, y + h - rad)
+  s.lineTo(x, y + rad)
+  s.quadraticCurveTo(x, y, x + rad, y)
+  return s
+}
+
+/** Clockwise hole so the cabinet is a frame, not a solid slab. */
+function roundedRectHole(w, h, r) {
+  const rad = Math.min(r, w / 2, h / 2)
+  const x = -w / 2
+  const y = -h / 2
+  const p = new THREE.Path()
+  p.moveTo(x + rad, y)
+  p.quadraticCurveTo(x, y, x, y + rad)
+  p.lineTo(x, y + h - rad)
+  p.quadraticCurveTo(x, y + h, x + rad, y + h)
+  p.lineTo(x + w - rad, y + h)
+  p.quadraticCurveTo(x + w, y + h, x + w, y + h - rad)
+  p.lineTo(x + w, y + rad)
+  p.quadraticCurveTo(x + w, y, x + w - rad, y)
+  p.lineTo(x + rad, y)
+  return p
+}
+
+function makeRoundedBoxGeometry(w, h, d, r, holeW, holeH, holeR) {
+  const outer = roundedRectShape(w, h, r)
+  if (holeW && holeH) {
+    outer.holes.push(roundedRectHole(holeW, holeH, holeR ?? r))
+  }
+  const geo = new THREE.ExtrudeGeometry(outer, {
+    depth: d,
+    bevelEnabled: true,
+    bevelThickness: 0.012,
+    bevelSize: 0.01,
+    bevelSegments: 2,
+    curveSegments: 12,
+  })
+  geo.translate(0, 0, -d / 2)
+  geo.computeVertexNormals()
+  return geo
+}
+
+function makeRoundedPlaneGeometry(w, h, r) {
+  return new THREE.ShapeGeometry(roundedRectShape(w, h, r), 12)
+}
+
+function InfoKiosk({ hud, showBoot = true, pickable = false, onPick }) {
+  const { settings } = useGfx()
+  const { cabW, cabH, cabD, postH, postW, screenW, screenH, panelW, panelH } = KIOSK
   const yCab = postH + cabH / 2
   const screen = useRef()
   const { camera, size } = useThree()
@@ -3309,8 +3655,9 @@ function InfoKiosk({ hud, showBoot = true }) {
     root.style.width = `${size.width}px`
     root.style.height = `${size.height}px`
     root.style.perspective = `${fov}px`
+    root.style.perspectiveOrigin = '50% 50%'
     const camXform = `translateZ(${fov}px)${cssMatrix3d(camera.matrixWorldInverse, CAM_CSS_MUL)}translate(${widthHalf}px,${heightHalf}px)`
-    const objXform = objectCssMatrix(screen.current.matrixWorld, pxPerMeter)
+    const objXform = objectCssMatrix(screen.current.matrixWorld, pxPerMeter, panelW, panelH)
     // Remounted nodes have empty style — must write even if xform string matches last trip
     if (camXform !== lastCam.current || camEl.style.transform !== camXform) {
       lastCam.current = camXform
@@ -3324,54 +3671,164 @@ function InfoKiosk({ hud, showBoot = true }) {
     root.style.visibility = 'visible'
   })
 
-  const faceZ = cabD / 2 + 0.002
-  const white = { color: '#f2f2f0', roughness: 0.48, metalness: 0.08 }
-  const lip = bezel + 0.012
+  const faceZ = cabD / 2
+  /** LCD sits behind the lip so the 3D bezel frames it (not a flush sticker). */
+  const screenZ = faceZ - 0.018
+  const well = 0.026
+  const holeW = screenW + well * 2
+  const holeH = screenH + well * 2
+  const outerR = KIOSK_RADIUS_M + 0.022
+  const holeR = KIOSK_RADIUS_M + 0.006
   const logoW = screenW * 0.52
   const logoH = logoW * (144 / 256)
+  const cabGeo = useMemo(
+    () => makeRoundedBoxGeometry(cabW, cabH, cabD, outerR, holeW, holeH, holeR),
+    [cabW, cabH, cabD, outerR, holeW, holeH, holeR],
+  )
+  const linerGeo = useMemo(
+    () => makeRoundedBoxGeometry(
+      holeW - 0.003,
+      holeH - 0.003,
+      cabD - 0.05,
+      Math.max(0.01, holeR - 0.004),
+      screenW + 0.002,
+      screenH + 0.002,
+      KIOSK_RADIUS_M,
+    ),
+    [cabD, holeW, holeH, holeR, screenW, screenH],
+  )
+  const lipGeo = useMemo(
+    () => makeRoundedBoxGeometry(
+      holeW - 0.002,
+      holeH - 0.002,
+      0.024,
+      holeR,
+      screenW + 0.001,
+      screenH + 0.001,
+      KIOSK_RADIUS_M,
+    ),
+    [holeW, holeH, holeR, screenW, screenH],
+  )
+  const screenGeo = useMemo(
+    () => makeRoundedPlaneGeometry(screenW + 0.004, screenH + 0.004, KIOSK_RADIUS_M),
+    [screenW, screenH],
+  )
+  const plastic = useMemo(() => {
+    const map = makeCanvasTexture(paintKioskPlastic, 256, THREE.SRGBColorSpace)
+    const rough = makeCanvasTexture(paintKioskRough, 256, THREE.NoColorSpace)
+    map.repeat.set(1.2, 2)
+    rough.repeat.set(1.2, 2)
+    return { map, rough }
+  }, [])
+  const blobTex = useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 128
+    const ctx = canvas.getContext('2d')
+    const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 62)
+    g.addColorStop(0, 'rgba(0,0,0,0.62)')
+    g.addColorStop(0.35, 'rgba(0,0,0,0.28)')
+    g.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, 128, 128)
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.needsUpdate = true
+    return texture
+  }, [])
+  useLayoutEffect(() => () => {
+    cabGeo.dispose()
+    linerGeo.dispose()
+    lipGeo.dispose()
+    screenGeo.dispose()
+    plastic.map.dispose()
+    plastic.rough.dispose()
+    blobTex.dispose()
+  }, [blobTex, cabGeo, linerGeo, lipGeo, plastic, screenGeo])
+
+  const shell = {
+    map: plastic.map,
+    roughnessMap: plastic.rough,
+    bumpMap: plastic.rough,
+    bumpScale: 0.04,
+    color: '#c2c4be',
+    roughness: 0.3,
+    metalness: 0.38,
+    clearcoat: 0.5,
+    clearcoatRoughness: 0.2,
+  }
 
   return (
-    <group position={[KIOSK.x, 0, KIOSK.z]}>
-      <mesh position={[0, 0.025, 0]}>
-        <boxGeometry args={[0.58, 0.05, 0.24]} />
-        <meshStandardMaterial {...white} />
+    <group
+      position={[KIOSK.x, 0, KIOSK.z]}
+      onClick={pickable ? (e) => {
+        e.stopPropagation()
+        onPick?.()
+      } : undefined}
+      onPointerOver={pickable ? (e) => {
+        e.stopPropagation()
+        document.body.style.cursor = 'pointer'
+      } : undefined}
+      onPointerOut={pickable ? () => {
+        document.body.style.cursor = 'auto'
+      } : undefined}
+    >
+      {settings.kioskFill ? (
+        <pointLight
+          position={[0.15, yCab + 0.82, 0.72]}
+          color="#fff1d4"
+          intensity={settings.kioskFill}
+          distance={5}
+          decay={2}
+        />
+      ) : null}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.004, 0.04]} raycast={() => null}>
+        <planeGeometry args={[1.2, 0.78]} />
+        <meshBasicMaterial map={blobTex} transparent opacity={1} depthWrite={false} />
+      </mesh>
+      <mesh position={[0, 0.032, 0]}>
+        <cylinderGeometry args={[0.34, 0.37, 0.064, 24]} />
+        <meshPhysicalMaterial {...shell} />
       </mesh>
       {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * 0.2, postH / 2, 0]}>
-          <boxGeometry args={[postW, postH, postW]} />
-          <meshStandardMaterial {...white} />
+        <mesh key={s} position={[s * 0.22, postH / 2, 0]}>
+          <cylinderGeometry args={[postW * 0.48, postW * 0.56, postH, 14]} />
+          <meshPhysicalMaterial {...shell} />
         </mesh>
       ))}
-      <mesh position={[0, yCab, 0]}>
-        <boxGeometry args={[cabW, cabH, cabD]} />
-        <meshStandardMaterial {...white} />
-      </mesh>
-      {/* White bezel around the screen */}
-      {[
-        [0, yCab + (screenH + lip) / 2, faceZ, cabW, lip],
-        [0, yCab - (screenH + lip) / 2, faceZ, cabW, lip],
-        [-(screenW + lip) / 2, yCab, faceZ, lip, screenH + lip * 2],
-        [(screenW + lip) / 2, yCab, faceZ, lip, screenH + lip * 2],
-      ].map(([x, y, z, w, h], i) => (
-        <mesh key={i} position={[x, y, z]}>
-          <planeGeometry args={[w, h]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.42} metalness={0.05} />
+      <group position={[0, yCab, 0]}>
+        <mesh geometry={cabGeo}>
+          <meshPhysicalMaterial {...shell} />
         </mesh>
-      ))}
-      {/* Idle screensaver: real mesh in the scene (depth-sorts with MetroCard). No CSS overlay. */}
-      {showBoot ? (
-        <group position={[0, yCab, faceZ + 0.001]}>
-          <mesh>
-            <planeGeometry args={[screenW, screenH]} />
-            <meshBasicMaterial color="#000000" toneMapped={false} />
-          </mesh>
-          <mesh position={[0, 0, 0.001]}>
+        <mesh geometry={linerGeo}>
+          <meshStandardMaterial color="#121214" roughness={0.92} metalness={0.04} />
+        </mesh>
+        <mesh position={[0, 0, faceZ - 0.012]} geometry={lipGeo}>
+          <meshStandardMaterial color="#0c0d10" roughness={0.5} metalness={0.2} />
+        </mesh>
+        <mesh position={[0, 0, -cabD / 2 + 0.014]} geometry={screenGeo}>
+          <meshBasicMaterial color="#050505" toneMapped={false} />
+        </mesh>
+        {showBoot ? (
+          <mesh position={[0, 0, -cabD / 2 + 0.016]}>
             <planeGeometry args={[logoW, logoH]} />
             <meshBasicMaterial map={logoTex} toneMapped={false} />
           </mesh>
-        </group>
+        ) : (
+          <pointLight
+            position={[0.1, 0.14, faceZ + 0.2]}
+            color="#c5d6ea"
+            intensity={2.6}
+            distance={1.7}
+            decay={2}
+          />
+        )}
+        <object3D ref={screen} position={[0, 0, screenZ]} />
+      </group>
+      {pickable ? (
+        <mesh position={[0, (postH + cabH) * 0.5, 0]}>
+          <boxGeometry args={[cabW + 0.2, postH + cabH + 0.16, cabD + 0.22]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
       ) : null}
-      <object3D ref={screen} position={[0, yCab, faceZ]} />
     </group>
   )
 }
@@ -3882,7 +4339,7 @@ function TrackTrash() {
   const bits = useMemo(() => {
     const rand = mulberry32(9173)
     const items = []
-    // Visible stretch of trench from the kiosk / video shot
+    // Visible stretch of trench from the kiosk
     for (let i = 0; i < 14; i += 1) {
       const kind = rand() < 0.55 ? 'bottle' : rand() < 0.75 ? 'can' : rand() < 0.9 ? 'bag' : 'paper'
       items.push({
@@ -3900,6 +4357,26 @@ function TrackTrash() {
               ? (['#c8c4bc', '#2a2a2a', '#d4c8a8'][Math.floor(rand() * 3)])
               : '#b8b0a0',
         scale: 0.75 + rand() * 0.45,
+      })
+    }
+    // Extra junk in the kiosk sightline (platform lip, mid-trench)
+    for (let i = 0; i < 18; i += 1) {
+      const kind = rand() < 0.4 ? 'bottle' : rand() < 0.7 ? 'can' : rand() < 0.88 ? 'bag' : 'paper'
+      items.push({
+        kind,
+        x: TRACK_X0 + 0.12 + rand() * 1.15,
+        z: -3.5 - rand() * 4.8,
+        rotY: rand() * Math.PI * 2,
+        rotX: kind === 'bottle' || kind === 'can' ? Math.PI / 2 + (rand() - 0.5) * 0.4 : 0.35 + rand() * 0.55,
+        rotZ: (rand() - 0.5) * 0.55,
+        color: kind === 'bottle'
+          ? (['#2a5a32', '#5a3a1e', '#6a7a82', '#1a4a28'][Math.floor(rand() * 4)])
+          : kind === 'can'
+            ? (['#b0b4b8', '#c45a28', '#d8d0c0'][Math.floor(rand() * 3)])
+            : kind === 'bag'
+              ? (['#c8c4bc', '#2a2a2a', '#d4c8a8'][Math.floor(rand() * 3)])
+              : '#b8b0a0',
+        scale: 0.85 + rand() * 0.5,
       })
     }
     // A few upright bottles against the platform wall of the trench
@@ -3998,16 +4475,25 @@ function TrackTrash() {
 
 function StationWorld({
   pov,
+  kioskZoom = 'close',
   hud,
+  wallHud,
+  wall,
   onReady,
-  onExit,
+  onBoardSelect,
   dimmed,
   onArrive,
   introReady,
   onIntroDone,
   showBoot = true,
-  photoLive = false,
+  immersed = false,
+  immersedId = null,
+  kioskPickable = false,
+  onKioskPick,
+  onLookAside,
 }) {
+  const landscapeInvite = isLandscapeZoom(kioskZoom) && !dimmed
+  const { settings } = useGfx()
   const maps = useStationMaps()
   const reducedMotion = useMemo(
     () => typeof window !== 'undefined'
@@ -4020,27 +4506,44 @@ function StationWorld({
     if (dimmed) setWindMounted(true)
   }, [dimmed])
 
-  const inCabin = pov === 'cabin' || pov === 'photo' || pov === 'video' || pov === 'about'
-
   return (
     <>
-      <CameraRig pov={pov} onArrive={onArrive} locked={dimmed} />
-      <PhotoSeatPan enabled={photoLive && !dimmed} />
+      <CameraRig pov={pov} kioskZoom={kioskZoom} onArrive={onArrive} locked={dimmed} />
       <Atmosphere />
-      <Shell maps={maps} />
-      <CeilingBeams />
-      <Stairwell />
-      <Benches />
-      <YellowStrip />
-      <FloorTrash showMetroCard={!windMounted} />
-      <Tracks />
-      <TrackTrash />
-      <Train showInterior={inCabin} showPhotos={pov === 'photo'} />
-      <TrainSteam />
-      <VibeRat />
-      <Pillars />
-      <Signage onExit={onExit} locked={dimmed} />
-      <InfoKiosk hud={hud} showBoot={showBoot} />
+      <group
+        onClick={(e) => {
+          e.stopPropagation()
+          onLookAside?.(e)
+        }}
+      >
+        <Shell maps={maps} />
+        <CeilingBeams maps={maps} />
+        <Stairwell maps={maps} />
+        <Benches />
+        <YellowStrip maps={maps} />
+        <FloorTrash showMetroCard={!windMounted} />
+        <Tracks maps={maps} />
+        <TrackTrash />
+        <group name="pillar-occlude">
+          <Pillars />
+        </group>
+      </group>
+      <Signage locked={dimmed} />
+      <WallBoards
+        wall={wall}
+        wallHuds={wallHud}
+        immersed={immersed}
+        immersedId={immersedId}
+        onSelect={onBoardSelect}
+        invite={landscapeInvite}
+        projectHtml={!dimmed}
+      />
+      <Train invite={landscapeInvite} />
+      {settings.extras ? <TrainSteam /> : null}
+      {settings.extras ? <VibeRat /> : null}
+      <group name="kiosk-occlude">
+        <InfoKiosk hud={hud} showBoot={showBoot} pickable={kioskPickable} onPick={onKioskPick} />
+      </group>
       {windMounted ? (
         <WindCard
           ready={introReady}
@@ -4050,6 +4553,8 @@ function StationWorld({
         />
       ) : null}
       <ReadyPing onReady={onReady} />
+      <GfxWatch />
+      <ToneMap />
     </>
   )
 }
@@ -4061,15 +4566,29 @@ export default function StationScene({
   introReady = false,
   onIntroComplete,
   onReady,
-  onExit,
   onArrive,
   leaveRef,
+  wallPages = null,
+  wallInteractive = false,
+  headerH = 64,
 }) {
+  const { settings } = useGfx()
   const [use3d, setUse3d] = useState(() => hasWebGL())
+  const [tabHidden, setTabHidden] = useState(
+    () => typeof document !== 'undefined' && document.hidden,
+  )
+  const [wall, setWall] = useState(() => {
+    if (typeof window === 'undefined') return setWallFace(layoutWallFace(1100, 700))
+    return setWallFace(layoutWallFace(window.innerWidth, Math.max(1, window.innerHeight - headerH)))
+  })
   const hud = useRef({ root: null, cam: null, obj: null })
+  const wallHud = useRef({
+    root: null,
+    cam: null,
+    obj: { photo: null, video: null, about: null },
+  })
   const navigate = useNavigate()
-  const pov = POVS[shot] ? shot : 'kiosk'
-  const mobile = typeof window !== 'undefined' && window.innerWidth < 768
+  const pov = isWallPov(shot) || shot === 'kiosk' ? shot : (POVS[shot] ? shot : 'kiosk')
   const reducedMotion = useMemo(
     () => typeof window !== 'undefined'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -4077,17 +4596,80 @@ export default function StationScene({
   )
   const [zap, setZap] = useState('closed')
   const [kioskArrived, setKioskArrived] = useState(false)
-  const [photoLive, setPhotoLive] = useState(false)
+  const [immersed, setImmersed] = useState(false)
+  const [kioskZoom, setKioskZoom] = useState('close')
+  const [camSettled, setCamSettled] = useState(true)
   const pendingNav = useRef(null)
-  const screenLive = kioskLive && zap === 'open'
-  // CSS-3D overlay only while zapping / live — idle uses a cheap WebGL boot plane
+  const immerseTimer = useRef(null)
+  const landscape = pov === 'kiosk' && isLandscapeZoom(kioskZoom)
+  const screenLive = kioskLive && zap === 'open' && kioskZoom === 'close'
+  // Keep the real kiosk HTML projected on left/right (clicks off until close)
   const overlayOn = zap !== 'closed'
+  const pageView = immersed && isWallPov(pov)
+
+  useEffect(() => {
+    const onVis = () => setTabHidden(document.hidden)
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [])
+
+  useEffect(() => {
+    const apply = () => {
+      const next = layoutWallFace(
+        window.innerWidth,
+        Math.max(1, window.innerHeight - headerH),
+      )
+      setWallFace(next)
+      setWall(next)
+    }
+    apply()
+    window.addEventListener('resize', apply)
+    window.addEventListener('orientationchange', apply)
+    return () => {
+      window.removeEventListener('resize', apply)
+      window.removeEventListener('orientationchange', apply)
+    }
+  }, [headerH])
+
+  const goBoard = useCallback((id) => {
+    const to = `/${id}`
+    if (pov === id) return
+    if (leaveRef?.current?.tryLeave?.(to)) return
+    navigate(to)
+  }, [navigate, leaveRef, pov])
+
+  const lookAside = useCallback((e) => {
+    if (dimmed || pov !== 'kiosk' || kioskZoom !== 'close' || zap !== 'open') return
+    const x = ndcXFromEvent(e)
+    if (x == null) return
+    if (x < -0.28) {
+      setCamSettled(false)
+      setKioskZoom('left')
+      return
+    }
+    if (x > 0.28) {
+      setCamSettled(false)
+      setKioskZoom('right')
+    }
+  }, [dimmed, pov, kioskZoom, zap])
 
   const handleArrive = useCallback((next) => {
     onArrive?.(next)
+    setCamSettled(true)
     setKioskArrived(next === 'kiosk')
-    setPhotoLive(next === 'photo')
-  }, [onArrive])
+    if (immerseTimer.current) {
+      window.clearTimeout(immerseTimer.current)
+      immerseTimer.current = null
+    }
+    if (isWallPov(next)) {
+      immerseTimer.current = window.setTimeout(() => {
+        setImmersed(true)
+        immerseTimer.current = null
+      }, reducedMotion ? 0 : 40)
+      return
+    }
+    setImmersed(false)
+  }, [onArrive, reducedMotion])
 
   const handleIntroDone = useCallback(() => {
     // WindCard already parked the camera at kiosk — don't wait on CameraRig arrive
@@ -4100,16 +4682,23 @@ export default function StationScene({
       setKioskArrived(false)
       setZap('closed')
       pendingNav.current = null
+      setKioskZoom('close')
+      setCamSettled(true)
     }
-    if (pov !== 'photo') setPhotoLive(false)
+    setImmersed(false)
+    if (immerseTimer.current) {
+      window.clearTimeout(immerseTimer.current)
+      immerseTimer.current = null
+    }
   }, [pov])
 
   // Arrive at kiosk + interactive → zap open (black MTA until then)
   useEffect(() => {
     if (pov !== 'kiosk' || !kioskLive || !kioskArrived) return
+    if (kioskZoom !== 'close') return
     if (zap !== 'closed') return
     setZap(reducedMotion ? 'open' : 'opening')
-  }, [pov, kioskLive, kioskArrived, zap, reducedMotion])
+  }, [pov, kioskLive, kioskArrived, zap, reducedMotion, kioskZoom])
 
   const onZapPhaseEnd = useCallback((phase) => {
     if (phase === 'opening') {
@@ -4134,7 +4723,7 @@ export default function StationScene({
   useEffect(() => {
     if (!leaveRef) return undefined
     leaveRef.current.tryLeave = (to) => {
-      if (pov !== 'kiosk' || zap !== 'open') return false
+      if (pov !== 'kiosk' || zap !== 'open' || kioskZoom !== 'close') return false
       pendingNav.current = to
       setZap('closing')
       return true
@@ -4142,57 +4731,76 @@ export default function StationScene({
     return () => {
       leaveRef.current.tryLeave = () => false
     }
-  }, [leaveRef, pov, zap])
+  }, [leaveRef, pov, zap, kioskZoom])
 
-  if (!use3d) return null
+  const loop = tabHidden || pageView ? 'never' : 'always'
+
+  if (!use3d) {
+    return (
+      <Layer $hit={false} $page={false}>
+        <NoWebGL>This station needs WebGL.</NoWebGL>
+      </Layer>
+    )
+  }
 
   return (
-    <Layer $hit={!dimmed}>
+    <Layer $hit={!dimmed} $page={pageView}>
       <SceneWrap $dim={dimmed}>
       <Suspense fallback={null}>
         <Canvas
-          frameloop="always"
-            dpr={mobile ? [1, 1.25] : [1, 1.5]}
+          frameloop={loop}
+            dpr={settings.dpr}
             gl={{
               alpha: false,
-              antialias: true,
-              powerPreference: 'high-performance',
+              antialias: settings.antialias,
+              powerPreference: settings.powerPreference,
             }}
             camera={{
-              position: dimmed ? [0.2, 1.95, 3.6] : resolvePov(pov).position,
-              fov: dimmed ? 42 : resolvePov(pov).fov,
+              position: dimmed ? [0.2, 1.95, 3.6] : resolvePov(pov, undefined, kioskZoom).position,
+              fov: dimmed ? 42 : resolvePov(pov, undefined, kioskZoom).fov,
               near: 0.1,
               far: 90,
             }}
           onCreated={({ gl, camera }) => {
             gl.setClearColor(COL.clear, 1)
             gl.toneMapping = THREE.ACESFilmicToneMapping
-              gl.toneMappingExposure = 1.32
+            gl.toneMappingExposure = settings.exposure
               if (dimmed) camera.lookAt(0.15, 1.85, 1.0)
-              else camera.lookAt(...resolvePov(pov).lookAt)
+              else camera.lookAt(...resolvePov(pov, undefined, kioskZoom).lookAt)
             gl.domElement.addEventListener('webglcontextlost', (event) => {
               event.preventDefault()
               setUse3d(false)
             })
           }}
+          onPointerMissed={lookAside}
         >
             <StationWorld
               pov={pov}
+              kioskZoom={kioskZoom}
               hud={hud}
+              wallHud={wallHud}
+              wall={wall}
               onReady={onReady}
-              onExit={onExit}
+              onBoardSelect={goBoard}
               dimmed={dimmed}
               onArrive={handleArrive}
               introReady={introReady}
               onIntroDone={handleIntroDone}
               showBoot={!overlayOn}
-              photoLive={photoLive}
+              immersed={pageView}
+              immersedId={pov}
+              kioskPickable={landscape && !dimmed}
+              onKioskPick={() => {
+                setCamSettled(false)
+                setKioskZoom('close')
+              }}
+              onLookAside={lookAside}
             />
-            <StationBloom enabled />
+            {settings.bloom ? <StationBloom /> : null}
         </Canvas>
       </Suspense>
         {overlayOn ? (
-          <Overlay ref={(n) => { hud.current.root = n }}>
+          <Overlay ref={(n) => { hud.current.root = n }} $clip>
             <OverlayCam ref={(n) => { hud.current.cam = n }}>
               <OverlayObj ref={(n) => { hud.current.obj = n }} $live={screenLive}>
                 <KioskFrame>
@@ -4202,13 +4810,89 @@ export default function StationScene({
                     reducedMotion={reducedMotion}
                     onPhaseEnd={onZapPhaseEnd}
                   />
+                  <KioskGlass aria-hidden />
+                  <KioskGlassDirt aria-hidden />
                 </KioskFrame>
               </OverlayObj>
             </OverlayCam>
           </Overlay>
         ) : null}
+        {wallPages ? (
+          <Overlay data-wall-hud="root" ref={(n) => { wallHud.current.root = n }} $page={pageView} $clip>
+            <OverlayCam data-wall-hud="cam" ref={(n) => { wallHud.current.cam = n }} $page={pageView}>
+              {wallBoardList().map((b) => (
+                <OverlayObj
+                  key={b.id}
+                  data-wall-hud={`obj-${b.id}`}
+                  ref={(n) => { wallHud.current.obj[b.id] = n }}
+                  $live={wallInteractive && pov === b.id}
+                  $catch={!landscape && !pageView && !(wallInteractive && pov === b.id)}
+                  $fill={pageView && pov === b.id}
+                  $off={pageView && pov !== b.id}
+                  onClick={(e) => {
+                    if (pageView || (wallInteractive && pov === b.id)) return
+                    e.stopPropagation()
+                    goBoard(b.id)
+                  }}
+                >
+                  <WallFrame $fill={pageView && pov === b.id} $w={wall.panelW} $h={wall.panelH}>
+                    {wallPages[b.id]}
+                    {pageView && pov === b.id ? null : (
+                      <>
+                        <KioskGlass aria-hidden />
+                        <KioskGlassDirt aria-hidden />
+                      </>
+                    )}
+                  </WallFrame>
+                </OverlayObj>
+              ))}
+            </OverlayCam>
+          </Overlay>
+        ) : null}
       </SceneWrap>
-      <Grain />
+      {pageView || !settings.grain ? null : <Grain />}
+      {!dimmed && (isWallPov(pov) || (kioskLive && pov === 'kiosk' && (landscape || (kioskZoom === 'close' && kioskArrived && zap === 'open')))) ? (
+        <ChromeBar>
+          {landscape ? (
+            <ChromeBtn
+              type="button"
+              aria-label="Home"
+              onClick={() => {
+                setCamSettled(false)
+                setKioskZoom('close')
+                if (pov !== 'kiosk') navigate('/')
+              }}
+            >
+              <HomeIcon />
+            </ChromeBtn>
+          ) : null}
+          <ChromeBtn
+            type="button"
+            aria-label={isWallPov(pov) || kioskZoom === 'close' ? 'Zoom out' : (kioskZoom === 'right' ? 'Look left' : 'Look right')}
+            onClick={() => {
+              if (isWallPov(pov)) {
+                setCamSettled(false)
+                setKioskZoom('left')
+                navigate('/')
+                return
+              }
+              if (kioskZoom === 'close') {
+                setCamSettled(false)
+                setKioskZoom('right')
+                return
+              }
+              setCamSettled(false)
+              setKioskZoom((z) => (z === 'right' ? 'left' : 'right'))
+            }}
+          >
+            {isWallPov(pov) || kioskZoom === 'close' ? (
+              <LivePhotoIcon />
+            ) : (
+              <PanArrow dir={kioskZoom === 'right' ? 'left' : 'right'} />
+            )}
+          </ChromeBtn>
+        </ChromeBar>
+      ) : null}
     </Layer>
   )
 }

@@ -30,6 +30,44 @@ function decodeXml(value) {
     .replace(/&apos;/g, "'")
 }
 
+/** PT1H2M3S → 1:02:03 */
+export function formatIsoDuration(iso) {
+  if (!iso || typeof iso !== 'string') return ''
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
+  if (!match) return ''
+  const hours = Number(match[1] || 0)
+  const minutes = Number(match[2] || 0)
+  const seconds = Number(match[3] || 0)
+  if (!hours && !minutes && !seconds) return '0:00'
+  if (hours) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  }
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+async function fetchDurations(videoIds, apiKey) {
+  const durations = {}
+  for (let i = 0; i < videoIds.length; i += 50) {
+    const chunk = videoIds.slice(i, i + 50)
+    const params = new URLSearchParams({
+      part: 'contentDetails',
+      id: chunk.join(','),
+      key: apiKey,
+    })
+    const response = await fetch(`https://www.googleapis.com/youtube/v3/videos?${params}`)
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      console.error('youtube durations', data?.error?.message || response.status)
+      break
+    }
+    for (const item of data.items || []) {
+      const stamp = formatIsoDuration(item.contentDetails?.duration)
+      if (item.id && stamp) durations[item.id] = stamp
+    }
+  }
+  return durations
+}
+
 async function fetchSanityPlaylistId({ sanityProjectId, sanityDataset }) {
   const client = createClient({
     projectId: sanityProjectId,
@@ -155,8 +193,24 @@ export async function loadPlaylistVideos(config) {
     }
   }
 
+  let videos = result.videos
+  if (config.youtubeApiKey) {
+    try {
+      const durations = await fetchDurations(
+        videos.map((video) => video.videoId),
+        config.youtubeApiKey,
+      )
+      videos = videos.map((video) => ({
+        ...video,
+        duration: durations[video.videoId] || '',
+      }))
+    } catch (error) {
+      console.error('youtube durations', error)
+    }
+  }
+
   return {
     status: 200,
-    body: { videos: result.videos },
+    body: { videos },
   }
 }

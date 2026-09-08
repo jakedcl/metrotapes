@@ -2,109 +2,143 @@ import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { client, urlFor } from '../lib/sanity'
 import { PortableText } from '@portabletext/react'
-import { frostedPanel, frostedPanelShadow } from '../styles/frostedPanel'
 import FrostNote from '../components/FrostNote'
-import { cushy } from '../styles/theme'
+import { font, route } from '../styles/theme'
+
+const BROWN = route.about
 
 const Container = styled.div`
-  padding: 2rem;
-  color: white;
-  max-width: 1000px;
-  margin: 0 auto;
-
-  @media (max-width: 768px) {
-    padding: 1.5rem;
-  }
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #0c0e10;
+  padding: 12px 14px 28px;
+  box-sizing: border-box;
+  color: #fff;
+  pointer-events: auto;
+  -webkit-overflow-scrolling: touch;
+  font-family: ${font};
 `
 
-const Content = styled.div`
-  ${frostedPanel}
-  ${frostedPanelShadow}
-  border-radius: 12px;
-  padding: 2rem;
+const Shell = styled.div`
+  max-width: 780px;
+  margin: 0 auto;
 `
 
 const Title = styled.h1`
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 2rem;
-  margin-bottom: 1.5rem;
-  color: white;
-  letter-spacing: -0.02em;
-
-  @media (min-width: 768px) {
-    font-size: 2.5rem;
-  }
+  margin: 0 0 1.25rem;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
 `
 
-const TopSection = styled.div`
+const Top = styled.div`
   display: flex;
-  gap: 2rem;
-  margin-bottom: 2rem;
+  gap: 1.75rem;
+  align-items: start;
 
-  @media (max-width: 768px) {
+  @media (max-width: 640px) {
     flex-direction: column;
+    gap: 1.15rem;
   }
 `
 
-const PhotoContainer = styled.div`
-  flex: 1;
-  max-width: 400px;
-
-  @media (max-width: 768px) {
-    max-width: 100%;
-  }
+const Portrait = styled.div`
+  flex: 0 0 240px;
+  max-width: 100%;
 
   img {
     width: 100%;
     height: auto;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    display: block;
+  }
+
+  @media (max-width: 640px) {
+    flex-basis: auto;
+    width: min(100%, 280px);
   }
 `
 
-const LandscapePhotoContainer = styled.div`
-  width: 100%;
-  margin-top: 2rem;
-
-  img {
-    width: 100%;
-    height: auto;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-  }
-`
-
-const Description = styled.div`
+const Copy = styled.div`
   flex: 1;
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 1.1rem;
-  line-height: 1.6;
-  color: #f5f5f5;
+  min-width: 0;
+  font-size: 1rem;
+  line-height: 1.55;
+  letter-spacing: -0.02em;
+  color: rgba(255, 255, 255, 0.88);
 
   p {
-    margin-bottom: 1em;
+    margin: 0 0 0.9rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  strong {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  em {
+    font-style: italic;
   }
 
   a {
-    color: #fccc0a;
-    text-decoration: none;
-
-    &:hover {
-      text-decoration: underline;
-    }
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
   }
 `
 
+const Instagram = styled.a`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1.15rem;
+  color: ${BROWN};
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+
+  &:hover {
+    color: #fff;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+  }
+`
+
+const Landscape = styled.div`
+  margin-top: 1.75rem;
+
+  img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+`
+
+const InstagramIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" aria-hidden="true">
+    <path d="M224.1 141c-63.6 0-114.9 51.3-114.9 114.9s51.3 114.9 114.9 114.9S339 319.5 339 255.9 287.7 141 224.1 141zm0 189.6c-41.1 0-74.7-33.5-74.7-74.7s33.5-74.7 74.7-74.7 74.7 33.5 74.7 74.7-33.6 74.7-74.7 74.7zm146.4-194.3c0 14.9-12 26.8-26.8 26.8-14.9 0-26.8-12-26.8-26.8s12-26.8 26.8-26.8 26.8 12 26.8 26.8zm76.1 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM398.8 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z" />
+  </svg>
+)
+
 const portableTextComponents = {
-  block: {
-    h1: ({ children }) => <Title>{children}</Title>,
-    normal: ({ children }) => <p>{children}</p>,
-  },
   marks: {
     link: ({ children, value }) => {
-      const rel = !value.href.startsWith('/') ? 'noreferrer noopener' : undefined
+      const href = value?.href || ''
+      const rel = href.startsWith('/') ? undefined : 'noreferrer noopener'
       return (
-        <a href={value.href} rel={rel}>
+        <a href={href} rel={rel} target={href.startsWith('/') ? undefined : '_blank'}>
           {children}
         </a>
       )
@@ -113,78 +147,75 @@ const portableTextComponents = {
 }
 
 export default function AboutPage() {
-  const [aboutData, setAboutData] = useState(null)
+  const [aboutContent, setAboutContent] = useState(null)
   const [status, setStatus] = useState('loading')
 
   useEffect(() => {
-    const fetchAboutPage = async () => {
-      try {
-        const data = await client.fetch(`*[_type == "aboutPage"][0]{
-          title,
-          mainImage{
-            asset->{
-              _id,
-              url
-            }
-          },
-          landscapeImage{
-            asset->{
-              _id,
-              url
-            }
-          },
-          body
-        }`)
-        if (data) {
-          setAboutData(data)
-          setStatus('ready')
-        } else {
-          setStatus('empty')
-        }
-      } catch (error) {
-        console.error('Error fetching about page:', error)
-        setStatus('error')
+    let alive = true
+    client.fetch(`*[_type == "about"][0]{
+      title,
+      description,
+      photo1,
+      photo2,
+      instagramUrl
+    }`).then((data) => {
+      if (!alive) return
+      if (data) {
+        setAboutContent(data)
+        setStatus('ready')
+      } else {
+        setStatus('empty')
       }
-    }
-
-    fetchAboutPage()
+    }).catch((error) => {
+      console.error('Error fetching about content:', error)
+      if (alive) setStatus('error')
+    })
+    return () => { alive = false }
   }, [])
+
+  const photo2 = aboutContent?.photo2 ? urlFor(aboutContent.photo2).width(800).url() : ''
+  const photo1 = aboutContent?.photo1 ? urlFor(aboutContent.photo1).width(1400).url() : ''
 
   return (
     <Container>
-      {status === 'loading' && <FrostNote>Loading about info…</FrostNote>}
+      {status === 'loading' && <FrostNote>Loading…</FrostNote>}
       {status === 'empty' && <FrostNote>No about info yet.</FrostNote>}
       {status === 'error' && <FrostNote>Could not load about info.</FrostNote>}
-      {status === 'ready' && aboutData && (
-        <Content>
-          <TopSection>
-            {aboutData.mainImage && (
-              <PhotoContainer>
-                <img
-                  src={urlFor(aboutData.mainImage).width(400).url()}
-                  alt={aboutData.title || 'About Image'}
-                />
-              </PhotoContainer>
-            )}
-            {aboutData.body && (
-              <Description>
+      {status === 'ready' && aboutContent ? (
+        <Shell>
+          <Title>{aboutContent.title}</Title>
+          <Top>
+            {photo2 ? (
+              <Portrait>
+                <img src={photo2} alt="" />
+              </Portrait>
+            ) : null}
+            <Copy>
+              {aboutContent.description ? (
                 <PortableText
-                  value={aboutData.body}
+                  value={aboutContent.description}
                   components={portableTextComponents}
                 />
-              </Description>
-            )}
-          </TopSection>
-          {aboutData.landscapeImage && (
-            <LandscapePhotoContainer>
-              <img
-                src={urlFor(aboutData.landscapeImage).width(800).url()}
-                alt={aboutData.title || 'About Landscape Image'}
-              />
-            </LandscapePhotoContainer>
-          )}
-        </Content>
-      )}
+              ) : null}
+              {aboutContent.instagramUrl ? (
+                <Instagram
+                  href={aboutContent.instagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <InstagramIcon />
+                  @metrotapes
+                </Instagram>
+              ) : null}
+            </Copy>
+          </Top>
+          {photo1 ? (
+            <Landscape>
+              <img src={photo1} alt="" />
+            </Landscape>
+          ) : null}
+        </Shell>
+      ) : null}
     </Container>
   )
 }
