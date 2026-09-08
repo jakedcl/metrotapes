@@ -1,19 +1,14 @@
 import { useState, useEffect } from 'react'
 import styled from 'styled-components'
-import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCamera, faVideo, faBook, faBars } from '@fortawesome/free-solid-svg-icons'
 import { route, station, cushy } from '../styles/theme'
-import PropTypes from 'prop-types'
 import { useKioskLeave } from '../context/KioskLeaveContext'
 
 const HeaderContainer = styled.header`
-  position: fixed;
-  top: 0;
-  left: 0;
   width: 100%;
   background: ${station};
-  z-index: 100;
 `
 
 const HeaderContent = styled.div`
@@ -230,12 +225,10 @@ const TitleSection = styled.div`
   align-items: center;
 `
 
-export default function Header({ onShowLanding }) {
+export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const navigate = useNavigate()
-  const location = useLocation()
-  const isHomePage = location.pathname === '/'
   const kioskLeave = useKioskLeave()
 
   useEffect(() => {
@@ -273,7 +266,6 @@ export default function Header({ onShowLanding }) {
 
   const handleReset = () => {
     navigate('/')
-    window.location.reload()
   }
 
   const renderNavItems = () => (
@@ -334,8 +326,4 @@ export default function Header({ onShowLanding }) {
       </HeaderContent>
     </HeaderContainer>
   )
-}
-
-Header.propTypes = {
-  onShowLanding: PropTypes.func,
 } 

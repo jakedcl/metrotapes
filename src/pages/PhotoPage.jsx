@@ -1,41 +1,89 @@
 import { useEffect, useState } from 'react'
-import { client } from '../lib/sanity'
+import { createPortal } from 'react-dom'
+import { client, urlFor } from '../lib/sanity'
 import styled from 'styled-components'
 import ImageModal from '../components/ImageModal'
 import FrostNote from '../components/FrostNote'
-import { CABIN_PHOTO_EVENT } from '../lib/cabinGallery'
+import { font } from '../styles/theme'
 
-const Stage = styled.div`
-  min-height: calc(100vh - 64px);
-  pointer-events: none;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding: 20px 16px;
+const Panel = styled.div`
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #0c0e10;
+  color: #fff;
+  box-sizing: border-box;
+  padding: 12px 14px 24px;
+  pointer-events: auto;
+  -webkit-overflow-scrolling: touch;
+  font-family: ${font};
 `
 
-const Hint = styled.div`
-  pointer-events: none;
-  margin-top: 8px;
-  padding: 8px 12px;
-  font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.65);
+const Shell = styled.div`
+  max-width: 1400px;
+  margin: 0 auto;
 `
 
-const Note = styled.div`
-  pointer-events: none;
-  padding: 24px 16px;
+const Hero = styled.button`
+  display: block;
+  width: min(100%, calc(38vh * 16 / 9));
+  margin: 0 auto 12px;
+  padding: 0;
+  border: 0;
+  background: #000;
+  cursor: pointer;
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    display: block;
+  }
+
+  &:hover img { opacity: 0.92; }
+  &:active img { opacity: 0.85; }
 `
 
-/**
- * Thin HUD for /photo — frames live in the 3D car.
- * Listens for frame clicks and opens the existing modal.
- */
+const Masonry = styled.div`
+  columns: 5;
+  column-gap: 8px;
+  width: 100%;
+
+  @media (max-width: 1100px) {
+    columns: 4;
+  }
+  @media (max-width: 820px) {
+    columns: 3;
+  }
+  @media (max-width: 560px) {
+    columns: 2;
+  }
+`
+
+const PhotoItem = styled.button`
+  break-inside: avoid;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  text-align: left;
+
+  img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  &:hover img { opacity: 0.92; }
+  &:active img { opacity: 0.85; }
+`
+
 export default function PhotoPage() {
   const [photos, setPhotos] = useState([])
   const [status, setStatus] = useState('loading')
@@ -58,46 +106,69 @@ export default function PhotoPage() {
     return () => { alive = false }
   }, [])
 
-  useEffect(() => {
-    const onPick = (e) => {
-      const photo = e.detail?.photo
-      if (!photo) return
-      setSelectedImage(photo)
-      setIsModalOpen(true)
-      if (e.detail?.photos?.length) setPhotos(e.detail.photos)
-    }
-    window.addEventListener(CABIN_PHOTO_EVENT, onPick)
-    return () => window.removeEventListener(CABIN_PHOTO_EVENT, onPick)
-  }, [])
-
   const handleModalClose = (newImage) => {
-    if (newImage) {
-      setSelectedImage(newImage)
-    } else {
+    if (newImage) setSelectedImage(newImage)
+    else {
       setIsModalOpen(false)
       setSelectedImage(null)
     }
   }
 
-  const mediaItems = photos.map((photo) => ({
-    type: 'image',
-    image: photo,
-  }))
+  const open = (photo) => {
+    setSelectedImage(photo)
+    setIsModalOpen(true)
+  }
+
+  const featured = photos[0]
+  const rest = photos.slice(1)
+  const mediaItems = photos.map((photo) => ({ type: 'image', image: photo }))
 
   return (
-    <Stage>
-      {status === 'loading' && <Note><FrostNote>Loading photos…</FrostNote></Note>}
-      {status === 'empty' && <Note><FrostNote>No photos yet.</FrostNote></Note>}
-      {status === 'error' && <Note><FrostNote>Could not load photos.</FrostNote></Note>}
-      {status === 'ready' ? (
-        <Hint>Scroll to look · click a frame</Hint>
-      ) : null}
-      <ImageModal
-        isOpen={isModalOpen}
-        onClose={handleModalClose}
-        currentImage={selectedImage}
-        mediaItems={mediaItems}
-      />
-    </Stage>
+    <>
+      <Panel>
+        {status === 'loading' && <FrostNote>Loading photos…</FrostNote>}
+        {status === 'empty' && <FrostNote>No photos yet.</FrostNote>}
+        {status === 'error' && <FrostNote>Could not load photos.</FrostNote>}
+        {status === 'ready' && featured ? (
+          <Shell>
+            <Hero type="button" onClick={() => open(featured)} aria-label="Open photo">
+              <img
+                src={urlFor(featured).width(1200).url()}
+                alt=""
+              />
+            </Hero>
+            {rest.length ? (
+              <Masonry>
+                {rest.map((photo, index) => (
+                  <PhotoItem
+                    key={photo.asset?._ref || index}
+                    type="button"
+                    onClick={() => open(photo)}
+                    aria-label="Open photo"
+                  >
+                    <img
+                      src={urlFor(photo).width(560).url()}
+                      alt=""
+                      loading="lazy"
+                    />
+                  </PhotoItem>
+                ))}
+              </Masonry>
+            ) : null}
+          </Shell>
+        ) : null}
+      </Panel>
+      {typeof document !== 'undefined'
+        ? createPortal(
+          <ImageModal
+            isOpen={isModalOpen}
+            onClose={handleModalClose}
+            currentImage={selectedImage}
+            mediaItems={mediaItems}
+          />,
+          document.body,
+        )
+        : null}
+    </>
   )
 }

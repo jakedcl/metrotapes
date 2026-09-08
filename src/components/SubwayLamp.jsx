@@ -1,52 +1,19 @@
 /* eslint-disable react/no-unknown-property */
-import { Suspense, useMemo, useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import styled from 'styled-components'
 import PropTypes from 'prop-types'
 
 /**
- * NYC subway globe, built from primitives so it can emit light.
- * Frosted green-over-cream glass, painted iron — not a neon.
- * Header lamp stays the PNG button.
+ * NYC subway globe — green-over-cream glass, painted iron.
+ * Lives inside StationScene (one WebGL canvas). Header reset still uses /lamp.png.
  */
 const IRON = { color: '#2f5d52', roughness: 0.72, metalness: 0.1 }
 const IRON_DARK = { color: '#1c3f38', roughness: 0.8, metalness: 0.06 }
 const BAND = { color: '#2a2a2a', roughness: 0.45, metalness: 0.4 }
 
-const Slot = styled.div`
-  position: relative;
-  width: 220px;
-  height: 600px;
-  pointer-events: none;
-  overflow: visible;
-
-  @media (min-width: 768px) {
-    width: 320px;
-    height: 600px;
-  }
-
-  canvas {
-    position: relative;
-    display: block;
-    overflow: visible;
-  }
-`
-
-const FallbackLamp = styled.img`
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-`
-
-function hasWebGL() {
-  try {
-    const canvas = document.createElement('canvas')
-    return Boolean(canvas.getContext('webgl2') || canvas.getContext('webgl'))
-  } catch {
-    return false
-  }
-}
+/** Post box is centered at y=-0.55 with height 2.55 → bottom at -1.825. */
+const POST_BOTTOM_Y = -0.55 - 2.55 / 2
 
 function createFinShape() {
   const s = new THREE.Shape()
@@ -69,8 +36,9 @@ function createTriangleShape() {
   return s
 }
 
-function LampMesh({ reducedMotion }) {
+function LampMesh({ reducedMotion, fallen }) {
   const group = useRef()
+  const light = useRef()
   const finShape = useMemo(() => createFinShape(), [])
   const triangleShape = useMemo(() => createTriangleShape(), [])
   const finExtrude = useMemo(() => ({
@@ -86,6 +54,12 @@ function LampMesh({ reducedMotion }) {
   }), [])
 
   useFrame(({ clock }) => {
+    if (fallen) {
+      if (!light.current || reducedMotion) return
+      const t = clock.elapsedTime
+      light.current.intensity = 1.85 + Math.sin(t * 5.4) * 0.12 + Math.sin(t * 13.1) * 0.06
+      return
+    }
     if (!group.current || reducedMotion) return
     const t = clock.elapsedTime
     group.current.rotation.y = 0.38 + Math.sin(t * 0.2) * 0.1
@@ -93,7 +67,7 @@ function LampMesh({ reducedMotion }) {
   })
 
   return (
-    <group ref={group} position={[0, -0.12, 0]}>
+    <group ref={group} position={[0, -POST_BOTTOM_Y, 0]}>
       <group position={[0, 1.55, 0]}>
         <mesh>
           <sphereGeometry args={[0.1, 16, 16]} />
@@ -130,9 +104,10 @@ function LampMesh({ reducedMotion }) {
           <meshStandardMaterial {...BAND} />
         </mesh>
         <pointLight
+          ref={light}
           color="#ffe8c2"
-          intensity={0.95}
-          distance={4.5}
+          intensity={fallen ? 1.85 : 0.85}
+          distance={fallen ? 1.45 : 3.8}
           position={[0, -0.04, 0]}
         />
       </group>
@@ -192,79 +167,15 @@ function LampMesh({ reducedMotion }) {
 
 LampMesh.propTypes = {
   reducedMotion: PropTypes.bool,
+  fallen: PropTypes.bool,
 }
 
-function LivingLight({ reducedMotion }) {
-  const light = useRef()
-
-  useFrame(({ clock }) => {
-    if (!light.current || reducedMotion) return
-    const t = clock.elapsedTime
-    // Slow station key around the post — highlights on fins and square iron, not a spin
-    light.current.position.x = Math.cos(t * 0.26) * 1.85
-    light.current.position.y = 0.55 + Math.sin(t * 0.18) * 0.95
-    light.current.position.z = 1.05 + Math.sin(t * 0.26) * 1.65
-  })
-
-  return (
-    <pointLight
-      ref={light}
-      intensity={1.55}
-      color="#fff3c4"
-      distance={8}
-      position={[1.85, 0.55, 1.05]}
-    />
-  )
+/** Globe lamp. Origin is the post base. */
+export default function GlobeLamp({ reducedMotion = false, fallen = false }) {
+  return <LampMesh reducedMotion={reducedMotion} fallen={fallen} />
 }
 
-LivingLight.propTypes = {
+GlobeLamp.propTypes = {
   reducedMotion: PropTypes.bool,
-}
-
-function LampScene({ reducedMotion }) {
-  return (
-    <>
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[-2.4, 3.2, 3.6]} intensity={0.78} />
-      <directionalLight position={[2.2, 1.2, 2]} intensity={0.22} />
-      <LivingLight reducedMotion={reducedMotion} />
-      <LampMesh reducedMotion={reducedMotion} />
-    </>
-  )
-}
-
-LampScene.propTypes = {
-  reducedMotion: PropTypes.bool,
-}
-
-export default function SubwayLamp() {
-  const [use3d, setUse3d] = useState(() => hasWebGL())
-  const reducedMotion = typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-  return (
-    <Slot aria-hidden="true">
-      {use3d ? (
-        <Suspense fallback={<FallbackLamp src="/lamp.png" alt="" />}>
-          <Canvas
-            gl={{ alpha: true, antialias: true }}
-            dpr={[1, 2]}
-            camera={{ position: [1.5, -0.05, 10.2], fov: 24 }}
-            style={{ background: 'transparent', overflow: 'visible' }}
-            onCreated={({ gl }) => {
-              gl.setClearColor(0x000000, 0)
-              gl.domElement.addEventListener('webglcontextlost', (event) => {
-                event.preventDefault()
-                setUse3d(false)
-              })
-            }}
-          >
-            <LampScene reducedMotion={reducedMotion} />
-          </Canvas>
-        </Suspense>
-      ) : (
-        <FallbackLamp src="/lamp.png" alt="" />
-      )}
-    </Slot>
-  )
+  fallen: PropTypes.bool,
 }

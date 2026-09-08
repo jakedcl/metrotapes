@@ -4,22 +4,28 @@ import VideoPage from './pages/VideoPage'
 import AboutPage from './pages/AboutPage'
 import Header from './components/Header'
 import BootScreen from './components/BootScreen'
-import StationScene from './components/StationScene'
-import StationIntro from './components/StationIntro'
 import { preloadStationAssets } from './lib/preloadStation'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import styled, { keyframes } from 'styled-components'
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import styled from 'styled-components'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Blog from './pages/Blog'
 import { font, station } from './styles/theme'
 import usePageMeta from './hooks/usePageMeta'
 import { KioskLeaveProvider } from './context/KioskLeaveContext'
+import { GfxProvider } from './lib/gfxTier'
+
+const StationScene = lazy(() => import('./components/StationScene'))
 
 const GlobalStyle = createGlobalStyle`
   * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    min-height: 100dvh;
   }
 
   html {
@@ -31,7 +37,7 @@ const GlobalStyle = createGlobalStyle`
     color: white;
     font-family: ${font};
     font-weight: 500;
-    min-height: 90vh;
+    min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     letter-spacing: -0.02em;
@@ -41,7 +47,7 @@ const GlobalStyle = createGlobalStyle`
     display: flex;
     flex-direction: column;
     background: ${station};
-    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -62,15 +68,16 @@ const GlobalStyle = createGlobalStyle`
 `
 
 const Layout = styled.div`
-  padding-top: ${(p) => (p.$pad ? '64px' : '0')};
+  padding-top: ${(p) => (p.$pad ? `${p.$header}px` : '0')};
   position: relative;
   overflow-x: hidden;
   overflow-y: visible;
-  min-height: 100vh;
+  min-height: 100%;
 `
 
 const HeaderArea = styled.header`
-  height: 64px;
+  min-height: 64px;
+  height: auto;
   position: fixed;
   top: 0;
   left: 0;
@@ -84,7 +91,10 @@ const HeaderArea = styled.header`
 
 const StationStage = styled.div`
   position: fixed;
-  inset: 64px 0 0 0;
+  top: ${(p) => p.$header}px;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: ${(p) => (p.$front ? 5 : 0)};
   pointer-events: ${(p) => (p.$hit ? 'auto' : 'none')};
   transition: z-index 0s;
@@ -92,29 +102,10 @@ const StationStage = styled.div`
 
 const ContentArea = styled.main`
   width: 100%;
-  min-height: calc(100vh - 64px);
+  min-height: calc(100% - ${(p) => p.$header}px);
   position: relative;
   z-index: 1;
   pointer-events: ${(p) => (p.$pass ? 'none' : 'auto')};
-`
-
-const fadeUp = keyframes`
-  from { opacity: 0; }
-  to { opacity: 1; }
-`
-
-const PageLayer = styled.div`
-  animation: ${fadeUp} 0.55s ease both;
-  background: ${(p) => (p.$clear
-    ? 'transparent'
-    : 'linear-gradient(180deg, rgba(10, 22, 16, 0.12) 0%, rgba(10, 22, 16, 0.55) 32%)')};
-  min-height: calc(100vh - 64px);
-  opacity: ${(p) => (p.$show ? 1 : 0)};
-  pointer-events: ${(p) => {
-    if (!p.$show) return 'none'
-    return p.$clear ? 'none' : 'auto'
-  }};
-  transition: opacity 0.45s ease;
 `
 
 const SHOT = {
@@ -126,18 +117,24 @@ const SHOT = {
 
 function AppContent() {
   const location = useLocation()
-  const navigate = useNavigate()
   const shotFromRoute = SHOT[location.pathname]
   const atKiosk = location.pathname === '/'
+  const onBlog = location.pathname === '/blog'
   const skipIntro = useMemo(
     () => typeof window !== 'undefined'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     [],
   )
-  const [entered, setEntered] = useState(skipIntro)
+  // Intro is a first-load ceremony on `/` only. Wall pages (and reduced motion)
+  // start already inside the station so going home is a camera move, not a replay.
+  const [entered, setEntered] = useState(() => {
+    if (typeof window === 'undefined') return false
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true
+    return window.location.pathname !== '/'
+  })
   const [assetsReady, setAssetsReady] = useState(false)
   const [sceneReady, setSceneReady] = useState(false)
-  const [cabinReady, setCabinReady] = useState(false)
+  const [pageReady, setPageReady] = useState(false)
   const [bootLeaving, setBootLeaving] = useState(false)
   const [bootGone, setBootGone] = useState(skipIntro)
   const booted = assetsReady && sceneReady
@@ -145,16 +142,40 @@ function AppContent() {
   const showBoot = arriving && !bootGone
   const shot = arriving ? 'kiosk' : (shotFromRoute || 'kiosk')
   const onPage = Boolean(shotFromRoute && shotFromRoute !== 'kiosk')
-  const showPage = onPage && cabinReady
+  const showPage = onPage && pageReady
   const leaveRef = useRef({ tryLeave: () => false })
   const kioskLeave = useMemo(() => ({
     tryLeave: (to) => leaveRef.current.tryLeave(to),
   }), [])
+  const wallPages = useMemo(() => ({
+    photo: <PhotoPage />,
+    video: <VideoPage />,
+    about: <AboutPage />,
+  }), [])
+  const headerRef = useRef(null)
+  const [headerH, setHeaderH] = useState(64)
   usePageMeta()
 
   useEffect(() => {
-    // New route → wait for camera to finish flying into the car
-    setCabinReady(!onPage)
+    const el = headerRef.current
+    if (!el) return undefined
+    const apply = () => {
+      const h = Math.round(el.getBoundingClientRect().height)
+      if (h > 0) setHeaderH(h)
+    }
+    apply()
+    const ro = new ResizeObserver(apply)
+    ro.observe(el)
+    window.addEventListener('resize', apply)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', apply)
+    }
+  }, [entered])
+
+  useEffect(() => {
+    // New route → wait for camera to finish turning to the wall
+    setPageReady(!onPage)
   }, [location.pathname, onPage])
 
   useEffect(() => {
@@ -184,50 +205,46 @@ function AppContent() {
     return undefined
   }, [arriving, booted, bootGone])
 
-  const returnToIntro = () => {
-    if (location.pathname !== '/') navigate('/')
-    setEntered(false)
-  }
-
   const handleArrive = (pov) => {
-    if (pov === 'photo' || pov === 'video' || pov === 'about' || pov === 'cabin') {
-      setCabinReady(true)
+    if (pov === 'photo' || pov === 'video' || pov === 'about') {
+      setPageReady(true)
     }
   }
 
   return (
     <KioskLeaveProvider value={kioskLeave}>
-    <Layout $pad>
-      <HeaderArea $show={entered}>
+    <Layout $pad $header={headerH}>
+      <HeaderArea ref={headerRef} $show={entered}>
         <Header />
       </HeaderArea>
-      {shotFromRoute || arriving || entered ? (
-        <StationStage $front={arriving} $hit={!arriving && !!shotFromRoute}>
-          <StationScene
-            shot={shot}
-            kioskLive={atKiosk && entered}
-            dimmed={arriving}
-            introReady={booted && bootGone}
-            onIntroComplete={() => setEntered(true)}
-            onReady={() => setSceneReady(true)}
-            onExit={returnToIntro}
-            onArrive={handleArrive}
-            leaveRef={leaveRef}
-          />
+      {(!onBlog && (shotFromRoute || arriving || entered)) ? (
+        <StationStage $header={headerH} $front={arriving} $hit={!arriving && (entered || !!shotFromRoute)}>
+          <Suspense fallback={null}>
+            <StationScene
+              shot={shot}
+              kioskLive={atKiosk && entered}
+              dimmed={arriving}
+              introReady={booted && bootGone}
+              onIntroComplete={() => setEntered(true)}
+              onReady={() => setSceneReady(true)}
+              onArrive={handleArrive}
+              leaveRef={leaveRef}
+              wallPages={wallPages}
+              wallInteractive={showPage}
+              headerH={headerH}
+            />
+          </Suspense>
         </StationStage>
-      ) : null}
-      {arriving && booted ? (
-        <StationIntro onComplete={() => setEntered(true)} />
       ) : null}
       {showBoot ? (
         <BootScreen leaving={bootLeaving} />
       ) : null}
-      <ContentArea $pass={atKiosk || location.pathname === '/photo'}>
+      <ContentArea $header={headerH} $pass={atKiosk || onPage}>
         <Routes>
           <Route path="/" element={null} />
-          <Route path="/photo" element={<PageLayer $show={showPage} $clear><PhotoPage /></PageLayer>} />
-          <Route path="/video" element={<PageLayer $show={showPage}><VideoPage /></PageLayer>} />
-          <Route path="/about" element={<PageLayer $show={showPage}><AboutPage /></PageLayer>} />
+          <Route path="/photo" element={null} />
+          <Route path="/video" element={null} />
+          <Route path="/about" element={null} />
           <Route path="/blog" element={<Blog />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -241,7 +258,9 @@ function App() {
   return (
     <BrowserRouter>
       <GlobalStyle />
-      <AppContent />
+      <GfxProvider>
+        <AppContent />
+      </GfxProvider>
     </BrowserRouter>
   )
 }

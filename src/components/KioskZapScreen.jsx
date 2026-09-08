@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import styled, { css, keyframes } from 'styled-components'
-import { KIOSK_PANEL_W, KIOSK_PANEL_H } from '../lib/kioskSize'
+import { KIOSK_PANEL_W, KIOSK_PANEL_H, KIOSK_RADIUS_PX } from '../lib/kioskSize'
 import KioskScreen from './KioskScreen'
 
 const ZAP_MS = 520
@@ -13,7 +13,7 @@ const Root = styled.div`
   width: ${KIOSK_PANEL_W}px;
   height: ${KIOSK_PANEL_H}px;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: ${KIOSK_RADIUS_PX}px;
   background: #000;
 `
 

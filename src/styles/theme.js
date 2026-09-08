@@ -18,6 +18,8 @@ export const route = {
 }
 
 export const font = '"Helvetica Neue", Helvetica, Arial, sans-serif'
+/** Wall title strips + kiosk dest plates — Helvetica Bold, not Neue. */
+export const signage = 'Helvetica, "Helvetica Neue", "Arial Black", Arial, sans-serif'
 
 /**
  * Same press as the metrotapes home title:
