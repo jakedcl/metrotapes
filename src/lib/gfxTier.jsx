@@ -5,13 +5,21 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState } fro
  *
  * Fill rate (pixels × lights × materials) is the usual killer on phones.
  * We never promote mid-session — dropping is cheap, rebuilding textures is not.
+ *
+ * Look (lo-fi station):
+ * - Mobile stays 1× DPR (chunky on purpose).
+ * - Shared CSS grain sits over canvas AND HTML screens so LCDs aren't 4K stickers.
+ * - Light CA fringe on the same film layer (not WebGL barrel / fisheye).
  */
 export const GFX = {
   low: {
     dpr: [1, 1],
     bloom: false,
     antialias: false,
-    grain: false,
+    grain: true,
+    grainOpacity: 0.18,
+    ca: true,
+    softScreens: true,
     extras: false,
     lights: 1,
     physicalWalls: false,
@@ -29,7 +37,10 @@ export const GFX = {
     dpr: [1, 1.25],
     bloom: false,
     antialias: true,
-    grain: false,
+    grain: true,
+    grainOpacity: 0.12,
+    ca: true,
+    softScreens: false,
     extras: true,
     lights: 2,
     physicalWalls: false,
@@ -48,6 +59,9 @@ export const GFX = {
     bloom: true,
     antialias: false,
     grain: true,
+    grainOpacity: 0.1,
+    ca: false,
+    softScreens: false,
     extras: true,
     lights: 3,
     physicalWalls: true,

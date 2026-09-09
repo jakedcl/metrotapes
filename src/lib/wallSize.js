@@ -2,8 +2,8 @@
 
 export const WALL_BEZEL = 0.036
 export const WALL_TITLE_H = 0.12
-/** Bench backrest top in world meters (seat top 0.42 + gap 0.13 + back 0.19). */
-export const BENCH_BACK_TOP = 0.73
+/** Bench backrest top in world meters (seat 0.42 + armrest overlap + back 0.19). */
+export const BENCH_BACK_TOP = 0.68
 /** Keep the chrome lip a few inches above the benches. */
 export const BOARD_BENCH_GAP = 0.3
 export const BOARD_Y_PREFERRED = 1.72

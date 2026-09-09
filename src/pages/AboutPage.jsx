@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { client, urlFor } from '../lib/sanity'
+import { getWallPageCache, whenStationPreloaded } from '../lib/preloadStation'
 import { PortableText } from '@portabletext/react'
 import FrostNote from '../components/FrostNote'
 import { font, route } from '../styles/theme'
@@ -147,28 +148,38 @@ const portableTextComponents = {
 }
 
 export default function AboutPage() {
-  const [aboutContent, setAboutContent] = useState(null)
-  const [status, setStatus] = useState('loading')
+  const seed = getWallPageCache('about')
+  const [aboutContent, setAboutContent] = useState(() => (seed.status === 'ready' ? seed.data : null))
+  const [status, setStatus] = useState(() => (seed.status === 'idle' ? 'loading' : seed.status))
 
   useEffect(() => {
     let alive = true
-    client.fetch(`*[_type == "about"][0]{
-      title,
-      description,
-      photo1,
-      photo2,
-      instagramUrl
-    }`).then((data) => {
+    whenStationPreloaded().then(() => {
       if (!alive) return
-      if (data) {
-        setAboutContent(data)
-        setStatus('ready')
-      } else {
-        setStatus('empty')
+      const cached = getWallPageCache('about')
+      if (cached.status === 'ready' || cached.status === 'empty' || cached.status === 'error') {
+        setAboutContent(cached.data)
+        setStatus(cached.status)
+        return
       }
-    }).catch((error) => {
-      console.error('Error fetching about content:', error)
-      if (alive) setStatus('error')
+      client.fetch(`*[_type == "about"][0]{
+        title,
+        description,
+        photo1,
+        photo2,
+        instagramUrl
+      }`).then((data) => {
+        if (!alive) return
+        if (data) {
+          setAboutContent(data)
+          setStatus('ready')
+        } else {
+          setStatus('empty')
+        }
+      }).catch((error) => {
+        console.error('Error fetching about content:', error)
+        if (alive) setStatus('error')
+      })
     })
     return () => { alive = false }
   }, [])

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import FrostNote from '../components/FrostNote'
+import { getWallPageCache, whenStationPreloaded } from '../lib/preloadStation'
 import { font, route } from '../styles/theme'
 
 const GREEN = route.video
@@ -205,52 +206,64 @@ function ThumbChrome({ videoId, duration, lazy = false, size = 40 }) {
 }
 
 export default function VideoPage() {
+  const seed = getWallPageCache('video')
   const scroller = useRef(null)
-  const [videos, setVideos] = useState([])
-  const [status, setStatus] = useState('loading')
-  const [statusDetail, setStatusDetail] = useState('')
-  const [featuredId, setFeaturedId] = useState(null)
+  const [videos, setVideos] = useState(() => (seed.status === 'ready' ? seed.data : []))
+  const [status, setStatus] = useState(() => (seed.status === 'idle' ? 'loading' : seed.status))
+  const [statusDetail, setStatusDetail] = useState(() => seed.detail || '')
+  const [featuredId, setFeaturedId] = useState(() => (
+    seed.status === 'ready' && seed.data?.[0] ? seed.data[0].videoId : null
+  ))
   const [playing, setPlaying] = useState(false)
 
   useEffect(() => {
     let alive = true
-    const fetchVideos = async () => {
-      setStatus('loading')
-      setStatusDetail('')
-      setPlaying(false)
+    whenStationPreloaded().then(() => {
+      if (!alive) return
+      const cached = getWallPageCache('video')
+      if (cached.status === 'ready' || cached.status === 'empty' || cached.status === 'error') {
+        setVideos(cached.data || [])
+        setStatus(cached.status)
+        setStatusDetail(cached.detail || '')
+        if (cached.status === 'ready' && cached.data?.[0]) {
+          setFeaturedId(cached.data[0].videoId)
+        }
+        return
+      }
 
-      try {
-        const response = await fetch('/api/videos')
-        const data = await response.json().catch(() => ({}))
-        if (!alive) return
-
-        if (!response.ok) {
+      const fetchVideos = async () => {
+        setStatus('loading')
+        setStatusDetail('')
+        setPlaying(false)
+        try {
+          const response = await fetch('/api/videos')
+          const data = await response.json().catch(() => ({}))
+          if (!alive) return
+          if (!response.ok) {
+            setVideos([])
+            setStatus('error')
+            setStatusDetail(data.detail || `Could not load videos (${response.status}).`)
+            return
+          }
+          if (!data.videos?.length) {
+            setVideos([])
+            setStatus('empty')
+            setStatusDetail(data.detail || 'No videos to show.')
+            return
+          }
+          setVideos(data.videos)
+          setFeaturedId(data.videos[0].videoId)
+          setStatus('ready')
+        } catch (error) {
+          console.error('Error fetching videos:', error)
+          if (!alive) return
           setVideos([])
           setStatus('error')
-          setStatusDetail(data.detail || `Could not load videos (${response.status}).`)
-          return
+          setStatusDetail(error?.message || 'Could not load videos.')
         }
-
-        if (!data.videos?.length) {
-          setVideos([])
-          setStatus('empty')
-          setStatusDetail(data.detail || 'No videos to show.')
-          return
-        }
-
-        setVideos(data.videos)
-        setFeaturedId(data.videos[0].videoId)
-        setStatus('ready')
-      } catch (error) {
-        console.error('Error fetching videos:', error)
-        if (!alive) return
-        setVideos([])
-        setStatus('error')
-        setStatusDetail(error?.message || 'Could not load videos.')
       }
-    }
-
-    fetchVideos()
+      fetchVideos()
+    })
     return () => { alive = false }
   }, [])
 

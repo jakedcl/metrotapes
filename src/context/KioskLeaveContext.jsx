@@ -10,7 +10,7 @@ export function KioskLeaveProvider({ value, children }) {
   )
 }
 
-/** Returns true if leave was intercepted (zap will navigate after close). */
+/** Returns tryLeave / goHome for header + kiosk nav. */
 export function useKioskLeave() {
   return useContext(KioskLeaveContext)
 }
