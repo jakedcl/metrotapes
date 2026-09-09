@@ -3220,6 +3220,7 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
       }
 
       const objXform = objectCssMatrix(mesh.matrixWorld, pxPerMeter, panelW, panelH)
+      objEl.style.transformOrigin = '0px 0px'
       if (objXform !== lastObj.current[b.id] || objEl.style.transform !== objXform) {
         lastObj.current[b.id] = objXform
         objEl.style.transform = objXform
