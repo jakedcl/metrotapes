@@ -376,35 +376,26 @@ const LcdCopy = styled.div`
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   text-shadow:
     0 0 6px rgba(245, 196, 0, 0.95),
     0 1px 0 rgba(245, 196, 0, 0.8);
 `
 
-const LcdEyebrow = styled.div`
-  font-size: 7px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  opacity: 0.7;
-  line-height: 1.1;
-`
-
 const LcdTitle = styled.div`
-  font-size: 15px;
+  font-size: 26px;
   font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
   text-transform: uppercase;
 `
 
 const LcdBody = styled.div`
-  font-size: 8px;
-  font-weight: 600;
-  line-height: 1.3;
-  opacity: 0.88;
-  max-width: 22em;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  opacity: 0.9;
+  max-width: 18em;
 `
 
 const Audio = styled.div`
@@ -672,7 +663,6 @@ export default function MetroMachineFace() {
         <Lcd>
           <LineBounceField size={15} speed={1.05} />
           <LcdCopy>
-            <LcdEyebrow>Welcome</LcdEyebrow>
             <LcdTitle>Ronnie Foreman</LcdTitle>
             <LcdBody>
               Based in the Hudson Valley and NYC.
