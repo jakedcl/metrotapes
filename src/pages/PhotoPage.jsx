@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { client, urlFor } from '../lib/sanity'
+import { getWallPageCache, whenStationPreloaded } from '../lib/preloadStation'
 import styled from 'styled-components'
 import ImageModal from '../components/ImageModal'
 import FrostNote from '../components/FrostNote'
@@ -85,23 +86,33 @@ const PhotoItem = styled.button`
 `
 
 export default function PhotoPage() {
-  const [photos, setPhotos] = useState([])
-  const [status, setStatus] = useState('loading')
+  const seed = getWallPageCache('photo')
+  const [photos, setPhotos] = useState(() => (seed.status === 'ready' ? seed.data : []))
+  const [status, setStatus] = useState(() => (seed.status === 'idle' ? 'loading' : seed.status))
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedImage, setSelectedImage] = useState(null)
 
   useEffect(() => {
     let alive = true
-    client.fetch(`*[_type == "photos"][0].images`).then((data) => {
+    whenStationPreloaded().then(() => {
       if (!alive) return
-      if (data?.length) {
-        setPhotos(data)
-        setStatus('ready')
-      } else {
-        setStatus('empty')
+      const cached = getWallPageCache('photo')
+      if (cached.status === 'ready' || cached.status === 'empty' || cached.status === 'error') {
+        setPhotos(cached.data || [])
+        setStatus(cached.status)
+        return
       }
-    }).catch(() => {
-      if (alive) setStatus('error')
+      client.fetch(`*[_type == "photos"][0].images`).then((data) => {
+        if (!alive) return
+        if (data?.length) {
+          setPhotos(data)
+          setStatus('ready')
+        } else {
+          setStatus('empty')
+        }
+      }).catch(() => {
+        if (alive) setStatus('error')
+      })
     })
     return () => { alive = false }
   }, [])

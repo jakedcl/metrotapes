@@ -143,9 +143,16 @@ function AppContent() {
   const shot = arriving ? 'kiosk' : (shotFromRoute || 'kiosk')
   const onPage = Boolean(shotFromRoute && shotFromRoute !== 'kiosk')
   const showPage = onPage && pageReady
-  const leaveRef = useRef({ tryLeave: () => false })
+  const leaveRef = useRef({ tryLeave: () => false, goHome: null })
   const kioskLeave = useMemo(() => ({
     tryLeave: (to) => leaveRef.current.tryLeave(to),
+    goHome: () => {
+      if (typeof leaveRef.current.goHome === 'function') {
+        leaveRef.current.goHome()
+        return true
+      }
+      return false
+    },
   }), [])
   const wallPages = useMemo(() => ({
     photo: <PhotoPage />,

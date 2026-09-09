@@ -111,16 +111,16 @@ const POVS = {
   },
   kiosk: {
     // Close on the LCD — slight pullback so chrome still reads
-    position: [0.38, 1.36, -2.52],
+    position: [0.38, 1.36, -2.38],
     lookAt: [0.38, 1.2, -4.28],
-    fov: 50,
+    fov: 51,
     ease: 1.35,
   },
   kioskMobile: {
     // Portrait: smaller pullback than desktop — keep UI readable
-    position: [0.38, 1.34, -2.42],
+    position: [0.38, 1.34, -2.32],
     lookAt: [0.38, 1.2, -4.32],
-    fov: 51,
+    fov: 52,
     ease: 1.35,
   },
   // Over the tracks, near the far wall — train + trench + rat, stairs back-left
@@ -1284,6 +1284,10 @@ const KioskFrame = styled.div`
   border-radius: ${KIOSK_RADIUS_PX}px;
   /* Inherit from OverlayObj — don't re-enable hits while intro has live=false */
   pointer-events: inherit;
+  /* Soften retina HTML so it sits in the lo-fi WebGL world (mobile). */
+  ${(p) => p.$soft && `
+    filter: contrast(0.94) saturate(0.86) brightness(0.98);
+  `}
 `
 
 /** LCD glass: gasket + glare. No RGB subpixel mesh — that read as a screen door. */
@@ -1347,17 +1351,61 @@ const WallFrame = styled.div`
   ${(p) => !p.$fill && `
     * { pointer-events: none !important; }
   `}
+  /* Projected boards only — fullscreen page view stays sharp. */
+  ${(p) => p.$soft && !p.$fill && `
+    filter: contrast(0.94) saturate(0.86) brightness(0.98);
+  `}
 `
 
-const Grain = styled.div`
+/** Film over canvas + CSS-3D screens (under chrome). Ties lo-fi WebGL to sharp HTML. */
+const StationFilm = styled.div`
   position: absolute;
   inset: 0;
+  z-index: 5;
   pointer-events: none;
-  z-index: 1;
-  opacity: 0.1;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,${GRAIN_SVG}");
-  background-size: 128px 128px;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -8%;
+    opacity: ${(p) => p.$grain};
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,${GRAIN_SVG}");
+    background-size: 140px 140px;
+    animation: stationGrain 0.55s steps(2) infinite;
+  }
+
+  ${(p) => p.$ca && `
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0.55;
+      mix-blend-mode: screen;
+      background:
+        linear-gradient(
+          90deg,
+          rgba(255, 40, 60, 0.07) 0%,
+          transparent 18%,
+          transparent 82%,
+          rgba(40, 220, 255, 0.07) 100%
+        ),
+        radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.22) 100%);
+    }
+  `}
+
+  @keyframes stationGrain {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(-1.2%, 0.8%); }
+    50% { transform: translate(0.9%, -1%); }
+    75% { transform: translate(-0.6%, -0.5%); }
+    100% { transform: translate(0, 0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::before { animation: none; }
+  }
 `
 
 const NoWebGL = styled.div`
@@ -3148,11 +3196,26 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
     if (!root || !camEl) return
 
     if (!projectHtml && !(immersed && isWallPov(immersedId))) {
-      root.style.opacity = '0'
+      // Still drive CSS-3D so transforms are warm before intro ends — stay invisible.
+      camera.updateMatrixWorld()
+      const camXform = applyCss3dCamera(root, camera, size, gl.domElement, camEl)
+      if (camXform !== lastCam.current || camEl.style.transform !== camXform) {
+        lastCam.current = camXform
+        camEl.style.transform = camXform
+      }
       liveBoards.forEach((b) => {
         const objEl = wallHuds.current.obj?.[b.id] || document.querySelector(`[data-wall-hud="obj-${b.id}"]`)
-        if (objEl) objEl.style.visibility = 'hidden'
+        const mesh = screens.current[b.id]
+        if (!objEl || !mesh) return
+        mesh.updateWorldMatrix(true, false)
+        const objXform = objectCssMatrix(mesh.matrixWorld, pxPerMeter, panelW, panelH)
+        if (objXform !== lastObj.current[b.id] || objEl.style.transform !== objXform) {
+          lastObj.current[b.id] = objXform
+          objEl.style.transform = objXform
+        }
+        objEl.style.visibility = 'hidden'
       })
+      root.style.opacity = '0'
       return
     }
 
@@ -3248,6 +3311,9 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
   const chrome = { color: '#e8ebef', roughness: 0.2, metalness: 0.86 }
   const { boardW, boardH, boardY, contentW, contentH, contentY, titleY, titleH } = face
   const y = Number.isFinite(boardY) ? boardY : 1.72
+  // iOS residual: HTML sits high in the chrome hole. Move the 3D anchor down only —
+  // do not touch CSS perspective / transform-origin (that blanks overlays).
+  const screenY = y + contentY + (isIOSWebKit() ? -titleH * 1.15 : 0)
 
   return (
     <group>
@@ -3330,7 +3396,7 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
         <object3D
           key={`${b.id}-screen`}
           ref={(n) => { screens.current[b.id] = n }}
-          position={[x + contentX + 0.004, y + contentY, b.z]}
+          position={[x + contentX + 0.004, screenY, b.z]}
           rotation={[0, Math.PI / 2, 0]}
         />
       ))}
@@ -3355,9 +3421,12 @@ function Benches() {
   const seatT = 0.09
   const seatTop = 0.42
   const seatY = seatTop - seatT / 2
-  const gap = 0.13
+  // Backrest sits on the armrests (overlap), not floating above a gap.
   const backH = 0.19
   const backT = 0.07
+  const divHEnd = 0.2
+  const divHMid = 0.175
+  const backBottom = seatTop + divHEnd * 0.35
   const nDiv = 6
   const divW = 0.07
   const x = WALL_X + depth * 0.5 + 0.06
@@ -3381,17 +3450,17 @@ function Benches() {
             <boxGeometry args={[depth, seatT, len]} />
             <meshStandardMaterial {...oak} />
           </mesh>
-          {/* Backrest flush to seat rear so armrests meet it (no floating gap). */}
-          <mesh position={[-depth / 2 - backT / 2, seatTop + gap + backH / 2, 0]}>
+          {/* Overlap armrests in depth so the joint reads as attached. */}
+          <mesh position={[-depth / 2 - backT / 2 + 0.012, backBottom + backH / 2, 0]}>
             <boxGeometry args={[backT, backH, len]} />
             <meshStandardMaterial {...oak} />
           </mesh>
           {Array.from({ length: nDiv }, (_, i) => {
             const end = i === 0 || i === nDiv - 1
-            const divD = end ? depth * 0.48 : depth * 0.34
-            const divH = end ? 0.135 : 0.118
+            const divD = end ? depth * 0.55 : depth * 0.4
+            const divH = end ? divHEnd : divHMid
             const dz = -len / 2 + (i / (nDiv - 1)) * len
-            // Back face of each divider sits on the seat rear / backrest front.
+            // Back face flush with seat rear / into the backrest.
             const dx = -depth / 2 + divD / 2
             return (
               <mesh key={i} position={[dx, seatTop + divH / 2, dz]}>
@@ -3661,7 +3730,7 @@ function makeRoundedPlaneGeometry(w, h, r) {
   return new THREE.ShapeGeometry(roundedRectShape(w, h, r), 12)
 }
 
-function InfoKiosk({ hud, showBoot = true, pickable = false, onPick }) {
+function InfoKiosk({ hud, showBoot = true, pickable = false, onPick, projectHtml = true }) {
   const { settings } = useGfx()
   const { cabW, cabH, cabD, postH, postW, screenW, screenH, panelW, panelH } = KIOSK
   const yCab = postH + cabH / 2
@@ -3680,13 +3749,13 @@ function InfoKiosk({ hud, showBoot = true, pickable = false, onPick }) {
     logoTex.needsUpdate = true
   }, [logoTex])
 
-  // CSS-3D projection only while the live overlay is mounted
+  // CSS-3D projection — keep transforms warm even while hidden (boot / intro).
   useFrame(() => {
     const root = hud?.current?.root
     const camEl = hud?.current?.cam
     const objEl = hud?.current?.obj
     if (!screen.current || !root || !camEl || !objEl) {
-      // Overlay unmounted (cabin / boot) — drop cache so remount re-applies transforms
+      // Overlay unmounted — drop cache so remount re-applies transforms
       lastCam.current = ''
       lastObj.current = ''
       return
@@ -3695,10 +3764,7 @@ function InfoKiosk({ hud, showBoot = true, pickable = false, onPick }) {
     screen.current.updateWorldMatrix(true, false)
     camera.getWorldDirection(camDir)
     toObj.setFromMatrixPosition(screen.current.matrixWorld).sub(camera.position)
-    if (toObj.angleTo(camDir) > Math.PI / 2) {
-      root.style.opacity = '0'
-      return
-    }
+    const facing = toObj.angleTo(camDir) <= Math.PI / 2
     const camXform = applyCss3dCamera(root, camera, size, gl.domElement, camEl)
     const objXform = objectCssMatrix(screen.current.matrixWorld, pxPerMeter, panelW, panelH)
     // Remounted nodes have empty style — must write even if xform string matches last trip
@@ -3710,8 +3776,8 @@ function InfoKiosk({ hud, showBoot = true, pickable = false, onPick }) {
       lastObj.current = objXform
       objEl.style.transform = objXform
     }
-    // Reveal only after transforms land (avoids top-left flash on remount)
-    root.style.opacity = '1'
+    // Reveal only when projecting + facing (avoids top-left flash on remount)
+    root.style.opacity = projectHtml && facing ? '1' : '0'
   })
 
   const faceZ = cabD / 2
@@ -3876,7 +3942,7 @@ function InfoKiosk({ hud, showBoot = true, pickable = false, onPick }) {
   )
 }
 
-function ReadyPing({ onReady }) {
+function ReadyPing({ onReady, hud, wallHud }) {
   const { gl, scene, camera } = useThree()
   const sent = useRef(false)
   const frames = useRef(0)
@@ -3893,6 +3959,10 @@ function ReadyPing({ onReady }) {
     if (sent.current) return
     frames.current += 1
     if (frames.current < 4) return
+    // Hold boot until CSS-3D overlays have a live perspective (screens warmed).
+    const wallOk = Boolean(wallHud?.current?.root?.style?.perspective)
+    const kioskOk = Boolean(hud?.current?.root?.style?.perspective)
+    if ((!wallOk || !kioskOk) && frames.current < 120) return
     sent.current = true
     onReady?.()
   })
@@ -4579,13 +4649,19 @@ function StationWorld({
         immersedId={immersedId}
         onSelect={onBoardSelect}
         invite={landscapeInvite}
-        projectHtml={!dimmed}
+        projectHtml
       />
       <Train invite={landscapeInvite} />
       {settings.extras ? <TrainSteam /> : null}
       {settings.extras ? <VibeRat /> : null}
       <group name="kiosk-occlude">
-        <InfoKiosk hud={hud} showBoot={showBoot} pickable={kioskPickable} onPick={onKioskPick} />
+        <InfoKiosk
+          hud={hud}
+          showBoot={showBoot}
+          pickable={kioskPickable}
+          onPick={onKioskPick}
+          projectHtml
+        />
       </group>
       {windMounted ? (
         <WindCard
@@ -4595,7 +4671,7 @@ function StationWorld({
           reducedMotion={reducedMotion}
         />
       ) : null}
-      <ReadyPing onReady={onReady} />
+      <ReadyPing onReady={onReady} hud={hud} wallHud={wallHud} />
       <GfxWatch />
       <ToneMap />
     </>
@@ -4645,9 +4721,9 @@ export default function StationScene({
   const pendingNav = useRef(null)
   const immerseTimer = useRef(null)
   const landscape = pov === 'kiosk' && isLandscapeZoom(kioskZoom)
+  // Keep HTML mounted so CSS-3D + page content warm during boot / intro.
+  // Zap phase still gates the visible “turn on” — closed = black MTA cover.
   const screenLive = kioskLive && zap === 'open' && kioskZoom === 'close'
-  // Keep the real kiosk HTML projected on left/right (clicks off until close)
-  const overlayOn = zap !== 'closed'
   const pageView = immersed && isWallPov(pov)
 
   useEffect(() => {
@@ -4740,13 +4816,19 @@ export default function StationScene({
     }
   }, [pov])
 
-  // Arrive at kiosk + interactive → zap open (black MTA until then)
+  // Screens on for intro fly-in (preloaded). Zap open while dimmed so the LCD
+  // isn't a black MTA plate during the approach; post-intro keeps it open.
   useEffect(() => {
-    if (pov !== 'kiosk' || !kioskLive || !kioskArrived) return
-    if (kioskZoom !== 'close') return
+    if (pov !== 'kiosk' || kioskZoom !== 'close') return
     if (zap !== 'closed') return
-    setZap(reducedMotion ? 'open' : 'opening')
-  }, [pov, kioskLive, kioskArrived, zap, reducedMotion, kioskZoom])
+    if (dimmed) {
+      setZap('open')
+      return
+    }
+    if (kioskLive && kioskArrived) {
+      setZap(reducedMotion ? 'open' : 'opening')
+    }
+  }, [pov, kioskLive, kioskArrived, zap, reducedMotion, kioskZoom, dimmed])
 
   const onZapPhaseEnd = useCallback((phase) => {
     if (phase === 'opening') {
@@ -4776,10 +4858,17 @@ export default function StationScene({
       setZap('closing')
       return true
     }
+    leaveRef.current.goHome = () => {
+      setCamSettled(false)
+      setKioskZoom('close')
+      setImmersed(false)
+      if (pov !== 'kiosk') navigate('/')
+    }
     return () => {
       leaveRef.current.tryLeave = () => false
+      leaveRef.current.goHome = null
     }
-  }, [leaveRef, pov, zap, kioskZoom])
+  }, [leaveRef, pov, zap, kioskZoom, navigate])
 
   const loop = tabHidden || pageView ? 'never' : 'always'
 
@@ -4834,7 +4923,7 @@ export default function StationScene({
               onArrive={handleArrive}
               introReady={introReady}
               onIntroDone={handleIntroDone}
-              showBoot={!overlayOn}
+              showBoot={zap === 'closed' || zap === 'closing'}
               immersed={pageView}
               immersedId={pov}
               kioskPickable={landscape && !dimmed}
@@ -4847,11 +4936,10 @@ export default function StationScene({
             {settings.bloom ? <StationBloom /> : null}
         </Canvas>
       </Suspense>
-        {overlayOn ? (
-          <Overlay ref={(n) => { hud.current.root = n }}>
+        <Overlay ref={(n) => { hud.current.root = n }}>
             <OverlayCam ref={(n) => { hud.current.cam = n }}>
               <OverlayObj ref={(n) => { hud.current.obj = n }} $live={screenLive}>
-                <KioskFrame>
+                <KioskFrame $soft={settings.softScreens}>
                   <KioskZapScreen
                     phase={zap}
                     live={screenLive}
@@ -4864,7 +4952,6 @@ export default function StationScene({
               </OverlayObj>
             </OverlayCam>
           </Overlay>
-        ) : null}
         {wallPages ? (
           <Overlay data-wall-hud="root" ref={(n) => { wallHud.current.root = n }} $page={pageView}>
             <OverlayCam data-wall-hud="cam" ref={(n) => { wallHud.current.cam = n }} $page={pageView}>
@@ -4883,7 +4970,12 @@ export default function StationScene({
                     goBoard(b.id)
                   }}
                 >
-                  <WallFrame $fill={pageView && pov === b.id} $w={wall.panelW} $h={wall.panelH}>
+                  <WallFrame
+                    $fill={pageView && pov === b.id}
+                    $w={wall.panelW}
+                    $h={wall.panelH}
+                    $soft={settings.softScreens}
+                  >
                     {wallPages[b.id]}
                     {pageView && pov === b.id ? null : (
                       <>
@@ -4898,7 +4990,13 @@ export default function StationScene({
           </Overlay>
         ) : null}
       </SceneWrap>
-      {pageView || !settings.grain ? null : <Grain />}
+      {pageView || !settings.grain ? null : (
+        <StationFilm
+          $grain={settings.grainOpacity ?? 0.12}
+          $ca={Boolean(settings.ca)}
+          aria-hidden
+        />
+      )}
       {!dimmed && (isWallPov(pov) || (kioskLive && pov === 'kiosk' && (landscape || (kioskZoom === 'close' && kioskArrived && zap === 'open')))) ? (
         <ChromeBar>
           {landscape ? (

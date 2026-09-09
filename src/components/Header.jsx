@@ -246,6 +246,8 @@ export default function Header() {
 
   const handleTitleClick = (e) => {
     e.preventDefault()
+    // Prefer station goHome — resets look-aside zoom + returns from wall boards
+    if (kioskLeave?.goHome?.()) return
     navigate('/')
   }
 
@@ -265,6 +267,7 @@ export default function Header() {
   }
 
   const handleReset = () => {
+    if (kioskLeave?.goHome?.()) return
     navigate('/')
   }
 
