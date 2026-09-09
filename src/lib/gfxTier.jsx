@@ -13,8 +13,8 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState } fro
  */
 export const GFX = {
   low: {
-    // Phones: try 2× — modern iPhones handle it; boot preload hides the cost.
-    dpr: [1, 2],
+    // Phones: 1.5× — sharper than 1×, ~half the fill of 2× (which felt slow).
+    dpr: [1, 1.5],
     bloom: false,
     antialias: false,
     grain: false,
