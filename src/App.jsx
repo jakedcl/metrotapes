@@ -166,10 +166,13 @@ function AppContent() {
     apply()
     const ro = new ResizeObserver(apply)
     ro.observe(el)
+    const vv = window.visualViewport
     window.addEventListener('resize', apply)
+    vv?.addEventListener('resize', apply)
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', apply)
+      vv?.removeEventListener('resize', apply)
     }
   }, [entered])
 
