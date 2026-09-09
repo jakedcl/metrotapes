@@ -1196,10 +1196,12 @@ const Layer = styled.div`
   inset: 0;
   z-index: 0;
   pointer-events: ${(p) => (p.$hit ? 'auto' : 'none')};
-  overflow: hidden;
+  overflow: ${(p) => (p.$page ? 'hidden' : 'visible')};
 
   canvas {
     display: block;
+    position: relative;
+    z-index: 0;
     width: 100%;
     height: 100%;
     opacity: ${(p) => (p.$page ? 0 : 1)};
@@ -1218,15 +1220,16 @@ const Overlay = styled.div`
   left: 0;
   z-index: 3;
   pointer-events: none;
-  overflow: ${(p) => (p.$page || p.$clip ? 'hidden' : 'visible')};
+  overflow: ${(p) => (p.$page ? 'hidden' : 'visible')};
   transform-style: ${(p) => (p.$page ? 'flat' : 'preserve-3d')};
   background: ${(p) => (p.$page ? '#0c0e10' : 'transparent')};
-  /* Hidden until CSS-3D transforms land. Fullscreen pages skip that loop. */
-  visibility: hidden;
+  /* Opacity, not visibility — iOS preserve-3d + visibility:hidden never shows children. */
+  opacity: 0;
   ${(p) => p.$hide && `
     display: none !important;
   `}
   ${(p) => p.$page && `
+    opacity: 1;
     visibility: visible !important;
     perspective: none !important;
     right: 0;
@@ -3106,7 +3109,7 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
   const glowLights = useRef({})
   const inviteRef = useRef(invite)
   inviteRef.current = invite
-  const { camera, size, scene } = useThree()
+  const { camera, size, scene, gl } = useThree()
   const camDir = useMemo(() => new THREE.Vector3(), [])
   const toObj = useMemo(() => new THREE.Vector3(), [])
   const ray = useMemo(() => new THREE.Raycaster(), [])
@@ -3141,7 +3144,7 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
     if (!root || !camEl) return
 
     if (!projectHtml && !(immersed && isWallPov(immersedId))) {
-      root.style.visibility = 'hidden'
+      root.style.opacity = '0'
       liveBoards.forEach((b) => {
         const objEl = wallHuds.current.obj?.[b.id] || document.querySelector(`[data-wall-hud="obj-${b.id}"]`)
         if (objEl) objEl.style.visibility = 'hidden'
@@ -3150,11 +3153,16 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
     }
 
     if (immersed && isWallPov(immersedId)) {
-      root.style.visibility = 'visible'
+      root.style.opacity = '1'
       root.style.perspective = 'none'
+      root.style.perspectiveOrigin = '50% 50%'
+      root.style.position = 'absolute'
+      root.style.top = '0px'
+      root.style.left = '0px'
       root.style.width = `${size.width}px`
       root.style.height = `${size.height}px`
       camEl.style.transform = 'none'
+      camEl.style.transformOrigin = '50% 50%'
       lastCam.current = ''
       liveBoards.forEach((b) => {
         const objEl = wallHuds.current.obj?.[b.id] || document.querySelector(`[data-wall-hud="obj-${b.id}"]`)
@@ -3171,16 +3179,9 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
     }
 
     camera.updateMatrixWorld()
-    const widthHalf = size.width / 2
-    const heightHalf = size.height / 2
-    const fov = camera.projectionMatrix.elements[5] * heightHalf
     camera.getWorldDirection(camDir)
 
-    root.style.width = `${size.width}px`
-    root.style.height = `${size.height}px`
-    root.style.perspective = `${fov}px`
-    root.style.perspectiveOrigin = '50% 50%'
-    const camXform = `translateZ(${fov}px)${cssMatrix3d(camera.matrixWorldInverse, CAM_CSS_MUL)}translate(${widthHalf}px,${heightHalf}px)`
+    const camXform = applyCss3dCamera(root, camera, size, gl.domElement, camEl)
     if (camXform !== lastCam.current || camEl.style.transform !== camXform) {
       lastCam.current = camXform
       camEl.style.transform = camXform
@@ -3232,7 +3233,7 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
       objEl.style.visibility = 'visible'
       anyFacing = true
     })
-    root.style.visibility = anyFacing ? 'visible' : 'hidden'
+    root.style.opacity = anyFacing ? '1' : '0'
   })
 
   const x = WALL_X + 0.04
@@ -3543,6 +3544,51 @@ function cssMatrix3d(matrix, multipliers, prepend = '') {
 
 const CAM_CSS_MUL = [1, -1, 1, 1, 1, -1, 1, 1, 1, -1, 1, 1, 1, -1, 1, 1]
 
+function isIOSWebKit() {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  if (/iP(hone|od|ad)/.test(ua)) return true
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+}
+
+function evenPx(n) {
+  const v = Math.round(n)
+  return v - (v % 2)
+}
+
+function applyCss3dCamera(root, camera, size, _canvas, camEl) {
+  const width = evenPx(size.width)
+  const height = evenPx(size.height)
+  const widthHalf = width / 2
+  const heightHalf = height / 2
+  const fov = camera.projectionMatrix.elements[5] * heightHalf
+  root.style.width = `${width}px`
+  root.style.height = `${height}px`
+  root.style.perspective = `${fov}px`
+  root.style.position = 'absolute'
+  root.style.top = '0px'
+  root.style.left = '0px'
+  root.style.right = 'auto'
+  root.style.bottom = 'auto'
+
+  if (isIOSWebKit()) {
+    // WebKit resolves % origins against the Safari viewport, not this node.
+    // Pixel lengths stay element-local — same space as translate(widthHalf, heightHalf).
+    // Do NOT add getBoundingClientRect() here: that mixes viewport Y into element
+    // space and empties the frustum (blank screens). Do NOT use origin 0 0.
+    const origin = `${widthHalf}px ${heightHalf}px`
+    root.style.perspectiveOrigin = origin
+    // Default OverlayCam is still 50% 50% → viewport center on iOS → HTML too low
+    // even after perspective-origin is fixed. Pin cam pivot in the same element space.
+    if (camEl) camEl.style.transformOrigin = origin
+  } else {
+    root.style.perspectiveOrigin = '50% 50%'
+    // Chrome: leave OverlayCam at default 50% 50% (element-local). Do not write it.
+  }
+
+  return `translateZ(${fov}px)${cssMatrix3d(camera.matrixWorldInverse, CAM_CSS_MUL)}translate(${widthHalf}px,${heightHalf}px)`
+}
+
 function objectCssMatrix(matrix, factor, panelW, panelH) {
   const f = factor
   // Pixel origin — iOS treats translate(-50%,-50%) as a % of the viewport in 3D,
@@ -3616,7 +3662,7 @@ function InfoKiosk({ hud, showBoot = true, pickable = false, onPick }) {
   const { cabW, cabH, cabD, postH, postW, screenW, screenH, panelW, panelH } = KIOSK
   const yCab = postH + cabH / 2
   const screen = useRef()
-  const { camera, size } = useThree()
+  const { camera, size, gl } = useThree()
   const camDir = useMemo(() => new THREE.Vector3(), [])
   const toObj = useMemo(() => new THREE.Vector3(), [])
   const pxPerMeter = panelW / screenW
@@ -3646,17 +3692,10 @@ function InfoKiosk({ hud, showBoot = true, pickable = false, onPick }) {
     camera.getWorldDirection(camDir)
     toObj.setFromMatrixPosition(screen.current.matrixWorld).sub(camera.position)
     if (toObj.angleTo(camDir) > Math.PI / 2) {
-      root.style.visibility = 'hidden'
+      root.style.opacity = '0'
       return
     }
-    const widthHalf = size.width / 2
-    const heightHalf = size.height / 2
-    const fov = camera.projectionMatrix.elements[5] * heightHalf
-    root.style.width = `${size.width}px`
-    root.style.height = `${size.height}px`
-    root.style.perspective = `${fov}px`
-    root.style.perspectiveOrigin = '50% 50%'
-    const camXform = `translateZ(${fov}px)${cssMatrix3d(camera.matrixWorldInverse, CAM_CSS_MUL)}translate(${widthHalf}px,${heightHalf}px)`
+    const camXform = applyCss3dCamera(root, camera, size, gl.domElement, camEl)
     const objXform = objectCssMatrix(screen.current.matrixWorld, pxPerMeter, panelW, panelH)
     // Remounted nodes have empty style — must write even if xform string matches last trip
     if (camXform !== lastCam.current || camEl.style.transform !== camXform) {
@@ -3668,7 +3707,7 @@ function InfoKiosk({ hud, showBoot = true, pickable = false, onPick }) {
       objEl.style.transform = objXform
     }
     // Reveal only after transforms land (avoids top-left flash on remount)
-    root.style.visibility = 'visible'
+    root.style.opacity = '1'
   })
 
   const faceZ = cabD / 2
@@ -4805,7 +4844,7 @@ export default function StationScene({
         </Canvas>
       </Suspense>
         {overlayOn ? (
-          <Overlay ref={(n) => { hud.current.root = n }} $clip>
+          <Overlay ref={(n) => { hud.current.root = n }}>
             <OverlayCam ref={(n) => { hud.current.cam = n }}>
               <OverlayObj ref={(n) => { hud.current.obj = n }} $live={screenLive}>
                 <KioskFrame>
@@ -4823,7 +4862,7 @@ export default function StationScene({
           </Overlay>
         ) : null}
         {wallPages ? (
-          <Overlay data-wall-hud="root" ref={(n) => { wallHud.current.root = n }} $page={pageView} $clip>
+          <Overlay data-wall-hud="root" ref={(n) => { wallHud.current.root = n }} $page={pageView}>
             <OverlayCam data-wall-hud="cam" ref={(n) => { wallHud.current.cam = n }} $page={pageView}>
               {wallBoardList().map((b) => (
                 <OverlayObj
