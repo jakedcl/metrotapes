@@ -675,7 +675,7 @@ export default function MetroMachineFace() {
             <LcdEyebrow>Welcome</LcdEyebrow>
             <LcdTitle>Ronnie Foreman</LcdTitle>
             <LcdBody>
-              Photography &amp; video from the New York metropolitan area.
+              Based in the Hudson Valley and NYC.
             </LcdBody>
           </LcdCopy>
         </Lcd>
