@@ -1242,7 +1242,6 @@ const OverlayCam = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  transform-origin: 0 0;
   transform-style: ${(p) => (p.$page ? 'flat' : 'preserve-3d')};
   pointer-events: none;
   ${(p) => p.$page && `
@@ -1254,7 +1253,6 @@ const OverlayObj = styled.div`
   position: absolute;
   top: 0;
   left: 0;
-  transform-origin: 0 0;
   /* Solid hit shield over the projected screen so the canvas can't steal clicks */
   pointer-events: ${(p) => (p.$live || p.$catch ? 'auto' : 'none')};
   cursor: ${(p) => (p.$catch && !p.$live ? 'pointer' : 'inherit')};
@@ -3173,9 +3171,16 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
     }
 
     camera.updateMatrixWorld()
+    const widthHalf = size.width / 2
+    const heightHalf = size.height / 2
+    const fov = camera.projectionMatrix.elements[5] * heightHalf
     camera.getWorldDirection(camDir)
 
-    const camXform = css3dCameraTransform(root, camEl, camera, size)
+    root.style.width = `${size.width}px`
+    root.style.height = `${size.height}px`
+    root.style.perspective = `${fov}px`
+    root.style.perspectiveOrigin = '50% 50%'
+    const camXform = `translateZ(${fov}px)${cssMatrix3d(camera.matrixWorldInverse, CAM_CSS_MUL)}translate(${widthHalf}px,${heightHalf}px)`
     if (camXform !== lastCam.current || camEl.style.transform !== camXform) {
       lastCam.current = camXform
       camEl.style.transform = camXform
@@ -3220,7 +3225,6 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
       }
 
       const objXform = objectCssMatrix(mesh.matrixWorld, pxPerMeter, panelW, panelH)
-      objEl.style.transformOrigin = '0px 0px'
       if (objXform !== lastObj.current[b.id] || objEl.style.transform !== objXform) {
         lastObj.current[b.id] = objXform
         objEl.style.transform = objXform
@@ -3550,19 +3554,6 @@ function objectCssMatrix(matrix, factor, panelW, panelH) {
   )
 }
 
-/** Match drei Html: WebKit resolves % perspective-origin against the viewport. */
-function css3dCameraTransform(root, camEl, camera, size) {
-  const widthHalf = size.width / 2
-  const heightHalf = size.height / 2
-  const fov = camera.projectionMatrix.elements[5] * heightHalf
-  root.style.width = `${size.width}px`
-  root.style.height = `${size.height}px`
-  root.style.perspective = `${fov}px`
-  root.style.perspectiveOrigin = `${widthHalf}px ${heightHalf}px`
-  if (camEl) camEl.style.transformOrigin = '0px 0px'
-  return `translateZ(${fov}px)${cssMatrix3d(camera.matrixWorldInverse, CAM_CSS_MUL)}translate(${widthHalf}px,${heightHalf}px)`
-}
-
 function roundedRectShape(w, h, r) {
   const rad = Math.min(r, w / 2, h / 2)
   const x = -w / 2
@@ -3658,9 +3649,15 @@ function InfoKiosk({ hud, showBoot = true, pickable = false, onPick }) {
       root.style.visibility = 'hidden'
       return
     }
-    const camXform = css3dCameraTransform(root, camEl, camera, size)
+    const widthHalf = size.width / 2
+    const heightHalf = size.height / 2
+    const fov = camera.projectionMatrix.elements[5] * heightHalf
+    root.style.width = `${size.width}px`
+    root.style.height = `${size.height}px`
+    root.style.perspective = `${fov}px`
+    root.style.perspectiveOrigin = '50% 50%'
+    const camXform = `translateZ(${fov}px)${cssMatrix3d(camera.matrixWorldInverse, CAM_CSS_MUL)}translate(${widthHalf}px,${heightHalf}px)`
     const objXform = objectCssMatrix(screen.current.matrixWorld, pxPerMeter, panelW, panelH)
-    objEl.style.transformOrigin = '0px 0px'
     // Remounted nodes have empty style — must write even if xform string matches last trip
     if (camXform !== lastCam.current || camEl.style.transform !== camXform) {
       lastCam.current = camXform
