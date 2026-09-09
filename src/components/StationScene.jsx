@@ -110,16 +110,17 @@ const POVS = {
     ease: 0.82,
   },
   kiosk: {
-    // Standing in front, slightly above the screen, looking down
-    position: [0.38, 1.54, -2.18],
-    lookAt: [0.38, 1.08, -4.28],
-    fov: 52,
+    // Close on the LCD — slight pullback so chrome still reads
+    position: [0.38, 1.36, -2.52],
+    lookAt: [0.38, 1.2, -4.28],
+    fov: 50,
     ease: 1.35,
   },
   kioskMobile: {
-    position: [0.38, 1.48, -2.0],
-    lookAt: [0.38, 1.1, -4.35],
-    fov: 54,
+    // Portrait: smaller pullback than desktop — keep UI readable
+    position: [0.38, 1.34, -2.42],
+    lookAt: [0.38, 1.2, -4.32],
+    fov: 51,
     ease: 1.35,
   },
   // Over the tracks, near the far wall — train + trench + rat, stairs back-left
@@ -2413,11 +2414,14 @@ function Train({ invite = false }) {
     const idle = parked ? 0.5 + 0.5 * Math.sin(t * (call ? 1.15 : 1.35)) : 0
     const s = 1 + h * 0.028 + idle * (call ? 0.018 : 0.008)
     root.current.scale.set(s, s, s)
+    // Headlights stay on while rolling — parked-only used to kill them.
     if (glowLight.current) {
-      glowLight.current.intensity = (parked ? (call ? 1.25 : 0.55) + idle * (call ? 1.7 : 0.85) : 0) + h * 3.4
+      glowLight.current.intensity = (parked
+        ? (call ? 1.25 : 0.55) + idle * (call ? 1.7 : 0.85)
+        : 0.85) + h * 3.4
     }
     headLights.current.forEach((light) => {
-      if (light) light.intensity = 3.6 + (parked ? idle * (call ? 1.85 : 1.0) : 0) + h * 2.2
+      if (light) light.intensity = 3.6 + (parked ? idle * (call ? 1.85 : 1.0) : 0.5) + h * 2.2
     })
 
     if (m.phase === 'departing') {
@@ -3377,9 +3381,8 @@ function Benches() {
             <boxGeometry args={[depth, seatT, len]} />
             <meshStandardMaterial {...oak} />
           </mesh>
-          <mesh
-            position={[-depth / 2 - backT / 2 - 0.022, seatTop + gap + backH / 2, 0]}
-          >
+          {/* Backrest flush to seat rear so armrests meet it (no floating gap). */}
+          <mesh position={[-depth / 2 - backT / 2, seatTop + gap + backH / 2, 0]}>
             <boxGeometry args={[backT, backH, len]} />
             <meshStandardMaterial {...oak} />
           </mesh>
@@ -3388,7 +3391,8 @@ function Benches() {
             const divD = end ? depth * 0.48 : depth * 0.34
             const divH = end ? 0.135 : 0.118
             const dz = -len / 2 + (i / (nDiv - 1)) * len
-            const dx = -depth / 2 + divD / 2 + 0.08
+            // Back face of each divider sits on the seat rear / backrest front.
+            const dx = -depth / 2 + divD / 2
             return (
               <mesh key={i} position={[dx, seatTop + divH / 2, dz]}>
                 <boxGeometry args={[divD, divH, divW]} />
