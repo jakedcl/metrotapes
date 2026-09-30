@@ -183,13 +183,12 @@ const ClipTitle = styled.span`
 `
 
 function YtThumb({ videoId, alt = '', lazy = false }) {
-  const [src, setSrc] = useState(`https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`)
+  // hqdefault always exists; maxresdefault 404s for many uploads and still logs in DevTools.
   return (
     <Thumb
-      src={src}
+      src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
       alt={alt}
       loading={lazy ? 'lazy' : 'eager'}
-      onError={() => setSrc(`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`)}
     />
   )
 }
