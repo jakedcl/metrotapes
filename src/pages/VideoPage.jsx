@@ -6,8 +6,6 @@ import { font, route } from '../styles/theme'
 
 const GREEN = route.video
 
-const THUMB_FALLBACKS = ['maxresdefault', 'sddefault', 'hqdefault']
-
 function formatDate(iso) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -429,14 +427,12 @@ function IconPause() {
 }
 
 function YtThumb({ videoId, alt = '', lazy = false }) {
-  const [tier, setTier] = useState(0)
-  const kind = THUMB_FALLBACKS[tier] || 'hqdefault'
+  // hqdefault always exists; maxresdefault 404s for many uploads and still logs in DevTools.
   return (
     <Thumb
-      src={`https://i.ytimg.com/vi/${videoId}/${kind}.jpg`}
+      src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
       alt={alt}
       loading={lazy ? 'lazy' : 'eager'}
-      onError={() => setTier((t) => Math.min(t + 1, THUMB_FALLBACKS.length - 1))}
     />
   )
 }
