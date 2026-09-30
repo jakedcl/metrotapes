@@ -6,7 +6,7 @@ Metrotapes is a single-page Vite and React app. The home page is a 3D subway sta
 
 - `src/App.jsx` has routes for `/`, `/photo`, `/video`, `/about` and `/blog`. Anything else redirects to `/`.
 - Only `/blog` renders as a normal page. For the other four routes the route element is `null`. `SHOT` in `App.jsx` maps the path to a camera shot (`kiosk`, `photo`, `video`, `about`), and `StationScene.jsx` (React Three Fiber, lazy loaded) flies the camera there.
-- The page content (`PhotoPage`, `VideoPage`, `AboutPage`) is rendered as HTML on top of the canvas, but only after the camera reports it has arrived (`onArrive` sets `pageReady`), so the content doesn't show up while the camera is still moving.
+- The wall pages (`PhotoPage`, `VideoPage`, `AboutPage`) are handed to the scene as `wallPages` and rendered as HTML panels mounted on the station walls, so they are on screen in the scene before you visit them. They only become interactive once the camera reports it has arrived (`onArrive` sets `pageReady`, which drives `wallInteractive`), and up until then a click on a wall panel flies the camera to it.
 - The boot screen only shows on a first visit to `/`. It waits until the scene has mounted and the preload below has finished. Visiting a wall page directly, or having reduced motion turned on, skips the intro.
 
 ## Preloading content
