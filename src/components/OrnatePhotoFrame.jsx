@@ -2,36 +2,33 @@ import styled from 'styled-components'
 import PropTypes from 'prop-types'
 
 /**
- * Your carved gold frame, punched transparent in the opening,
- * stretched so the opening matches the photo aspect.
- *
- * Insets / opening fractions measured from the source asset.
+ * Carved gold frame PNG (transparent opening), stretched so the
+ * opening matches the photo aspect. Fills its parent as large as possible.
  */
-const OPEN_W = 0.5615
-const OPEN_H = 0.6268
+const OPEN_W = 0.6106
+const OPEN_H = 0.6516
 const FRAME_INSET = {
-  left: '22.69%',
-  right: '21.15%',
-  top: '23.24%',
-  bottom: '14.08%',
+  left: '19.19%',
+  right: '19.75%',
+  top: '21.19%',
+  bottom: '13.64%',
 }
 
 const Shell = styled.button`
   position: relative;
   display: block;
-  /* Outer box aspect so the *opening* equals the photo ratio. */
-  width: min(
-    92vw,
-    560px,
-    calc(58vh * ${(p) => p.$frameAspect})
-  );
+  /* Fill the stage: as big as container allows while keeping opening aspect. */
+  width: min(100%, calc(100cqh * ${(p) => p.$frameAspect}));
+  max-width: 100%;
+  max-height: 100%;
   aspect-ratio: ${(p) => p.$frameAspect};
+  height: auto;
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
-  filter: drop-shadow(0 16px 36px rgba(0, 0, 0, 0.55));
+  filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.6));
   transition: width 0.7s ease, aspect-ratio 0.7s ease;
 
   &:focus-visible {
@@ -55,7 +52,7 @@ const FrameArt = styled.img`
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: fill; /* stretch with aspect — ornaments warp with the frame */
+  object-fit: fill;
   pointer-events: none;
   z-index: 3;
   user-select: none;
@@ -91,7 +88,6 @@ export default function OrnatePhotoFrame({
   'aria-label': ariaLabel,
 }) {
   const photoAspect = Number.isFinite(aspect) && aspect > 0.2 && aspect < 5 ? aspect : 4 / 3
-  // Stretch the whole PNG so its opening matches this photo ratio.
   const frameAspect = photoAspect * (OPEN_H / OPEN_W)
 
   return (
@@ -106,7 +102,7 @@ export default function OrnatePhotoFrame({
       aria-label={ariaLabel}
     >
       <Well>{children}</Well>
-      <FrameArt src="/photo-frame.png" alt="" draggable={false} />
+      <FrameArt src="/photo-frame.png?v=4" alt="" draggable={false} />
       {caption ? <Caption>{caption}</Caption> : null}
     </Shell>
   )

@@ -16,26 +16,29 @@ const drift = keyframes`
 const Panel = styled.div`
   width: 100%;
   height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   overscroll-behavior: contain;
-  background:
-    radial-gradient(ellipse 70% 55% at 50% 28%, #1a1410 0%, transparent 70%),
-    #0a0908;
+  background: #0a0908;
   color: #fff;
   box-sizing: border-box;
-  padding: 16px 0 28px;
+  padding: 0;
   pointer-events: auto;
-  -webkit-overflow-scrolling: touch;
   font-family: ${font};
 `
 
+/** Frame takes every leftover pixel above the fixed strip. */
 const Stage = styled.div`
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 22px;
-  min-height: min(100%, 720px);
+  justify-content: center;
+  padding: 6px 10px 4px;
+  box-sizing: border-box;
+  container-type: size;
 `
 
 const Slide = styled.img`
@@ -51,28 +54,23 @@ const Slide = styled.img`
   z-index: ${(p) => (p.$show ? 2 : 1)};
 `
 
-/** Full-bleed film strip under the frame. */
+/** Fixed low strip — doesn't steal vertical space from the frame. */
 const StripRail = styled.div`
-  width: 100vw;
-  margin-left: calc(50% - 50vw);
+  flex: 0 0 auto;
+  width: 100%;
   overflow: hidden;
-  padding: 10px 0 6px;
+  padding: 8px 0 10px;
   background:
-    linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.35)),
-    repeating-linear-gradient(
-      90deg,
-      #1a120c 0 10px,
-      #120c08 10px 12px
-    );
-  border-top: 1px solid rgba(196, 160, 106, 0.18);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.55);
-  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+    linear-gradient(180deg, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.45)),
+    #100c08;
+  border-top: 1px solid rgba(196, 160, 106, 0.16);
+  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
 `
 
 const StripTrack = styled.div`
   display: flex;
   width: max-content;
-  gap: 8px;
+  gap: 7px;
   padding: 0 8px;
   ${(p) => (p.$run ? css`
     animation: ${drift} ${p.$sec}s linear infinite;
@@ -85,23 +83,20 @@ const StripTrack = styled.div`
 
 const StripShot = styled.button`
   flex: 0 0 auto;
-  width: clamp(112px, 18vw, 168px);
+  width: clamp(88px, 14vw, 132px);
   aspect-ratio: 4 / 3;
   padding: 0;
-  border: 2px solid ${(p) => (p.$on ? '#c4a06a' : 'rgba(255, 230, 190, 0.18)')};
+  border: 2px solid ${(p) => (p.$on ? '#c4a06a' : 'rgba(255, 230, 190, 0.16)')};
   background: #000;
   cursor: pointer;
   overflow: hidden;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.4),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.5);
 
   img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-    opacity: ${(p) => (p.$on ? 1 : 0.78)};
+    opacity: ${(p) => (p.$on ? 1 : 0.75)};
     transition: opacity 0.25s ease;
   }
 
@@ -168,7 +163,6 @@ export default function PhotoPage() {
     return () => window.clearTimeout(clear)
   }, [featuredIndex])
 
-  // When the featured slide changes, morph the frame to that photo's ratio.
   useEffect(() => {
     const cached = aspects.current[featuredIndex]
     if (cached) setAspect(cached)
@@ -225,31 +219,33 @@ export default function PhotoPage() {
         {status === 'empty' && <FrostNote>No photos yet.</FrostNote>}
         {status === 'error' && <FrostNote>Could not load photos.</FrostNote>}
         {status === 'ready' && featured ? (
-          <Stage>
-            <OrnatePhotoFrame
-              aspect={aspect}
-              caption={caption}
-              onClick={() => open(featured, featuredIndex)}
-              onMouseEnter={() => setPaused(true)}
-              onMouseLeave={() => setPaused(false)}
-              onFocus={() => setPaused(true)}
-              onBlur={() => setPaused(false)}
-              aria-label="Open featured photo"
-            >
-              {layers.map((layer) => {
-                const photo = photos[layer.index]
-                if (!photo) return null
-                return (
-                  <Slide
-                    key={layer.key}
-                    src={urlFor(photo).width(1200).url()}
-                    alt=""
-                    $show={layer.show}
-                    onLoad={(e) => rememberAspect(layer.index, e.currentTarget)}
-                  />
-                )
-              })}
-            </OrnatePhotoFrame>
+          <>
+            <Stage>
+              <OrnatePhotoFrame
+                aspect={aspect}
+                caption={caption}
+                onClick={() => open(featured, featuredIndex)}
+                onMouseEnter={() => setPaused(true)}
+                onMouseLeave={() => setPaused(false)}
+                onFocus={() => setPaused(true)}
+                onBlur={() => setPaused(false)}
+                aria-label="Open featured photo"
+              >
+                {layers.map((layer) => {
+                  const photo = photos[layer.index]
+                  if (!photo) return null
+                  return (
+                    <Slide
+                      key={layer.key}
+                      src={urlFor(photo).width(1600).url()}
+                      alt=""
+                      $show={layer.show}
+                      onLoad={(e) => rememberAspect(layer.index, e.currentTarget)}
+                    />
+                  )
+                })}
+              </OrnatePhotoFrame>
+            </Stage>
 
             <StripRail aria-label="Photo strip">
               <StripTrack $run={photos.length > 1} $sec={stripSec}>
@@ -266,7 +262,7 @@ export default function PhotoPage() {
                       aria-current={on ? 'true' : undefined}
                     >
                       <img
-                        src={urlFor(photo).width(420).height(315).fit('crop').url()}
+                        src={urlFor(photo).width(360).height(270).fit('crop').url()}
                         alt=""
                         loading="lazy"
                         draggable={false}
@@ -276,7 +272,7 @@ export default function PhotoPage() {
                 })}
               </StripTrack>
             </StripRail>
-          </Stage>
+          </>
         ) : null}
       </Panel>
       {typeof document !== 'undefined'
