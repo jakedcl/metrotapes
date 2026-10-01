@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { client, urlFor } from '../lib/sanity'
+import { PHOTOS_QUERY, client, imageAlt, urlFor } from '../lib/sanity'
 import { getWallPageCache, whenStationPreloaded } from '../lib/preloadStation'
 import styled from 'styled-components'
 import ImageModal from '../components/ImageModal'
@@ -102,7 +102,7 @@ export default function PhotoPage() {
         setStatus(cached.status)
         return
       }
-      client.fetch(`*[_type == "photos"][0].images`).then((data) => {
+      client.fetch(PHOTOS_QUERY).then((data) => {
         if (!alive) return
         if (data?.length) {
           setPhotos(data)
@@ -142,10 +142,10 @@ export default function PhotoPage() {
         {status === 'error' && <FrostNote>Could not load photos.</FrostNote>}
         {status === 'ready' && featured ? (
           <Shell>
-            <Hero type="button" onClick={() => open(featured)} aria-label="Open photo">
+            <Hero type="button" onClick={() => open(featured)}>
               <img
                 src={urlFor(featured).width(1200).url()}
-                alt=""
+                alt={imageAlt(featured, 'Photograph by Ronnie Foreman')}
               />
             </Hero>
             {rest.length ? (
@@ -155,11 +155,10 @@ export default function PhotoPage() {
                     key={photo.asset?._ref || index}
                     type="button"
                     onClick={() => open(photo)}
-                    aria-label="Open photo"
                   >
                     <img
                       src={urlFor(photo).width(560).url()}
-                      alt=""
+                      alt={imageAlt(photo, 'Photograph by Ronnie Foreman')}
                       loading="lazy"
                     />
                   </PhotoItem>

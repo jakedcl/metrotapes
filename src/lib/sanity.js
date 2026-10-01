@@ -25,4 +25,24 @@ const builder = imageUrlBuilder(client)
 export const urlFor = (source) => {
   if (!source?.asset) return ''
   return builder.image(source)
+}
+
+/** Keep asset._ref so urlFor still works, and read alt when the studio has one. */
+export const PHOTOS_QUERY = `*[_type == "photos"][0].images[]{
+  ...,
+  "alt": coalesce(alt, asset->altText)
+}`
+
+export const ABOUT_QUERY = `*[_type == "about"][0]{
+  title,
+  description,
+  instagramUrl,
+  photo1{..., "alt": coalesce(alt, asset->altText)},
+  photo2{..., "alt": coalesce(alt, asset->altText)}
+}`
+
+export function imageAlt(image, fallback) {
+  const alt = image?.alt || image?.altText || image?.asset?.altText
+  if (typeof alt === 'string' && alt.trim()) return alt.trim()
+  return fallback
 } 

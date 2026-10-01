@@ -45,6 +45,12 @@ const TitleWrapper = styled.button`
   padding: 0;
   display: inline-block;
   transform-origin: left center;
+  border-radius: 2px;
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 4px;
+  }
 `
 
 const Title = styled.div`
@@ -85,6 +91,11 @@ const ResetButton = styled.button`
     pointer-events: none;
     display: block;
   }
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 3px;
+  }
 `
 
 const RightCluster = styled.div`
@@ -101,6 +112,7 @@ const NavList = styled.nav`
   overflow: hidden;
   max-height: ${props => props.$isOpen ? '300px' : '0'};
   opacity: ${props => props.$isOpen ? 1 : 0};
+  visibility: ${props => props.$isOpen ? 'visible' : 'hidden'};
   transition: all 0.3s ease;
   padding: 0;
   margin: ${props => props.$isOpen ? '1rem 0 .5rem' : '0'};
@@ -110,6 +122,7 @@ const NavList = styled.nav`
     gap: 1rem;
     max-height: none;
     opacity: 1;
+    visibility: visible;
     overflow: visible;
     padding: 0;
     margin: 0;
@@ -124,6 +137,12 @@ const NavItem = styled(NavLink)`
   height: 32px;
   position: relative;
   overflow: hidden;
+  border-radius: 19px;
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 3px;
+  }
 
   @media (min-width: 768px) {
     height: 38px;
@@ -162,7 +181,7 @@ const Circle = styled.div`
     border-radius: 19px;
     font-size: 1.1rem;
 
-    ${NavItem}:hover &, ${NavItem}.active & {
+    ${NavItem}:hover &, ${NavItem}:focus-visible &, ${NavItem}.active & {
       width: 120px;
       padding: 0 1.5rem 0 1rem;
       justify-content: flex-start;
@@ -190,7 +209,7 @@ const NavText = styled.span`
     opacity: 0;
     font-size: 1.2rem;
     
-    ${NavItem}:hover &, ${NavItem}.active & {
+    ${NavItem}:hover &, ${NavItem}:focus-visible &, ${NavItem}.active & {
       opacity: 1;
     }
   }
@@ -208,6 +227,11 @@ const MenuButton = styled.button`
 
   &:hover {
     color: white;
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 3px;
   }
 
   @media (max-width: 767px) {
@@ -273,19 +297,19 @@ export default function Header() {
 
   const renderNavItems = () => (
     <>
-      <NavItem to="/photo" onClick={handleNavClick('/photo')}>
+      <NavItem to="/photo" aria-label="Photo" onClick={handleNavClick('/photo')}>
         <Circle color={route.photo}>
           <FontAwesomeIcon icon={faCamera} />
         </Circle>
         <NavText>photo</NavText>
       </NavItem>
-      <NavItem to="/video" onClick={handleNavClick('/video')}>
+      <NavItem to="/video" aria-label="Video" onClick={handleNavClick('/video')}>
         <Circle color={route.video}>
           <FontAwesomeIcon icon={faVideo} />
         </Circle>
         <NavText>video</NavText>
       </NavItem>
-      <NavItem to="/about" onClick={handleNavClick('/about')}>
+      <NavItem to="/about" aria-label="About" onClick={handleNavClick('/about')}>
         <Circle color={route.about}>
           <FontAwesomeIcon icon={faBook} />
         </Circle>
@@ -300,7 +324,13 @@ export default function Header() {
         <TopSection>
           <TitleSection>
             {isMobile && (
-              <MenuButton onClick={handleMenuToggle} aria-label="Open menu">
+              <MenuButton
+                type="button"
+                onClick={handleMenuToggle}
+                aria-label={isOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={isOpen}
+                aria-controls="site-nav"
+              >
                 <FontAwesomeIcon icon={faBars} size="lg" />
               </MenuButton>
             )}
@@ -312,7 +342,7 @@ export default function Header() {
           </TitleSection>
           <RightCluster>
             {!isMobile && (
-              <NavList $isOpen={isOpen}>
+              <NavList id="site-nav" aria-label="Pages" $isOpen={isOpen}>
                 {renderNavItems()}
               </NavList>
             )}
@@ -322,7 +352,7 @@ export default function Header() {
           </RightCluster>
         </TopSection>
         {isMobile && (
-          <NavList $isOpen={isOpen}>
+          <NavList id="site-nav" aria-label="Pages" $isOpen={isOpen}>
             {renderNavItems()}
           </NavList>
         )}
