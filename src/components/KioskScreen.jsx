@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { font, route } from '../styles/theme'
 import MetroMachineFace from './MetroMachineFace'
 import { KIOSK_PANEL_W, KIOSK_PANEL_H, KIOSK_RADIUS_PX } from '../lib/kioskSize'
@@ -463,18 +463,15 @@ export default function KioskScreen({ live = false }) {
   const weather = useNycWeather()
   const clips = useRecentVideos()
   const [playingId, setPlayingId] = useState(null)
-  const navLock = useRef(false)
 
   useEffect(() => {
-    if (!live) {
-      setPlayingId(null)
-      navLock.current = false
-    }
+    if (!live) setPlayingId(null)
   }, [live])
 
   const goTo = (to) => {
-    if (!live || navLock.current) return
-    navLock.current = true
+    if (!live) return
+    // tryLeave plays the close. If it declines, navigate anyway so a
+    // click cannot vanish into a lock that never clears.
     if (kioskLeave?.tryLeave?.(to)) return
     navigate(to)
   }
