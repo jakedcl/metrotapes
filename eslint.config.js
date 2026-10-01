@@ -35,6 +35,9 @@ export default [
       ...react.configs['jsx-runtime'].rules,
       ...reactHooks.configs.recommended.rules,
       'react/jsx-no-target-blank': 'off',
+      // JS, not TypeScript, and PropTypes are not part of this codebase.
+      // Requiring them produced ~170 errors without catching real bugs.
+      'react/prop-types': 'off',
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
