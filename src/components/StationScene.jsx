@@ -169,6 +169,14 @@ function ndcXFromEvent(e) {
   return ((e.clientX - rect.left) / rect.width) * 2 - 1
 }
 
+/** NDC X across the whole station stage (edge strips + missed canvas clicks). */
+function ndcXFromClient(clientX, root) {
+  if (clientX == null || !root?.getBoundingClientRect) return null
+  const rect = root.getBoundingClientRect()
+  if (!rect.width) return null
+  return ((clientX - rect.left) / rect.width) * 2 - 1
+}
+
 /** Active camera shot — phones use a pulled-back kiosk framing. */
 function resolvePov(key, aspect, kioskZoom = 'close') {
   if (key === 'kiosk') {
@@ -1420,21 +1428,64 @@ const NoWebGL = styled.div`
   letter-spacing: -0.02em;
 `
 
+/**
+ * Runtime budget guard.
+ * Soften DPR first (fill rate), then drop tier (lights / extras / bloom).
+ * Never promotes. Warm-up + cooldown so fly-ins / tab returns don't panic.
+ */
 function GfxWatch() {
-  const { drop, tier } = useGfx()
-  const acc = useRef({ t: 0, n: 0, warm: 0 })
-  useFrame((_, dt) => {
-    if (tier !== 'high') return
-    acc.current.warm += dt
-    if (acc.current.warm < 4) return
-    acc.current.t += dt
-    acc.current.n += 1
-    if (acc.current.t < 2) return
-    const fps = acc.current.n / acc.current.t
-    acc.current.t = 0
-    acc.current.n = 0
-    if (fps < 40) drop()
+  const { soften, drop, canSoften, canDrop } = useGfx()
+  const acc = useRef({
+    warm: 0,
+    cool: 0,
+    t: 0,
+    n: 0,
+    hitches: 0,
   })
+
+  useFrame((_, dt) => {
+    if (!canSoften && !canDrop) return
+
+    const a = acc.current
+    // Cap so a background tab resume doesn't look like 2fps forever.
+    const frame = Math.min(Math.max(dt, 0), 0.1)
+    a.warm += frame
+    if (a.cool > 0) a.cool = Math.max(0, a.cool - frame)
+    if (a.warm < 3) return
+
+    a.t += frame
+    a.n += 1
+    // ~21fps frame = hitch (60Hz target; 48ms+ is a real stall).
+    if (frame > 0.048) a.hitches += 1
+
+    if (a.t < 1.25) return
+
+    const fps = a.n / a.t
+    const hitchRate = a.hitches / a.t
+    a.t = 0
+    a.n = 0
+    a.hitches = 0
+
+    if (a.cool > 0) return
+
+    // Sustained jank, not a single spike.
+    const bad = fps < 36 || hitchRate >= 1.6
+    if (!bad) return
+
+    if (canSoften) {
+      soften()
+      a.cool = 2.4
+      a.warm = 1.2
+      return
+    }
+
+    if (canDrop) {
+      drop()
+      a.cool = 3.6
+      a.warm = 0.8
+    }
+  })
+
   return null
 }
 
@@ -1603,6 +1654,23 @@ const ChromeBar = styled.div`
   align-items: center;
   gap: 0.15rem;
   pointer-events: auto;
+`
+
+/** Far left / right of the stage — look aside even when HTML screens eat canvas hits. */
+const EdgeHit = styled.button`
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  ${(p) => (p.$side === 'left' ? 'left: 0;' : 'right: 0;')}
+  width: min(18vw, 7.5rem);
+  z-index: 4;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: ew-resize;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
 `
 
 const ChromeBtn = styled.button`
@@ -4762,20 +4830,28 @@ export default function StationScene({
     navigate(to)
   }, [navigate, leaveRef, pov])
 
-  const lookAside = useCallback((e) => {
-    if (dimmed || pov !== 'kiosk' || kioskZoom !== 'close' || zap !== 'open') return
-    const x = ndcXFromEvent(e)
-    if (x == null) return
-    if (x < -0.28) {
-      setCamSettled(false)
-      setKioskZoom('left')
-      return
+  const layerRef = useRef(null)
+
+  const lookAside = useCallback((e, forcedDir = null) => {
+    if (dimmed) return
+    // Already looking left/right — chrome pans; don't nest another edge click
+    if (pov === 'kiosk' && isLandscapeZoom(kioskZoom)) return
+
+    let dir = forcedDir
+    if (!dir) {
+      const x = typeof e?.clientX === 'number'
+        ? ndcXFromClient(e.clientX, layerRef.current)
+        : ndcXFromEvent(e)
+      if (x == null) return
+      if (x < -0.28) dir = 'left'
+      else if (x > 0.28) dir = 'right'
+      else return
     }
-    if (x > 0.28) {
-      setCamSettled(false)
-      setKioskZoom('right')
-    }
-  }, [dimmed, pov, kioskZoom, zap])
+
+    setCamSettled(false)
+    setKioskZoom(dir)
+    if (pov !== 'kiosk') navigate('/')
+  }, [dimmed, pov, kioskZoom, navigate])
 
   const handleArrive = useCallback((next) => {
     onArrive?.(next)
@@ -4881,7 +4957,7 @@ export default function StationScene({
   }
 
   return (
-    <Layer $hit={!dimmed} $page={pageView}>
+    <Layer ref={layerRef} $hit={!dimmed} $page={pageView}>
       <SceneWrap $dim={dimmed}>
       <Suspense fallback={null}>
         <Canvas
@@ -4997,6 +5073,22 @@ export default function StationScene({
           aria-hidden
         />
       )}
+      {!dimmed && !(pov === 'kiosk' && isLandscapeZoom(kioskZoom)) ? (
+        <>
+          <EdgeHit
+            type="button"
+            $side="left"
+            aria-label="Look left"
+            onClick={(e) => lookAside(e, 'left')}
+          />
+          <EdgeHit
+            type="button"
+            $side="right"
+            aria-label="Look right"
+            onClick={(e) => lookAside(e, 'right')}
+          />
+        </>
+      ) : null}
       {!dimmed && (isWallPov(pov) || (kioskLive && pov === 'kiosk' && (landscape || (kioskZoom === 'close' && kioskArrived && zap === 'open')))) ? (
         <ChromeBar>
           {landscape ? (

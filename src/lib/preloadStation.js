@@ -1,4 +1,5 @@
 import { client, urlFor } from './sanity'
+import { shouldConserveBandwidth } from './gfxTier'
 
 export const STATION_ASSETS = [
   '/metrocard.png',
@@ -35,9 +36,12 @@ async function preloadPhotos() {
     const data = await client.fetch(`*[_type == "photos"][0].images`)
     if (data?.length) {
       wallCache.photo = { status: 'ready', data, detail: '' }
+      const lean = shouldConserveBandwidth()
       const urls = data
-        .slice(0, 8)
-        .map((photo, i) => urlFor(photo).width(i === 0 ? 1200 : 560).url())
+        .slice(0, lean ? 3 : 8)
+        .map((photo, i) => urlFor(photo).width(
+          lean ? (i === 0 ? 720 : 360) : (i === 0 ? 1200 : 560),
+        ).url())
         .filter(Boolean)
       await Promise.all(urls.map(loadImage))
       return
@@ -69,8 +73,9 @@ async function preloadVideos() {
       return
     }
     wallCache.video = { status: 'ready', data: data.videos, detail: '' }
+    const lean = shouldConserveBandwidth()
     const thumbs = data.videos
-      .slice(0, 6)
+      .slice(0, lean ? 2 : 6)
       .map((v) => v.thumbnail || v.thumb || v.poster)
       .filter(Boolean)
     await Promise.all(thumbs.map(loadImage))
@@ -94,9 +99,10 @@ async function preloadAbout() {
     }`)
     if (data) {
       wallCache.about = { status: 'ready', data, detail: '' }
+      const lean = shouldConserveBandwidth()
       const urls = [
-        data.photo1 ? urlFor(data.photo1).width(1400).url() : '',
-        data.photo2 ? urlFor(data.photo2).width(800).url() : '',
+        data.photo1 ? urlFor(data.photo1).width(lean ? 800 : 1400).url() : '',
+        lean ? '' : (data.photo2 ? urlFor(data.photo2).width(800).url() : ''),
       ].filter(Boolean)
       await Promise.all(urls.map(loadImage))
       return

@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 /**
  * Practical 3D: one scene, three GPU budgets.
@@ -6,8 +14,12 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState } fro
  * Fill rate (pixels × lights × materials) is the usual killer on phones.
  * We never promote mid-session — dropping is cheap, rebuilding textures is not.
  *
+ * Runtime adapt:
+ * - Soften DPR first (cheap fill-rate cut).
+ * - Then step high → mid → low (bloom / extras / lights / grain).
+ * - Bad connection (saveData / 2g) forces low.
+ *
  * Look (lo-fi station):
- * - Mobile stays 1× DPR (chunky on purpose).
  * - Shared CSS grain sits over canvas AND HTML screens so LCDs aren't 4K stickers.
  * - Light CA fringe on the same film layer (not WebGL barrel / fisheye).
  */
@@ -78,6 +90,24 @@ export const GFX = {
   },
 }
 
+function tierDprMax(tier) {
+  const dpr = GFX[tier].dpr
+  return Array.isArray(dpr) ? dpr[1] : dpr
+}
+
+function isSlowConnection(conn) {
+  if (!conn) return false
+  if (conn.saveData) return true
+  const et = conn.effectiveType
+  return et === '2g' || et === 'slow-2g'
+}
+
+/** True when we should shrink preload / prefer low bandwidth. */
+export function shouldConserveBandwidth() {
+  if (typeof navigator === 'undefined') return false
+  return isSlowConnection(navigator.connection)
+}
+
 export function detectGfxTier() {
   if (typeof window === 'undefined') return 'mid'
 
@@ -85,13 +115,13 @@ export function detectGfxTier() {
   if (forced === 'low' || forced === 'mid' || forced === 'high') return forced
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const saveData = Boolean(navigator.connection?.saveData)
   const coarse = window.matchMedia('(pointer: coarse)').matches
   const narrow = window.innerWidth < 768
   const cores = navigator.hardwareConcurrency || 8
   const mem = navigator.deviceMemory
+  const conn = navigator.connection
 
-  if (reduced || saveData) return 'low'
+  if (reduced || isSlowConnection(conn)) return 'low'
   if (narrow) return 'low'
   // Chrome caps deviceMemory at 8 (= "8GB or more"). Phones often report 4.
   if (typeof mem === 'number' && mem <= 4) return 'low'
@@ -100,22 +130,83 @@ export function detectGfxTier() {
   return 'mid'
 }
 
+function stepDown(tier) {
+  if (tier === 'high') return 'mid'
+  if (tier === 'mid') return 'low'
+  return 'low'
+}
+
 const GfxContext = createContext(null)
 
 export function GfxProvider({ children }) {
   const [tier, setTier] = useState(detectGfxTier)
+  const [dprMax, setDprMax] = useState(null)
   const startRef = useRef(tier)
+  const forcedRef = useRef(
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('gfx')
+      : null,
+  )
+
+  const soften = useCallback(() => {
+    setDprMax((prev) => {
+      const ceiling = prev ?? tierDprMax(tier)
+      if (ceiling <= 1) return 1
+      // Step down in 0.25 chunks; floor at 1.
+      return Math.max(1, Math.round((ceiling - 0.25) * 100) / 100)
+    })
+  }, [tier])
 
   const drop = useCallback(() => {
-    setTier((current) => (current === 'high' ? 'mid' : current))
+    if (forcedRef.current === 'low') return
+    setTier((current) => {
+      const next = stepDown(current)
+      if (next === current) return current
+      // New tier brings its own DPR budget; clear soft cap.
+      setDprMax(null)
+      return next
+    })
   }, [])
+
+  // Bad network mid-session → collapse to low (bandwidth + thermal crush).
+  useEffect(() => {
+    const conn = typeof navigator !== 'undefined' ? navigator.connection : null
+    if (!conn || forcedRef.current) return undefined
+
+    const apply = () => {
+      if (!isSlowConnection(conn)) return
+      setTier((t) => (t === 'low' ? t : 'low'))
+      setDprMax(null)
+    }
+
+    apply()
+    conn.addEventListener('change', apply)
+    return () => conn.removeEventListener('change', apply)
+  }, [])
+
+  const settings = useMemo(() => {
+    const base = GFX[tier]
+    const min = Array.isArray(base.dpr) ? base.dpr[0] : 1
+    const max = dprMax ?? (Array.isArray(base.dpr) ? base.dpr[1] : base.dpr)
+    return {
+      ...base,
+      dpr: [min, Math.max(min, max)],
+    }
+  }, [tier, dprMax])
+
+  const effectiveMax = settings.dpr[1]
+  const canSoften = effectiveMax > 1.01
+  const canDrop = tier !== 'low' && forcedRef.current !== 'low'
 
   const value = useMemo(() => ({
     tier,
-    settings: GFX[tier],
+    settings,
     startSettings: GFX[startRef.current],
+    soften,
     drop,
-  }), [drop, tier])
+    canSoften,
+    canDrop,
+  }), [tier, settings, soften, drop, canSoften, canDrop])
 
   return <GfxContext.Provider value={value}>{children}</GfxContext.Provider>
 }
@@ -127,7 +218,10 @@ export function useGfx() {
       tier: 'mid',
       settings: GFX.mid,
       startSettings: GFX.mid,
+      soften: () => {},
       drop: () => {},
+      canSoften: false,
+      canDrop: false,
     }
   }
   return value
