@@ -1,17 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { client, urlFor } from '../lib/sanity'
 import { getWallPageCache, whenStationPreloaded } from '../lib/preloadStation'
-import styled, { keyframes, css } from 'styled-components'
+import styled from 'styled-components'
 import ImageModal from '../components/ImageModal'
 import OrnatePhotoFrame from '../components/OrnatePhotoFrame'
 import FrostNote from '../components/FrostNote'
 import { font } from '../styles/theme'
 
-const drift = keyframes`
-  from { transform: translateX(-50%); }
-  to { transform: translateX(0); }
-`
+const AUTO_MS = 4500
+const GAP = 7
+const COPIES = 5 // odd — we sit on the middle copy for infinite wrap
 
 const Panel = styled.div`
   width: 100%;
@@ -28,7 +27,6 @@ const Panel = styled.div`
   font-family: ${font};
 `
 
-/** Frame takes every leftover pixel above the fixed strip. */
 const Stage = styled.div`
   flex: 1 1 auto;
   min-height: 0;
@@ -49,65 +47,331 @@ const Slide = styled.img`
   object-fit: cover;
   display: block;
   opacity: ${(p) => (p.$show ? 1 : 0)};
-  transition: opacity 1.1s ease;
+  transition: opacity 0.85s ease;
   pointer-events: none;
   z-index: ${(p) => (p.$show ? 2 : 1)};
 `
 
-/** Fixed low strip — doesn't steal vertical space from the frame. */
 const StripRail = styled.div`
+  position: relative;
   flex: 0 0 auto;
   width: 100%;
   overflow: hidden;
-  padding: 8px 0 10px;
+  padding: 10px 0 12px;
   background:
     linear-gradient(180deg, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.45)),
     #100c08;
   border-top: 1px solid rgba(196, 160, 106, 0.16);
-  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  /* Center tick — the “gate” the film passes through */
+  &::after {
+    content: '';
+    position: absolute;
+    top: 6px;
+    bottom: 8px;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      180deg,
+      transparent,
+      rgba(196, 160, 106, 0.85) 18%,
+      rgba(196, 160, 106, 0.85) 82%,
+      transparent
+    );
+    pointer-events: none;
+    z-index: 3;
+    opacity: 0.7;
+  }
 `
 
 const StripTrack = styled.div`
   display: flex;
   width: max-content;
-  gap: 7px;
-  padding: 0 8px;
-  ${(p) => (p.$run ? css`
-    animation: ${drift} ${p.$sec}s linear infinite;
-  ` : '')}
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
+  gap: ${GAP}px;
+  padding: 0;
+  will-change: transform;
 `
 
-const StripShot = styled.button`
+const StripShot = styled.div`
   flex: 0 0 auto;
-  width: clamp(88px, 14vw, 132px);
+  width: var(--shot-w, 110px);
   aspect-ratio: 4 / 3;
-  padding: 0;
-  border: 2px solid ${(p) => (p.$on ? '#c4a06a' : 'rgba(255, 230, 190, 0.16)')};
+  border: 2px solid ${(p) => (p.$on ? '#c4a06a' : 'rgba(255, 230, 190, 0.14)')};
   background: #000;
-  cursor: pointer;
   overflow: hidden;
+  transform: scale(${(p) => (p.$on ? 1.06 : 1)});
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  box-shadow: ${(p) => (p.$on ? '0 0 0 1px rgba(196, 160, 106, 0.35)' : 'none')};
 
   img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-    opacity: ${(p) => (p.$on ? 1 : 0.75)};
-    transition: opacity 0.25s ease;
-  }
-
-  &:hover {
-    border-color: #d4b07a;
-  }
-
-  &:hover img {
-    opacity: 1;
+    opacity: ${(p) => (p.$on ? 1 : 0.72)};
+    pointer-events: none;
   }
 `
+
+function shotWidth() {
+  if (typeof window === 'undefined') return 110
+  const w = window.innerWidth
+  return Math.round(Math.min(132, Math.max(88, w * 0.14)))
+}
+
+function FilmStrip({
+  photos,
+  index,
+  onIndexChange,
+  onInteract,
+}) {
+  const railRef = useRef(null)
+  const trackRef = useRef(null)
+  const xRef = useRef(0)
+  const velRef = useRef(0)
+  const dragRef = useRef(null)
+  const rafRef = useRef(0)
+  const cellRef = useRef(shotWidth() + GAP)
+  const skipEaseRef = useRef(false)
+  const activeRef = useRef(index)
+  const n = photos.length
+  const [shotW, setShotW] = useState(shotWidth)
+  const [active, setActive] = useState(index)
+
+  const cells = useMemo(() => {
+    const out = []
+    for (let c = 0; c < COPIES; c += 1) {
+      for (let i = 0; i < n; i += 1) {
+        out.push({ photo: photos[i], real: i, key: `${c}-${i}` })
+      }
+    }
+    return out
+  }, [photos, n])
+
+  const loopW = () => n * cellRef.current
+
+  const applyX = useCallback((x) => {
+    const track = trackRef.current
+    if (!track) return
+    const loop = loopW()
+    if (loop > 0) {
+      const mid = loop * Math.floor(COPIES / 2)
+      while (x < mid - loop * 0.5) x += loop
+      while (x > mid + loop * 1.5) x -= loop
+    }
+    xRef.current = x
+    track.style.transform = `translate3d(${-x}px, 0, 0)`
+  }, [n])
+
+  const indexFromX = useCallback((x) => {
+    const rail = railRef.current
+    if (!rail || n < 1) return 0
+    const cell = cellRef.current
+    const center = x + rail.clientWidth / 2
+    const i = Math.round((center - cell / 2) / cell)
+    return ((i % n) + n) % n
+  }, [n])
+
+  const xForIndex = useCallback((i) => {
+    const rail = railRef.current
+    if (!rail) return 0
+    const cell = cellRef.current
+    const loop = loopW()
+    const mid = loop * Math.floor(COPIES / 2)
+    const targetCenter = mid + i * cell + cell / 2
+    return targetCenter - rail.clientWidth / 2
+  }, [n])
+
+  const reportIndex = useCallback((next) => {
+    activeRef.current = next
+    setActive(next)
+    skipEaseRef.current = true
+    onIndexChange(next)
+  }, [onIndexChange])
+
+  const syncActive = useCallback((x) => {
+    const next = indexFromX(x)
+    if (next !== activeRef.current) reportIndex(next)
+  }, [indexFromX, reportIndex])
+
+  /** Ease strip so photo `real` lands on the center tick. */
+  const easeToIndex = useCallback((real, { report = true } = {}) => {
+    cancelAnimationFrame(rafRef.current)
+    if (report) reportIndex(real)
+
+    const start = xRef.current
+    const goal = xForIndex(real)
+    const loop = loopW()
+    let delta = goal - start
+    if (loop > 0) {
+      while (delta > loop / 2) delta -= loop
+      while (delta < -loop / 2) delta += loop
+    }
+    // Already there
+    if (Math.abs(delta) < 1) {
+      applyX(goal)
+      activeRef.current = real
+      setActive(real)
+      return
+    }
+
+    const end = start + delta
+    const dur = Math.min(700, Math.max(320, Math.abs(delta) * 0.55))
+    const t0 = performance.now()
+
+    const tick = (now) => {
+      if (dragRef.current) return
+      const t = Math.min(1, (now - t0) / dur)
+      const e = 1 - (1 - t) ** 3
+      applyX(start + (end - start) * e)
+      if (t < 1) rafRef.current = requestAnimationFrame(tick)
+      else {
+        applyX(xForIndex(real))
+        activeRef.current = real
+        setActive(real)
+      }
+    }
+    rafRef.current = requestAnimationFrame(tick)
+  }, [applyX, xForIndex, reportIndex, n])
+
+  useEffect(() => {
+    const measure = () => {
+      const w = shotWidth()
+      setShotW(w)
+      cellRef.current = w + GAP
+      applyX(xForIndex(index))
+      activeRef.current = index
+      setActive(index)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [n, photos])
+
+  // Parent-driven advance (auto-rotate) → ease strip so that photo hits center.
+  useEffect(() => {
+    if (skipEaseRef.current) {
+      skipEaseRef.current = false
+      activeRef.current = index
+      setActive(index)
+      return undefined
+    }
+    if (dragRef.current) return undefined
+    easeToIndex(index, { report: false })
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [index, easeToIndex])
+
+  const coast = useCallback(() => {
+    cancelAnimationFrame(rafRef.current)
+    const step = () => {
+      if (dragRef.current) return
+      let v = velRef.current
+      if (Math.abs(v) < 0.05) {
+        const nearest = indexFromX(xRef.current)
+        easeToIndex(nearest, { report: true })
+        return
+      }
+      v *= 0.955
+      velRef.current = v
+      applyX(xRef.current + v)
+      syncActive(xRef.current)
+      rafRef.current = requestAnimationFrame(step)
+    }
+    rafRef.current = requestAnimationFrame(step)
+  }, [applyX, indexFromX, easeToIndex, syncActive])
+
+  const onPointerDown = (e) => {
+    onInteract?.()
+    cancelAnimationFrame(rafRef.current)
+    velRef.current = 0
+    dragRef.current = {
+      id: e.pointerId,
+      startX: e.clientX,
+      origin: xRef.current,
+      lastX: e.clientX,
+      lastT: performance.now(),
+      moved: false,
+    }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  const onPointerMove = (e) => {
+    const d = dragRef.current
+    if (!d || d.id !== e.pointerId) return
+    const now = performance.now()
+    const dx = e.clientX - d.startX
+    if (Math.abs(dx) > 5) d.moved = true
+    applyX(d.origin - dx)
+    const dt = Math.max(8, now - d.lastT)
+    velRef.current = -(e.clientX - d.lastX) / dt * 16
+    d.lastX = e.clientX
+    d.lastT = now
+    syncActive(xRef.current)
+  }
+
+  const onPointerUp = (e) => {
+    const d = dragRef.current
+    if (!d || d.id !== e.pointerId) return
+    dragRef.current = null
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      /* already released */
+    }
+
+    // Tap: scroll that photo to the center tick — strip is source of truth.
+    if (!d.moved) {
+      const rail = railRef.current
+      if (!rail) return
+      const rect = rail.getBoundingClientRect()
+      const local = e.clientX - rect.left + xRef.current
+      const abs = Math.floor(local / cellRef.current)
+      const real = ((abs % n) + n) % n
+      onInteract?.()
+      easeToIndex(real, { report: true })
+      return
+    }
+    coast()
+  }
+
+  return (
+    <StripRail
+      ref={railRef}
+      aria-label="Photo strip — drag to scroll"
+      style={{ '--shot-w': `${shotW}px` }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      <StripTrack ref={trackRef}>
+        {cells.map((cell) => (
+          <StripShot
+            key={cell.key}
+            $on={cell.real === active}
+            aria-hidden
+          >
+            <img
+              src={urlFor(cell.photo).width(360).height(270).fit('crop').url()}
+              alt=""
+              loading="lazy"
+              draggable={false}
+            />
+          </StripShot>
+        ))}
+      </StripTrack>
+    </StripRail>
+  )
+}
 
 export default function PhotoPage() {
   const seed = getWallPageCache('photo')
@@ -121,6 +385,7 @@ export default function PhotoPage() {
   const [layers, setLayers] = useState([{ key: 0, index: 0, show: true }])
   const layerKey = useRef(0)
   const aspects = useRef({})
+  const resumeTimer = useRef(0)
 
   useEffect(() => {
     let alive = true
@@ -159,7 +424,7 @@ export default function PhotoPage() {
     })
     const clear = window.setTimeout(() => {
       setLayers((prev) => prev.filter((l) => l.show))
-    }, 1200)
+    }, 1000)
     return () => window.clearTimeout(clear)
   }, [featuredIndex])
 
@@ -168,6 +433,7 @@ export default function PhotoPage() {
     if (cached) setAspect(cached)
   }, [featuredIndex])
 
+  // Auto-advance every ~4.5s — strip recenters, frame follows.
   useEffect(() => {
     if (status !== 'ready' || photos.length < 2 || paused || isModalOpen) return undefined
     const reduced = typeof window !== 'undefined'
@@ -176,9 +442,17 @@ export default function PhotoPage() {
 
     const id = window.setInterval(() => {
       setFeaturedIndex((i) => (i + 1) % photos.length)
-    }, 5000)
+    }, AUTO_MS)
     return () => window.clearInterval(id)
   }, [status, photos.length, paused, isModalOpen])
+
+  const bumpPause = useCallback(() => {
+    setPaused(true)
+    window.clearTimeout(resumeTimer.current)
+    resumeTimer.current = window.setTimeout(() => setPaused(false), 5000)
+  }, [])
+
+  useEffect(() => () => window.clearTimeout(resumeTimer.current), [])
 
   const handleModalClose = (newImage) => {
     if (newImage) setSelectedImage(newImage)
@@ -202,14 +476,7 @@ export default function PhotoPage() {
   }
 
   const featured = photos[featuredIndex] || photos[0]
-  const strip = useMemo(() => {
-    if (!photos.length) return []
-    const base = photos.length < 6 ? [...photos, ...photos, ...photos] : photos
-    return [...base, ...base]
-  }, [photos])
-
   const mediaItems = photos.map((photo) => ({ type: 'image', image: photo }))
-  const stripSec = Math.max(28, photos.length * 4.5)
   const caption = `${String(featuredIndex + 1).padStart(2, '0')} / ${String(photos.length).padStart(2, '0')}`
 
   return (
@@ -225,10 +492,6 @@ export default function PhotoPage() {
                 aspect={aspect}
                 caption={caption}
                 onClick={() => open(featured, featuredIndex)}
-                onMouseEnter={() => setPaused(true)}
-                onMouseLeave={() => setPaused(false)}
-                onFocus={() => setPaused(true)}
-                onBlur={() => setPaused(false)}
                 aria-label="Open featured photo"
               >
                 {layers.map((layer) => {
@@ -247,31 +510,14 @@ export default function PhotoPage() {
               </OrnatePhotoFrame>
             </Stage>
 
-            <StripRail aria-label="Photo strip">
-              <StripTrack $run={photos.length > 1} $sec={stripSec}>
-                {strip.map((photo, i) => {
-                  const real = i % photos.length
-                  const on = real === featuredIndex
-                  return (
-                    <StripShot
-                      key={`${photo.asset?._ref || real}-${i}`}
-                      type="button"
-                      $on={on}
-                      onClick={() => setFeaturedIndex(real)}
-                      aria-label={`Show photo ${real + 1}`}
-                      aria-current={on ? 'true' : undefined}
-                    >
-                      <img
-                        src={urlFor(photo).width(360).height(270).fit('crop').url()}
-                        alt=""
-                        loading="lazy"
-                        draggable={false}
-                      />
-                    </StripShot>
-                  )
-                })}
-              </StripTrack>
-            </StripRail>
+            {photos.length > 1 ? (
+              <FilmStrip
+                photos={photos}
+                index={featuredIndex}
+                onIndexChange={setFeaturedIndex}
+                onInteract={bumpPause}
+              />
+            ) : null}
           </>
         ) : null}
       </Panel>
