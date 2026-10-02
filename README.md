@@ -11,6 +11,7 @@ Live at [metrotapes.com](https://metrotapes.com).
 - Content (photos, about text, blog posts and the video playlist id) comes from Sanity.
 - Videos are read from a YouTube playlist through a small serverless endpoint at `/api/videos`, which falls back to the playlist's RSS feed when no API key is set.
 - The Sanity Studio lives in `studio/` and is built into the deployed site under `/studio`.
+- A longer walkthrough of routing, preloading and the videos endpoint is in [docs/how-it-works.md](docs/how-it-works.md).
 
 ## Stack
 
