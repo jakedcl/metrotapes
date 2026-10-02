@@ -30,6 +30,7 @@ const Container = styled.div`
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  isolation: isolate;
   background: #0a0b0c;
   padding: 10px 10px 24px;
   box-sizing: border-box;

@@ -14,6 +14,7 @@ const Container = styled.div`
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  isolation: isolate;
   background: #0c0e10;
   padding: 12px 14px 28px;
   box-sizing: border-box;
