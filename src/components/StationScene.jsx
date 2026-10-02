@@ -11,6 +11,11 @@ import { KIOSK_CAB_H, KIOSK_CAB_W, KIOSK_POST_H, KIOSK_BEZEL, KIOSK_PANEL_W, KIO
 import { WALL_BEZEL, layoutWallFace, getWallFace, setWallFace } from '../lib/wallSize'
 import { useGfx } from '../lib/gfxTier'
 import { completeZapPhase, shouldOpenKiosk } from '../lib/kioskPhase'
+import {
+  composerBufferStale,
+  css3dBoxChanged,
+  preserveDrawingBuffer,
+} from '../lib/stationFrame'
 
 /**
  * 3D platform. Intro: one continuous MetroCard wind-flight onto litter, then kiosk home.
@@ -1213,14 +1218,19 @@ const Layer = styled.div`
     z-index: 0;
     width: 100%;
     height: 100%;
-    opacity: ${(p) => (p.$page ? 0 : 1)};
-    transition: opacity 0.35s ease;
+    /* Never fade the canvas itself. opacity + the film blend tears the
+       drawing buffer, and the wall page already covers it when immersed. */
   }
 `
 
 const SceneWrap = styled.div`
   position: absolute;
   inset: 0;
+  /* Clip CSS-3D overflow here, not on the preserve-3d node.
+     three.js CSS3DRenderer does the same: hidden on the outer box,
+     preserve-3d on the child. Otherwise a matrix3d element grows the
+     document, the scrollbar toggles, and the canvas buffer resizes. */
+  overflow: hidden;
 `
 
 const Overlay = styled.div`
@@ -1238,7 +1248,9 @@ const Overlay = styled.div`
     display: none !important;
   `}
   ${(p) => p.$page && `
-    opacity: 1;
+    /* Beat the inline opacity the CSS-3D loop wrote. Page view stops the
+       frameloop, so that loop will not get another chance to set it. */
+    opacity: 1 !important;
     visibility: visible !important;
     perspective: none !important;
     right: 0;
@@ -1376,12 +1388,16 @@ const StationFilm = styled.div`
   &::before {
     content: '';
     position: absolute;
-    inset: -8%;
+    inset: 0;
     opacity: ${(p) => p.$grain};
     mix-blend-mode: overlay;
     background-image: url("data:image/svg+xml,${GRAIN_SVG}");
     background-size: 140px 140px;
-    animation: stationGrain 0.55s steps(2) infinite;
+    /* steps(2) only ever showed the 0% pose and the old 50% pose
+       (translate 0.9%, -1% of a layer padded 8%). Shift the tile by that
+       same amount. A transform on this blend layer is what splits the
+       canvas into tiles and glitches the lower half. */
+    animation: stationGrain 0.55s steps(2, end) infinite;
   }
 
   ${(p) => p.$ca && `
@@ -1404,11 +1420,10 @@ const StationFilm = styled.div`
   `}
 
   @keyframes stationGrain {
-    0% { transform: translate(0, 0); }
-    25% { transform: translate(-1.2%, 0.8%); }
-    50% { transform: translate(0.9%, -1%); }
-    75% { transform: translate(-0.6%, -0.5%); }
-    100% { transform: translate(0, 0); }
+    from { background-position: 0 0; }
+    /* steps(2, end) holds the halfway value in the second half.
+       2.088% / 2 = 1.044% ≈ 0.9% of the old 116% layer. */
+    to { background-position: 2.088% -2.32%; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -2835,7 +2850,10 @@ function Fluorescents() {
 }
 
 function StationBloom() {
-  const { gl, scene, camera, size } = useThree()
+  const { gl, scene, camera } = useThree()
+  const drawingSize = useMemo(() => new THREE.Vector2(), [])
+  const cssSize = useMemo(() => new THREE.Vector2(), [])
+  const sized = useRef('')
   const composer = useMemo(() => {
     const next = new EffectComposer(gl, {
       multisampling: 0,
@@ -2852,13 +2870,34 @@ function StationBloom() {
     return next
   }, [camera, gl, scene])
 
-  useLayoutEffect(() => {
-    composer.setSize(size.width, size.height)
-  }, [composer, size.height, size.width])
-
-  useEffect(() => () => composer.dispose(), [composer])
+  useEffect(() => () => {
+    composer.dispose()
+    // EffectComposer turns autoClear off and does not put it back.
+    // After a tier drop the default renderer would smear the last frame,
+    // including whatever was left in the lower half of a stale target.
+    gl.autoClear = true
+    gl.setRenderTarget(null)
+  }, [composer, gl])
 
   useFrame((_, delta) => {
+    // Sync from the drawing buffer, not CSS size alone. A DPR soften keeps
+    // CSS pixels and leaves bloom targets at the previous height — the pass
+    // then paints the top of that target and the lower canvas stays stale.
+    // updateStyle false: do not fight R3F for the canvas CSS size.
+    const drawing = gl.getDrawingBufferSize(drawingSize)
+    const key = `${drawing.x}x${drawing.y}`
+    if (sized.current !== key) {
+      if (drawing.x > 0 && drawing.y > 0 && composerBufferStale(
+        composer.inputBuffer.width,
+        composer.inputBuffer.height,
+        drawing.x,
+        drawing.y,
+      )) {
+        const css = gl.getSize(cssSize)
+        composer.setSize(css.x, css.y, false)
+      }
+      sized.current = key
+    }
     composer.render(delta)
   }, 1)
 
@@ -3779,27 +3818,30 @@ function applyCss3dCamera(root, camera, size, _canvas, camEl) {
   const widthHalf = width / 2
   const heightHalf = height / 2
   const fov = camera.projectionMatrix.elements[5] * heightHalf
-  root.style.width = `${width}px`
-  root.style.height = `${height}px`
-  root.style.perspective = `${fov}px`
-  root.style.position = 'absolute'
-  root.style.top = '0px'
-  root.style.left = '0px'
-  root.style.right = 'auto'
-  root.style.bottom = 'auto'
+  const perspective = `${fov}px`
+  const origin = isIOSWebKit() ? `${widthHalf}px ${heightHalf}px` : '50% 50%'
 
-  if (isIOSWebKit()) {
-    // WebKit resolves % origins against the Safari viewport, not this node.
-    // Pixel lengths stay element-local — same space as translate(widthHalf, heightHalf).
-    // Do NOT add getBoundingClientRect() here: that mixes viewport Y into element
-    // space and empties the frustum (blank screens). Do NOT use origin 0 0.
-    const origin = `${widthHalf}px ${heightHalf}px`
+  // Same box as last frame: do not touch layout. Writing width every frame
+  // while the camera is parked makes the canvas ResizeObserver fire.
+  if (css3dBoxChanged(root.style, width, height, perspective, origin)) {
+    root.style.width = `${width}px`
+    root.style.height = `${height}px`
+    root.style.perspective = perspective
+    root.style.position = 'absolute'
+    root.style.top = '0px'
+    root.style.left = '0px'
+    root.style.right = 'auto'
+    root.style.bottom = 'auto'
     root.style.perspectiveOrigin = origin
-    // Default OverlayCam is still 50% 50% → viewport center on iOS → HTML too low
-    // even after perspective-origin is fixed. Pin cam pivot in the same element space.
-    if (camEl) camEl.style.transformOrigin = origin
-  } else {
-    root.style.perspectiveOrigin = '50% 50%'
+    if (isIOSWebKit() && camEl) {
+      // WebKit resolves % origins against the Safari viewport, not this node.
+      // Pixel lengths stay element-local — same space as translate(widthHalf, heightHalf).
+      // Do NOT add getBoundingClientRect() here: that mixes viewport Y into element
+      // space and empties the frustum (blank screens). Do NOT use origin 0 0.
+      // Default OverlayCam is still 50% 50% → viewport center on iOS → HTML too low
+      // even after perspective-origin is fixed. Pin cam pivot in the same element space.
+      camEl.style.transformOrigin = origin
+    }
     // Chrome: leave OverlayCam at default 50% 50% (element-local). Do not write it.
   }
 
@@ -4838,6 +4880,13 @@ export default function StationScene({
   headerH = 64,
 }) {
   const { settings } = useGfx()
+  // Context flags are fixed at creation. A later tier drop cannot change them.
+  const [glConfig] = useState(() => ({
+    alpha: false,
+    antialias: settings.antialias,
+    powerPreference: settings.powerPreference,
+    preserveDrawingBuffer: preserveDrawingBuffer(settings),
+  }))
   const [use3d, setUse3d] = useState(() => hasWebGL())
   const [tabHidden, setTabHidden] = useState(
     () => typeof document !== 'undefined' && document.hidden,
@@ -5106,13 +5155,11 @@ export default function StationScene({
       <SceneWrap $dim={dimmed}>
       <Suspense fallback={null}>
         <Canvas
+          style={{ isolation: 'isolate' }}
+          resize={{ scroll: false, offsetSize: true }}
           frameloop={loop}
             dpr={settings.dpr}
-            gl={{
-              alpha: false,
-              antialias: settings.antialias,
-              powerPreference: settings.powerPreference,
-            }}
+            gl={glConfig}
             camera={{
               position: dimmed ? [0.2, 1.95, 3.6] : resolvePov(pov, undefined, kioskZoom).position,
               fov: dimmed ? 42 : resolvePov(pov, undefined, kioskZoom).fov,

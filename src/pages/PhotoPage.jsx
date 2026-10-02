@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { PHOTOS_QUERY, client, imageAlt, urlFor } from '../lib/sanity'
 import { getWallPageCache, whenStationPreloaded } from '../lib/preloadStation'
@@ -7,6 +8,7 @@ import ImageModal from '../components/ImageModal'
 import OrnatePhotoFrame from '../components/OrnatePhotoFrame'
 import FrostNote from '../components/FrostNote'
 import { font } from '../styles/theme'
+import { photoAutoplayAllowed } from '../lib/stationFrame'
 
 const AUTO_MS = 4500
 const GAP = 7
@@ -19,6 +21,9 @@ const Panel = styled.div`
   flex-direction: column;
   overflow: hidden;
   overscroll-behavior: contain;
+  /* Keep backdrop-filter (loading note) inside this page. Otherwise it
+     samples the WebGL canvas and the lower half of the station tears. */
+  isolation: isolate;
   background: #0a0908;
   color: #fff;
   box-sizing: border-box;
@@ -374,6 +379,7 @@ function FilmStrip({
 }
 
 export default function PhotoPage() {
+  const location = useLocation()
   const seed = getWallPageCache('photo')
   const [photos, setPhotos] = useState(() => (seed.status === 'ready' ? seed.data : []))
   const [status, setStatus] = useState(() => (seed.status === 'idle' ? 'loading' : seed.status))
@@ -386,6 +392,15 @@ export default function PhotoPage() {
   const layerKey = useRef(0)
   const aspects = useRef({})
   const resumeTimer = useRef(0)
+  const [tabHidden, setTabHidden] = useState(
+    () => typeof document !== 'undefined' && document.hidden,
+  )
+
+  useEffect(() => {
+    const onVis = () => setTabHidden(document.hidden)
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -434,7 +449,9 @@ export default function PhotoPage() {
   }, [featuredIndex])
 
   // Auto-advance every ~4.5s — strip recenters, frame follows.
+  // The page stays mounted on the wall even when that board is hidden.
   useEffect(() => {
+    if (!photoAutoplayAllowed(location.pathname, tabHidden)) return undefined
     if (status !== 'ready' || photos.length < 2 || paused || isModalOpen) return undefined
     const reduced = typeof window !== 'undefined'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -444,7 +461,7 @@ export default function PhotoPage() {
       setFeaturedIndex((i) => (i + 1) % photos.length)
     }, AUTO_MS)
     return () => window.clearInterval(id)
-  }, [status, photos.length, paused, isModalOpen])
+  }, [location.pathname, tabHidden, status, photos.length, paused, isModalOpen])
 
   const bumpPause = useCallback(() => {
     setPaused(true)
