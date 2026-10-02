@@ -115,9 +115,6 @@ const HeaderArea = styled.header`
   right: 0;
   z-index: 100;
   background: ${station};
-  opacity: ${(p) => (p.$show ? 1 : 0)};
-  pointer-events: ${(p) => (p.$show ? 'auto' : 'none')};
-  transition: opacity 0.9s ease;
 `
 
 const StationStage = styled.div`
@@ -216,7 +213,7 @@ function AppContent() {
       window.removeEventListener('resize', apply)
       vv?.removeEventListener('resize', apply)
     }
-  }, [entered])
+  }, [])
 
   useEffect(() => {
     // New route → wait for camera to finish turning to the wall
@@ -260,7 +257,7 @@ function AppContent() {
     <KioskLeaveProvider value={kioskLeave}>
     <Layout $pad $header={headerH}>
       <SkipLink href="#content">Skip to content</SkipLink>
-      <HeaderArea ref={headerRef} $show={entered}>
+      <HeaderArea ref={headerRef}>
         <Header />
       </HeaderArea>
       {(!onBlog && (shotFromRoute || arriving || entered)) ? (
