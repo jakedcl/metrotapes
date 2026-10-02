@@ -1,5 +1,5 @@
 import styled, { keyframes, css } from 'styled-components'
-import { font, signage, station } from '../styles/theme'
+import { font, station } from '../styles/theme'
 import { SUBWAY_LINES } from '../lib/subwayLines'
 import PropTypes from 'prop-types'
 
@@ -53,22 +53,18 @@ const Bullet = styled.div`
   background: ${(p) => p.$bg};
 `
 
-const Brand = styled.div`
-  font-family: ${font};
-  font-weight: 700;
-  font-size: clamp(1.6rem, 5vw, 1.9rem);
-  letter-spacing: 0.02em;
-  line-height: 1;
-  color: #fff;
-`
-
-const Status = styled.div`
-  font-family: ${signage};
-  font-weight: 700;
-  font-size: 0.7rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #fccc0a;
+/** Off-screen label so the loader still announces without visible copy. */
+const SrOnly = styled.span`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 `
 
 const Track = styled.div`
@@ -100,7 +96,13 @@ const SEGS = 12
 
 export default function BootScreen({ leaving = false }) {
   return (
-    <Root $leaving={leaving} aria-busy="true" aria-live="polite">
+    <Root
+      $leaving={leaving}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <SrOnly>Loading</SrOnly>
       <Strip aria-hidden="true">
         {BOOT_LINES.map((line) => (
           <Bullet
@@ -112,8 +114,6 @@ export default function BootScreen({ leaving = false }) {
           </Bullet>
         ))}
       </Strip>
-      <Brand>metrotapes</Brand>
-      <Status>Please wait</Status>
       <Track aria-hidden="true">
         {Array.from({ length: SEGS }, (_, i) => (
           <Seg key={i} $i={i} />
