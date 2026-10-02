@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { client, urlFor } from '../lib/sanity'
+import { PHOTOS_QUERY, client, imageAlt, urlFor } from '../lib/sanity'
 import { getWallPageCache, whenStationPreloaded } from '../lib/preloadStation'
 import styled from 'styled-components'
 import ImageModal from '../components/ImageModal'
@@ -397,7 +397,7 @@ export default function PhotoPage() {
         setStatus(cached.status)
         return
       }
-      client.fetch(`*[_type == "photos"][0].images`).then((data) => {
+      client.fetch(PHOTOS_QUERY).then((data) => {
         if (!alive) return
         if (data?.length) {
           setPhotos(data)
@@ -492,7 +492,7 @@ export default function PhotoPage() {
                 aspect={aspect}
                 caption={caption}
                 onClick={() => open(featured, featuredIndex)}
-                aria-label="Open featured photo"
+                aria-label={`Open featured photo: ${imageAlt(featured, 'Photograph by Ronnie Foreman')}`}
               >
                 {layers.map((layer) => {
                   const photo = photos[layer.index]
@@ -501,7 +501,8 @@ export default function PhotoPage() {
                     <Slide
                       key={layer.key}
                       src={urlFor(photo).width(1600).url()}
-                      alt=""
+                      alt={layer.show ? imageAlt(photo, 'Photograph by Ronnie Foreman') : ''}
+                      aria-hidden={layer.show ? undefined : true}
                       $show={layer.show}
                       onLoad={(e) => rememberAspect(layer.index, e.currentTarget)}
                     />

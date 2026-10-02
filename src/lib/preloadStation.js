@@ -1,4 +1,4 @@
-import { client, urlFor } from './sanity'
+import { ABOUT_QUERY, PHOTOS_QUERY, client, urlFor } from './sanity'
 import { shouldConserveBandwidth } from './gfxTier'
 
 export const STATION_ASSETS = [
@@ -33,7 +33,7 @@ function loadImage(src) {
 
 async function preloadPhotos() {
   try {
-    const data = await client.fetch(`*[_type == "photos"][0].images`)
+    const data = await client.fetch(PHOTOS_QUERY)
     if (data?.length) {
       wallCache.photo = { status: 'ready', data, detail: '' }
       const lean = shouldConserveBandwidth()
@@ -90,13 +90,7 @@ async function preloadVideos() {
 
 async function preloadAbout() {
   try {
-    const data = await client.fetch(`*[_type == "about"][0]{
-      title,
-      description,
-      photo1,
-      photo2,
-      instagramUrl
-    }`)
+    const data = await client.fetch(ABOUT_QUERY)
     if (data) {
       wallCache.about = { status: 'ready', data, detail: '' }
       const lean = shouldConserveBandwidth()

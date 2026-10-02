@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from 'react'
 import PropTypes from 'prop-types'
 import styled from 'styled-components'
-import { urlFor } from '../lib/sanity'
+import { imageAlt, urlFor } from '../lib/sanity'
 import { cushy } from '../styles/theme'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faChevronLeft, faChevronRight, faTimes } from '@fortawesome/free-solid-svg-icons'
@@ -165,14 +165,14 @@ export default function ImageModal({ isOpen, onClose, currentImage, mediaItems }
     return (
         <Overlay $isOpen={isOpen} onClick={handleOverlayClick}>
             <ModalContent>
-                <CloseButton onClick={handleCloseClick}>
+                <CloseButton type="button" onClick={handleCloseClick} aria-label="Close photo">
                     <FontAwesomeIcon icon={faTimes} />
                 </CloseButton>
-                <NavButton $direction="prev" onClick={handlePrevious}>
+                <NavButton type="button" $direction="prev" onClick={handlePrevious} aria-label="Previous photo">
                     <FontAwesomeIcon icon={faChevronLeft} />
                 </NavButton>
-                <ModalImage src={imageUrl} alt="" />
-                <NavButton $direction="next" onClick={handleNext}>
+                <ModalImage src={imageUrl} alt={imageAlt(currentImage, 'Photograph by Ronnie Foreman')} />
+                <NavButton type="button" $direction="next" onClick={handleNext} aria-label="Next photo">
                     <FontAwesomeIcon icon={faChevronRight} />
                 </NavButton>
             </ModalContent>

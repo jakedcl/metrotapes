@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unknown-property */
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { BloomEffect, EffectComposer, EffectPass, FXAAEffect, RenderPass } from 'postprocessing'
@@ -10,6 +10,7 @@ import KioskZapScreen from './KioskZapScreen'
 import { KIOSK_CAB_H, KIOSK_CAB_W, KIOSK_POST_H, KIOSK_BEZEL, KIOSK_PANEL_W, KIOSK_PANEL_H, KIOSK_SCREEN_W, KIOSK_SCREEN_H, KIOSK_RADIUS_PX, KIOSK_RADIUS_M } from '../lib/kioskSize'
 import { WALL_BEZEL, layoutWallFace, getWallFace, setWallFace } from '../lib/wallSize'
 import { useGfx } from '../lib/gfxTier'
+import { completeZapPhase, shouldOpenKiosk } from '../lib/kioskPhase'
 
 /**
  * 3D platform. Intro: one continuous MetroCard wind-flight onto litter, then kiosk home.
@@ -43,7 +44,6 @@ const TRACK_CX = TRACK_X0 + 2.05
 const RAIL_HALF = 0.72
 const PLAT_W = TRACK_X0 - WALL_X
 const TRAIN_Z = -8.4
-const TRAIN_REV = 24
 const TRAIN_Y = TRACK_Y + 0.14
 const WALL_BOARD_Z0 = -3.2
 
@@ -1433,7 +1433,7 @@ const NoWebGL = styled.div`
  * Soften DPR first (fill rate), then drop tier (lights / extras / bloom).
  * Never promotes. Warm-up + cooldown so fly-ins / tab returns don't panic.
  */
-function GfxWatch() {
+function GfxWatch({ busyRef }) {
   const { soften, drop, canSoften, canDrop } = useGfx()
   const acc = useRef({
     warm: 0,
@@ -1445,6 +1445,9 @@ function GfxWatch() {
 
   useFrame((_, dt) => {
     if (!canSoften && !canDrop) return
+    // A camera move is supposed to be heavy. Don't treat it as a reason
+    // to drop DPR mid-flight — that resizes the buffer and jerks the shot.
+    if (busyRef?.current) return
 
     const a = acc.current
     // Cap so a background tab resume doesn't look like 2fps forever.
@@ -1514,7 +1517,7 @@ function smootherstep(t) {
 
 const WALL_FLY_SEC = 1.28
 
-function CameraRig({ pov, kioskZoom = 'close', onArrive, locked = false }) {
+function CameraRig({ pov, kioskZoom = 'close', onArrive, locked = false, busyRef }) {
   const { camera, size } = useThree()
   const look = useRef(new THREE.Vector3(...CAM.lookAt))
   const goalPos = useMemo(() => new THREE.Vector3(), [])
@@ -1524,7 +1527,10 @@ function CameraRig({ pov, kioskZoom = 'close', onArrive, locked = false }) {
   const lastPov = useRef(pov)
   const flyFrom = useMemo(() => new THREE.Vector3(), [])
   const flyLookFrom = useMemo(() => new THREE.Vector3(), [])
+  const flyGoal = useMemo(() => new THREE.Vector3(), [])
+  const flyLookGoal = useMemo(() => new THREE.Vector3(), [])
   const flyFovFrom = useRef(CAM.fov)
+  const flyFovTo = useRef(CAM.fov)
   const flyT = useRef(1)
   const reducedMotion = useMemo(
     () => typeof window !== 'undefined'
@@ -1532,35 +1538,55 @@ function CameraRig({ pov, kioskZoom = 'close', onArrive, locked = false }) {
     [],
   )
   const aspect = size.width / Math.max(1, size.height)
+  const aspectRef = useRef(aspect)
+  const povRef = useRef(pov)
+  const zoomRef = useRef(kioskZoom)
+  aspectRef.current = aspect
+  povRef.current = pov
+  zoomRef.current = kioskZoom
   const shotId = pov === 'kiosk'
     ? `kiosk:${kioskZoom}:${aspect < 0.85 ? 'tall' : 'wide'}`
     : pov
+  // Wall flights ignore kioskZoom. Resetting the curve when the parent
+  // snaps zoom back to "close" on the way out was a mid-flight restart.
+  const flyKey = isWallPov(pov) ? pov : `${pov}:${kioskZoom}`
 
   useLayoutEffect(() => {
     if (locked) return
-    const shot = resolvePov(pov, aspect, kioskZoom)
+    const shot = resolvePov(pov, aspectRef.current, kioskZoom)
     camera.position.set(...shot.position)
     look.current.set(...shot.lookAt)
     camera.fov = shot.fov
     camera.lookAt(look.current)
     camera.updateProjectionMatrix()
+    // Mount only. pov/zoom are applied by the frame loop below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera])
 
   useLayoutEffect(() => {
+    const povNow = povRef.current
+    const zoomNow = zoomRef.current
     if (locked) {
       arrivedFor.current = null
-      lastPov.current = pov
+      lastPov.current = povNow
+      if (busyRef) busyRef.current = false
       return
     }
     arrivedFor.current = null
-    if (isWallPov(pov)) {
+    if (isWallPov(povNow)) {
+      const shot = resolvePov(povNow, aspectRef.current, zoomNow)
       flyT.current = 0
       flyFrom.copy(camera.position)
       flyLookFrom.copy(look.current)
       flyFovFrom.current = camera.fov
+      // Freeze the destination for this flight. Chasing a layout that
+      // shifts under the curve (header, scrollbar) is what reads as a jerk.
+      flyGoal.set(...shot.position)
+      flyLookGoal.set(...shot.lookAt)
+      flyFovTo.current = shot.fov
+      if (busyRef) busyRef.current = true
     }
-  }, [pov, kioskZoom, locked, camera, flyFrom, flyLookFrom])
+  }, [flyKey, locked, camera, flyFrom, flyLookFrom, flyGoal, flyLookGoal, busyRef])
 
   useLayoutEffect(() => {
     if (locked) return
@@ -1570,6 +1596,7 @@ function CameraRig({ pov, kioskZoom = 'close', onArrive, locked = false }) {
   useFrame((_, dt) => {
     if (locked) {
       wasLocked.current = true
+      if (busyRef) busyRef.current = false
       return
     }
 
@@ -1579,7 +1606,11 @@ function CameraRig({ pov, kioskZoom = 'close', onArrive, locked = false }) {
 
     // Already settled on this POV — freeze so the CSS kiosk overlay
     // isn't rewritten every frame (that breaks button hit-testing).
-    if (arrivedFor.current === shotId) return
+    if (arrivedFor.current === shotId) {
+      if (busyRef) busyRef.current = false
+      return
+    }
+    if (busyRef) busyRef.current = true
 
     // Intro handoff — seed look so nothing pops
     if (wasLocked.current) {
@@ -1598,6 +1629,7 @@ function CameraRig({ pov, kioskZoom = 'close', onArrive, locked = false }) {
       camera.updateProjectionMatrix()
       arrivedFor.current = shotId
       lastPov.current = pov
+      if (busyRef) busyRef.current = false
       onArrive?.(pov)
     }
 
@@ -1607,11 +1639,14 @@ function CameraRig({ pov, kioskZoom = 'close', onArrive, locked = false }) {
     }
 
     if (isWallPov(pov)) {
-      flyT.current = Math.min(1, flyT.current + d / WALL_FLY_SEC)
+      // Keep the ease on the clock. Clamping a hitch to 50ms made the
+      // shot fall behind, then catch up as a jerk on the next frames.
+      const step = Math.min(Math.max(dt, 0), 0.125)
+      flyT.current = Math.min(1, flyT.current + step / WALL_FLY_SEC)
       const u = smootherstep(flyT.current)
-      camera.position.lerpVectors(flyFrom, goalPos, u)
-      look.current.lerpVectors(flyLookFrom, goalLook, u)
-      camera.fov = THREE.MathUtils.lerp(flyFovFrom.current, shot.fov, u)
+      camera.position.lerpVectors(flyFrom, flyGoal, u)
+      look.current.lerpVectors(flyLookFrom, flyLookGoal, u)
+      camera.fov = THREE.MathUtils.lerp(flyFovFrom.current, flyFovTo.current, u)
       camera.lookAt(look.current)
       camera.updateProjectionMatrix()
       if (flyT.current >= 1) settle()
@@ -2360,7 +2395,7 @@ function CarHardware({ carL, lead, tail }) {
   )
 }
 
-function TrainCar({ maps, body, frontGeo, roofGeo, carL, carW, carH, arch, wallTop, zOffset, lead, tail, headLights }) {
+function TrainCar({ maps, body, frontGeo, roofGeo, carL, carW, wallTop, zOffset, lead, tail, headLights }) {
   const { settings } = useGfx()
   return (
     <group position={[0, 0, zOffset]}>
@@ -2447,7 +2482,7 @@ function TrainCar({ maps, body, frontGeo, roofGeo, carL, carW, carH, arch, wallT
   )
 }
 
-function Train({ invite = false }) {
+function Train({ invite = false, blockClicksRef }) {
   const { startSettings, settings } = useGfx()
   const root = useRef()
   const glowLight = useRef()
@@ -2468,12 +2503,10 @@ function Train({ invite = false }) {
     [],
   )
 
-  const maps = useMemo(() => {
-    const front = makeLabelTexture(
-      (ctx, w, h) => paintCarFront(ctx, w, h, line),
-      startSettings.trainFront,
-      startSettings.trainFront,
-    )
+  // Sides and roof do not include the route badge. Rebuilding them when
+  // the line changes painted two 2048-wide canvases on the main thread
+  // and froze clicks. Only the front texture depends on `line`.
+  const bodyMaps = useMemo(() => {
     const side = makeLabelTexture(paintCarSide, startSettings.trainSide[0], startSettings.trainSide[1])
     const sidePlatform = makeLabelTexture(
       (ctx, w, h) => paintCarSide(ctx, w, h, { reverse: true }),
@@ -2484,8 +2517,20 @@ function Train({ invite = false }) {
     roof.wrapS = THREE.RepeatWrapping
     roof.wrapT = THREE.RepeatWrapping
     roof.repeat.set(8, 1)
-    return { front, side, sidePlatform, roof }
-  }, [line, TRAIN_REV, startSettings])
+    return { side, sidePlatform, roof }
+  }, [startSettings])
+  const front = useMemo(
+    () => makeLabelTexture(
+      (ctx, w, h) => paintCarFront(ctx, w, h, line),
+      startSettings.trainFront,
+      startSettings.trainFront,
+    ),
+    [line, startSettings],
+  )
+  const maps = useMemo(
+    () => ({ front, ...bodyMaps }),
+    [front, bodyMaps],
+  )
 
   const carL = TRAIN_CAR_L
   const carW = 2.9
@@ -2505,8 +2550,11 @@ function Train({ invite = false }) {
     [carW, carH, carL, arch],
   )
   useLayoutEffect(() => () => {
-    Object.values(maps).forEach((tex) => tex.dispose())
-  }, [maps])
+    front.dispose()
+  }, [front])
+  useLayoutEffect(() => () => {
+    Object.values(bodyMaps).forEach((tex) => tex.dispose())
+  }, [bodyMaps])
   useLayoutEffect(() => () => {
     body.dispose()
     frontGeo.dispose()
@@ -2522,12 +2570,13 @@ function Train({ invite = false }) {
     const m = motion.current
     const t = state.clock.elapsedTime
     const parked = m.phase === 'parked' && !reducedMotion
+    const idleMotion = settings.idleMotion !== false
 
     const wantHover = hoverTarget.current > 0 && parked
     hover.current = THREE.MathUtils.lerp(hover.current, wantHover ? 1 : 0, 1 - Math.exp(-10 * d))
     const h = hover.current
     const call = invite && parked
-    const idle = parked ? 0.5 + 0.5 * Math.sin(t * (call ? 1.15 : 1.35)) : 0
+    const idle = parked && idleMotion ? 0.5 + 0.5 * Math.sin(t * (call ? 1.15 : 1.35)) : 0
     const s = 1 + h * 0.028 + idle * (call ? 0.018 : 0.008)
     root.current.scale.set(s, s, s)
     // Headlights stay on while rolling — parked-only used to kill them.
@@ -2572,7 +2621,9 @@ function Train({ invite = false }) {
 
   const onTrainClick = (event) => {
     event.stopPropagation()
-    if (reducedMotion) return
+    // Close-up kiosk clicks fall through the CSS-3D menu on a bad frame
+    // and used to start the departure instead of navigating.
+    if (reducedMotion || blockClicksRef?.current) return
     const m = motion.current
     if (m.phase !== 'parked') return
     hoverTarget.current = 0
@@ -2588,7 +2639,7 @@ function Train({ invite = false }) {
       onClick={onTrainClick}
       onPointerOver={(e) => {
         e.stopPropagation()
-        if (motion.current.phase === 'parked' && !reducedMotion) {
+        if (motion.current.phase === 'parked' && !reducedMotion && !blockClicksRef?.current) {
           hoverTarget.current = 1
           document.body.style.cursor = 'pointer'
         }
@@ -2653,9 +2704,18 @@ function CeilingFixture({ z, index, lit = true, flicker, gain = 5.4 }) {
     if (!lit && index > 3) return
     const pulse = flicker?.current
     const level = pulse && pulse.index === index ? pulse.mul : 1
-    if (tubeRef.current) tubeRef.current.material.emissiveIntensity = level * 10
-    if (diffuserRef.current) diffuserRef.current.material.emissiveIntensity = level * 2.2
-    if (lightRef.current) lightRef.current.intensity = level * gain
+    const tube = level * 10
+    const diff = level * 2.2
+    const litLevel = level * gain
+    // Skip the write when the tube is idle. Six fixtures were touching
+    // materials every frame even when nothing flickered.
+    const tubeMat = tubeRef.current?.material
+    if (tubeMat && tubeMat.emissiveIntensity !== tube) tubeMat.emissiveIntensity = tube
+    const diffMat = diffuserRef.current?.material
+    if (diffMat && diffMat.emissiveIntensity !== diff) diffMat.emissiveIntensity = diff
+    if (lightRef.current && lightRef.current.intensity !== litLevel) {
+      lightRef.current.intensity = litLevel
+    }
   })
 
   const y = HEIGHT - 0.34
@@ -2722,7 +2782,7 @@ function Fluorescents() {
 
   useFrame((_, dt) => {
     const f = flicker.current
-    if (reducedMotion) {
+    if (reducedMotion || settings.idleMotion === false) {
       f.index = -1
       f.mul = 1
       return
@@ -3217,7 +3277,8 @@ function makeBoardLabel(title, accent) {
   return tex
 }
 
-function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSelect, invite = false, projectHtml = true }) {
+function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSelect, invite = false, projectHtml = true, busyRef }) {
+  const { tier } = useGfx()
   const face = wall || getWallFace()
   const boards = wallBoardList()
   const labels = useMemo(
@@ -3235,6 +3296,8 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
   const ray = useMemo(() => new THREE.Raycaster(), [])
   const lastCam = useRef('')
   const lastObj = useRef({ photo: '', video: '', about: '' })
+  const shown = useRef({})
+  const lastRayAt = useRef(0)
   const reducedMotion = useMemo(
     () => typeof window !== 'undefined'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -3316,6 +3379,14 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
     camera.updateMatrixWorld()
     camera.getWorldDirection(camDir)
 
+    const moving = Boolean(busyRef?.current)
+    const now = state.clock.elapsedTime
+    // Recursive raycasts against the kiosk bevels are the expensive part of
+    // a wall flight. Skip them while the camera is moving, and on low tier
+    // don't repeat them every frame once the shot is still.
+    const runRays = !moving && (tier !== 'low' || now - lastRayAt.current >= 0.25)
+    if (runRays) lastRayAt.current = now
+
     const camXform = applyCss3dCamera(root, camera, size, gl.domElement, camEl)
     if (camXform !== lastCam.current || camEl.style.transform !== camXform) {
       lastCam.current = camXform
@@ -3347,14 +3418,19 @@ function WallBoards({ wall, wallHuds, immersed = false, immersedId = null, onSel
     let anyFacing = false
     facing.forEach(({ b, objEl, mesh, dist, seen }) => {
       let show = seen && (!closeup || b.id === closestId)
-      if (show && dist > 0.2) {
+      if (moving && shown.current[b.id] != null) {
+        show = Boolean(shown.current[b.id]) && seen
+      } else if (show && dist > 0.2 && runRays) {
         toObj.setFromMatrixPosition(mesh.matrixWorld).sub(camera.position)
         ray.set(camera.position, toObj.normalize())
         ray.far = dist - 0.1
         const hitKiosk = dist < 3.6 && kiosk && ray.intersectObject(kiosk, true).length
         const hitPillar = pillars && ray.intersectObject(pillars, true).length
         if (hitKiosk || hitPillar) show = false
+      } else if (!runRays && shown.current[b.id] === false) {
+        show = false
       }
+      shown.current[b.id] = show
       if (!show) {
         objEl.style.visibility = 'hidden'
         return
@@ -4097,7 +4173,6 @@ function paintLitterReceipt(ctx, n, seed) {
 }
 
 function paintLitterBag(ctx, n, seed) {
-  const rand = mulberry32(seed)
   const img = ctx.createImageData(n, n)
   const { data } = img
   for (let i = 0; i < n * n; i += 1) {
@@ -4672,6 +4747,8 @@ function StationWorld({
   kioskPickable = false,
   onKioskPick,
   onLookAside,
+  busyRef,
+  blockClicksRef,
 }) {
   const landscapeInvite = isLandscapeZoom(kioskZoom) && !dimmed
   const { settings } = useGfx()
@@ -4689,7 +4766,7 @@ function StationWorld({
 
   return (
     <>
-      <CameraRig pov={pov} kioskZoom={kioskZoom} onArrive={onArrive} locked={dimmed} />
+      <CameraRig pov={pov} kioskZoom={kioskZoom} onArrive={onArrive} locked={dimmed} busyRef={busyRef} />
       <Atmosphere />
       <group
         onClick={(e) => {
@@ -4718,8 +4795,9 @@ function StationWorld({
         onSelect={onBoardSelect}
         invite={landscapeInvite}
         projectHtml
+        busyRef={busyRef}
       />
-      <Train invite={landscapeInvite} />
+      <Train invite={landscapeInvite} blockClicksRef={blockClicksRef} />
       {settings.extras ? <TrainSteam /> : null}
       {settings.extras ? <VibeRat /> : null}
       <group name="kiosk-occlude">
@@ -4740,7 +4818,7 @@ function StationWorld({
         />
       ) : null}
       <ReadyPing onReady={onReady} hud={hud} wallHud={wallHud} />
-      <GfxWatch />
+      <GfxWatch busyRef={busyRef} />
       <ToneMap />
     </>
   )
@@ -4775,6 +4853,7 @@ export default function StationScene({
     obj: { photo: null, video: null, about: null },
   })
   const navigate = useNavigate()
+  const location = useLocation()
   const pov = isWallPov(shot) || shot === 'kiosk' ? shot : (POVS[shot] ? shot : 'kiosk')
   const reducedMotion = useMemo(
     () => typeof window !== 'undefined'
@@ -4786,12 +4865,21 @@ export default function StationScene({
   const [immersed, setImmersed] = useState(false)
   const [kioskZoom, setKioskZoom] = useState('close')
   const [camSettled, setCamSettled] = useState(true)
+  const [navEpoch, setNavEpoch] = useState(0)
   const pendingNav = useRef(null)
+  const suppressOpen = useRef(false)
+  const zapRef = useRef(zap)
+  const pickAt = useRef(0)
+  const cameraBusyRef = useRef(false)
+  const blockClicksRef = useRef(false)
   const immerseTimer = useRef(null)
+  zapRef.current = zap
   const landscape = pov === 'kiosk' && isLandscapeZoom(kioskZoom)
-  // Keep HTML mounted so CSS-3D + page content warm during boot / intro.
-  // Zap phase still gates the visible “turn on” — closed = black MTA cover.
-  const screenLive = kioskLive && zap === 'open' && kioskZoom === 'close'
+  // Menu accepts clicks only after the close-up camera has settled.
+  // Otherwise the click that zooms in also hits a destination button.
+  const screenLive = kioskLive && zap === 'open' && kioskZoom === 'close' && camSettled
+  // Synchronous: the follow-up click from a kiosk pick happens before re-render.
+  blockClicksRef.current = pov === 'kiosk' && kioskZoom === 'close'
   const pageView = immersed && isWallPov(pov)
 
   useEffect(() => {
@@ -4806,6 +4894,14 @@ export default function StationScene({
         window.innerWidth,
         Math.max(1, window.innerHeight - headerH),
       )
+      const prev = getWallFace()
+      if (
+        prev.panelW === next.panelW
+        && prev.panelH === next.panelH
+        && prev.boardY === next.boardY
+        && prev.contentW === next.contentW
+        && prev.contentH === next.contentH
+      ) return
       setWallFace(next)
       setWall(next)
     }
@@ -4834,6 +4930,8 @@ export default function StationScene({
 
   const lookAside = useCallback((e, forcedDir = null) => {
     if (dimmed) return
+    // The kiosk pick and the browser's follow-up click are the same gesture.
+    if (performance.now() - pickAt.current < 400) return
     // Already looking left/right — chrome pans; don't nest another edge click
     if (pov === 'kiosk' && isLandscapeZoom(kioskZoom)) return
 
@@ -4877,14 +4975,20 @@ export default function StationScene({
     onIntroComplete?.()
   }, [onIntroComplete])
 
+  const prevPov = useRef(pov)
   useEffect(() => {
     if (pov !== 'kiosk') {
+      suppressOpen.current = false
       setKioskArrived(false)
       setZap('closed')
       pendingNav.current = null
       setKioskZoom('close')
       setCamSettled(true)
+    } else if (isWallPov(prevPov.current)) {
+      // Coming back from a poster: don't take menu clicks until the shot lands.
+      setCamSettled(false)
     }
+    prevPov.current = pov
     setImmersed(false)
     if (immerseTimer.current) {
       window.clearTimeout(immerseTimer.current)
@@ -4895,29 +4999,42 @@ export default function StationScene({
   // Screens on for intro fly-in (preloaded). Zap open while dimmed so the LCD
   // isn't a black MTA plate during the approach; post-intro keeps it open.
   useEffect(() => {
-    if (pov !== 'kiosk' || kioskZoom !== 'close') return
-    if (zap !== 'closed') return
-    if (dimmed) {
-      setZap('open')
-      return
-    }
-    if (kioskLive && kioskArrived) {
-      setZap(reducedMotion ? 'open' : 'opening')
-    }
-  }, [pov, kioskLive, kioskArrived, zap, reducedMotion, kioskZoom, dimmed])
+    const next = shouldOpenKiosk({
+      pov,
+      zoom: kioskZoom,
+      zap,
+      live: kioskLive,
+      arrived: kioskArrived,
+      dimmed,
+      reduced: reducedMotion,
+      suppress: suppressOpen.current,
+    })
+    if (next) setZap(next)
+  }, [pov, kioskLive, kioskArrived, zap, reducedMotion, kioskZoom, dimmed, navEpoch])
 
   const onZapPhaseEnd = useCallback((phase) => {
-    if (phase === 'opening') {
-      setZap('open')
-      return
-    }
-    if (phase === 'closing') {
-      setZap('closed')
-      const to = pendingNav.current
-      pendingNav.current = null
-      if (to) navigate(to)
-    }
+    // A late animationend/timeout must not close a screen that already moved on.
+    if (zapRef.current !== phase) return
+    const result = completeZapPhase({ phase, pending: pendingNav.current })
+    if (result.ignore || !result.zap) return
+    if (result.clearPending) pendingNav.current = null
+    if (result.suppress) suppressOpen.current = true
+    zapRef.current = result.zap
+    setZap(result.zap)
+    if (result.navigateTo) navigate(result.navigateTo)
   }, [navigate])
+
+  // Closing asked for a route and we are still on home: the navigation did
+  // not commit. Drop the hold and let the open effect bring the menu back
+  // instead of leaving the MTA plate up.
+  useEffect(() => {
+    if (!suppressOpen.current || location.pathname !== '/') return undefined
+    const t = window.setTimeout(() => {
+      suppressOpen.current = false
+      setNavEpoch((n) => n + 1)
+    }, 900)
+    return () => window.clearTimeout(t)
+  }, [location.pathname, zap])
 
   // prefers-reduced-motion: no animationend — snap phases
   useEffect(() => {
@@ -4926,25 +5043,53 @@ export default function StationScene({
     if (zap === 'closing') onZapPhaseEnd('closing')
   }, [zap, reducedMotion, onZapPhaseEnd])
 
+  const wakeKiosk = useCallback(() => {
+    pickAt.current = performance.now()
+    blockClicksRef.current = true
+    pendingNav.current = null
+    suppressOpen.current = false
+    setCamSettled(false)
+    setKioskZoom('close')
+    if (zapRef.current !== 'open' && zapRef.current !== 'opening') {
+      zapRef.current = reducedMotion ? 'open' : 'opening'
+    }
+    setZap((current) => {
+      if (current === 'open' || current === 'opening') return current
+      return reducedMotion ? 'open' : 'opening'
+    })
+  }, [reducedMotion])
+
   useEffect(() => {
     if (!leaveRef) return undefined
     leaveRef.current.tryLeave = (to) => {
-      if (pov !== 'kiosk' || zap !== 'open' || kioskZoom !== 'close') return false
+      if (pov !== 'kiosk' || kioskZoom !== 'close') return false
+      if (zap === 'closing') {
+        pendingNav.current = to
+        return true
+      }
+      if (zap !== 'open' || !camSettled) return false
       pendingNav.current = to
+      suppressOpen.current = false
       setZap('closing')
       return true
     }
     leaveRef.current.goHome = () => {
+      pendingNav.current = null
+      suppressOpen.current = false
       setCamSettled(false)
       setKioskZoom('close')
       setImmersed(false)
+      if (zap === 'closing') {
+        zapRef.current = 'closed'
+        setZap('closed')
+      }
       if (pov !== 'kiosk') navigate('/')
     }
     return () => {
       leaveRef.current.tryLeave = () => false
       leaveRef.current.goHome = null
     }
-  }, [leaveRef, pov, zap, kioskZoom, navigate])
+  }, [leaveRef, pov, zap, kioskZoom, camSettled, navigate])
 
   const loop = tabHidden || pageView ? 'never' : 'always'
 
@@ -5003,11 +5148,10 @@ export default function StationScene({
               immersed={pageView}
               immersedId={pov}
               kioskPickable={landscape && !dimmed}
-              onKioskPick={() => {
-                setCamSettled(false)
-                setKioskZoom('close')
-              }}
+              onKioskPick={wakeKiosk}
               onLookAside={lookAside}
+              busyRef={cameraBusyRef}
+              blockClicksRef={blockClicksRef}
             />
             {settings.bloom ? <StationBloom /> : null}
         </Canvas>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
-import { client, urlFor } from '../lib/sanity'
+import { ABOUT_QUERY, client, imageAlt, urlFor } from '../lib/sanity'
 import { getWallPageCache, whenStationPreloaded } from '../lib/preloadStation'
 import { PortableText } from '@portabletext/react'
 import FrostNote from '../components/FrostNote'
@@ -162,13 +162,7 @@ export default function AboutPage() {
         setStatus(cached.status)
         return
       }
-      client.fetch(`*[_type == "about"][0]{
-        title,
-        description,
-        photo1,
-        photo2,
-        instagramUrl
-      }`).then((data) => {
+      client.fetch(ABOUT_QUERY).then((data) => {
         if (!alive) return
         if (data) {
           setAboutContent(data)
@@ -198,7 +192,7 @@ export default function AboutPage() {
           <Top>
             {photo2 ? (
               <Portrait>
-                <img src={photo2} alt="" />
+                <img src={photo2} alt={imageAlt(aboutContent.photo2, 'Portrait of Ronnie Foreman')} />
               </Portrait>
             ) : null}
             <Copy>
@@ -222,7 +216,7 @@ export default function AboutPage() {
           </Top>
           {photo1 ? (
             <Landscape>
-              <img src={photo1} alt="" />
+              <img src={photo1} alt={imageAlt(aboutContent.photo1, 'Photograph by Ronnie Foreman')} />
             </Landscape>
           ) : null}
         </Shell>

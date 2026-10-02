@@ -65,6 +65,37 @@ const GlobalStyle = createGlobalStyle`
   a, button {
     cursor: pointer;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+`
+
+const SkipLink = styled.a`
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 200;
+  padding: 0.45rem 0.7rem;
+  background: #fff;
+  color: ${station};
+  font-family: ${font};
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  transform: translateY(-180%);
+
+  &:focus {
+    transform: none;
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
 `
 
 const Layout = styled.div`
@@ -103,6 +134,10 @@ const ContentArea = styled.main`
   position: relative;
   z-index: 1;
   pointer-events: ${(p) => (p.$pass ? 'none' : 'auto')};
+
+  &:focus {
+    outline: none;
+  }
 `
 
 const SHOT = {
@@ -221,6 +256,7 @@ function AppContent() {
   return (
     <KioskLeaveProvider value={kioskLeave}>
     <Layout $pad $header={headerH}>
+      <SkipLink href="#content">Skip to content</SkipLink>
       <HeaderArea ref={headerRef}>
         <Header />
       </HeaderArea>
@@ -246,7 +282,7 @@ function AppContent() {
       {showBoot ? (
         <BootScreen leaving={bootLeaving} />
       ) : null}
-      <ContentArea $header={headerH} $pass={atKiosk || onPage}>
+      <ContentArea id="content" tabIndex={-1} $header={headerH} $pass={atKiosk || onPage}>
         <Routes>
           <Route path="/" element={null} />
           <Route path="/photo" element={null} />

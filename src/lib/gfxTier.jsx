@@ -45,6 +45,8 @@ export const GFX = {
     tube: 9.4,
     kioskFill: 8.4,
     fog: 0.022,
+    // No idle pulse / ballast flicker. The still frame stays the same.
+    idleMotion: false,
   },
   mid: {
     dpr: [1, 1.25],
@@ -95,6 +97,25 @@ function tierDprMax(tier) {
   return Array.isArray(dpr) ? dpr[1] : dpr
 }
 
+let softwareGpu = false
+
+function isSoftwareRenderer() {
+  if (typeof document === 'undefined') return false
+  try {
+    const canvas = document.createElement('canvas')
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+    if (!gl) return false
+    const ext = gl.getExtension('WEBGL_debug_renderer_info')
+    const renderer = ext
+      ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '')
+      : String(gl.getParameter(gl.RENDERER) || '')
+    gl.getExtension('WEBGL_lose_context')?.loseContext()
+    return /swiftshader|llvmpipe|softpipe|software|microsoft basic render|mesa offscreen/i.test(renderer)
+  } catch {
+    return false
+  }
+}
+
 function isSlowConnection(conn) {
   if (!conn) return false
   if (conn.saveData) return true
@@ -113,6 +134,12 @@ export function detectGfxTier() {
 
   const forced = new URLSearchParams(window.location.search).get('gfx')
   if (forced === 'low' || forced === 'mid' || forced === 'high') return forced
+
+  // Software GL (SwiftShader, llvmpipe) reports a normal desktop CPU, so the
+  // phone heuristics miss it and it stays on the mid tier. Force low.
+  // ?gfx=high still wins — that check is above.
+  softwareGpu = isSoftwareRenderer()
+  if (softwareGpu) return 'low'
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const coarse = window.matchMedia('(pointer: coarse)').matches
@@ -187,7 +214,9 @@ export function GfxProvider({ children }) {
   const settings = useMemo(() => {
     const base = GFX[tier]
     const min = Array.isArray(base.dpr) ? base.dpr[0] : 1
-    const max = dprMax ?? (Array.isArray(base.dpr) ? base.dpr[1] : base.dpr)
+    let max = dprMax ?? (Array.isArray(base.dpr) ? base.dpr[1] : base.dpr)
+    // Phones stay at the low-tier cap (1.5). Software renderers draw at 1×.
+    if (softwareGpu) max = Math.min(max, 1)
     return {
       ...base,
       dpr: [min, Math.max(min, max)],

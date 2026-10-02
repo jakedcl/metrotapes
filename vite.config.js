@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react-swc'
+import { allowVideosRequest } from './server/videosGuard.js'
 import { getPlaylistConfig, loadPlaylistVideos } from './server/youtubePlaylist.js'
 
 function videosApiPlugin(env) {
@@ -7,11 +8,13 @@ function videosApiPlugin(env) {
     name: 'videos-api',
     configureServer(server) {
       server.middlewares.use('/api/videos', async (req, res) => {
-        if (req.method !== 'GET') {
-          res.statusCode = 405
-          res.setHeader('Allow', 'GET')
+        const guard = allowVideosRequest(req)
+        if (!guard.ok) {
+          res.statusCode = guard.status
+          if (guard.status === 405) res.setHeader('Allow', 'GET')
+          if (guard.status === 429) res.setHeader('Retry-After', '60')
           res.setHeader('Content-Type', 'application/json')
-          res.end(JSON.stringify({ detail: 'Method not allowed' }))
+          res.end(JSON.stringify(guard.body))
           return
         }
 
@@ -47,7 +50,16 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       assetsDir: 'assets',
-      sourcemap: false
+      sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/postprocessing/')) return 'postprocessing'
+            if (id.includes('node_modules/three/')) return 'three'
+            return undefined
+          },
+        },
+      },
     }
   }
 })
