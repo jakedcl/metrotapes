@@ -1,43 +1,16 @@
-import { BOOT_LIMIT_MS, withTimeout } from './bootGate'
-
-export const STATION_ASSETS = [
-  '/metrocard.png',
-  '/subwaysign.jpg',
-  '/subway-arrow-down.png',
-  '/mta-logo.jpg',
-  '/contactless-tap.png',
-]
-
 let preloadPromise = null
-
-function loadImage(src) {
-  return new Promise((resolve) => {
-    if (!src || typeof Image === 'undefined') {
-      resolve(src)
-      return
-    }
-    const img = new Image()
-    img.onload = () => resolve(src)
-    img.onerror = () => resolve(src)
-    img.src = src
-  })
-}
 
 /** Resolves when preloadStationAssets has finished (or immediately if already done). */
 export function whenStationPreloaded() {
-  return preloadPromise || Promise.resolve()
+  return preloadPromise || Promise.resolve('done')
 }
 
 /**
- * Station textures only. Wall photos, about images, and the video list
- * load with the page that shows them. The boot screen does not wait forever.
+ * Station textures load through the canvas (TextureLoader caches one request).
+ * A second preload raced that loader and downloaded the same files twice.
+ * The boot screen waits on the scene, with its own timeout in App.
  */
 export function preloadStationAssets() {
-  if (!preloadPromise) {
-    preloadPromise = withTimeout(
-      Promise.all(STATION_ASSETS.map(loadImage)),
-      BOOT_LIMIT_MS,
-    )
-  }
+  if (!preloadPromise) preloadPromise = Promise.resolve('done')
   return preloadPromise
 }
