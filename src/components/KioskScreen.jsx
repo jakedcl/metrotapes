@@ -5,6 +5,7 @@ import { font, route } from '../styles/theme'
 import MetroMachineFace from './MetroMachineFace'
 import { KIOSK_PANEL_W, KIOSK_PANEL_H, KIOSK_RADIUS_PX } from '../lib/kioskSize'
 import { useKioskLeave } from '../context/KioskLeaveContext'
+import { loadVideoCatalog, youtubeThumb } from '../lib/videoCatalog'
 
 const Panel = styled.div`
   width: ${KIOSK_PANEL_W}px;
@@ -216,8 +217,11 @@ const ClipFrame = styled.iframe`
 `
 
 const More = styled(Link)`
-  display: block;
+  display: flex;
+  align-items: center;
+  min-height: 48px;
   margin: 0 14px 4px;
+  padding: 0 4px;
   flex: 0 0 auto;
   font-size: 10px;
   font-weight: 700;
@@ -442,15 +446,10 @@ function useRecentVideos() {
   const [clips, setClips] = useState(null)
   useEffect(() => {
     let alive = true
-    fetch('/api/videos')
-      .then((res) => res.json())
-      .then((data) => {
-        if (!alive) return
-        setClips((data.videos || []).slice(0, 3))
-      })
-      .catch(() => {
-        if (alive) setClips([])
-      })
+    loadVideoCatalog().then((entry) => {
+      if (!alive) return
+      setClips((entry.data || []).slice(0, 3))
+    })
     return () => { alive = false }
   }, [])
   return clips
@@ -520,8 +519,10 @@ export default function KioskScreen({ live = false }) {
               ) : (
                 <>
                   <Thumb
-                    src={`https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`}
+                    src={youtubeThumb(video.videoId)}
                     alt=""
+                    width={480}
+                    height={360}
                   />
                   <ClipMeta>{video.title}</ClipMeta>
                 </>
@@ -532,6 +533,7 @@ export default function KioskScreen({ live = false }) {
       </RecentList>
       <More
         to="/video"
+        data-kiosk-to="/video"
         onClick={(e) => {
           e.preventDefault()
           goTo('/video')
@@ -545,6 +547,7 @@ export default function KioskScreen({ live = false }) {
           <DestBtn
             key={row.to}
             type="button"
+            data-kiosk-to={row.to}
             onClick={() => goTo(row.to)}
             aria-label={row.title}
           >

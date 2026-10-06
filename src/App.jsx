@@ -5,6 +5,9 @@ import AboutPage from './pages/AboutPage'
 import Header from './components/Header'
 import BootScreen from './components/BootScreen'
 import { preloadStationAssets } from './lib/preloadStation'
+import { BOOT_LIMIT_MS } from './lib/bootGate'
+import { hasWebGL } from './lib/webglSupport'
+import FlatHome from './components/FlatHome'
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
@@ -164,11 +167,12 @@ function AppContent() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true
     return window.location.pathname !== '/'
   })
-  const [assetsReady, setAssetsReady] = useState(false)
-  const [sceneReady, setSceneReady] = useState(false)
+  const [flat, setFlat] = useState(() => !hasWebGL())
+  const [assetsReady, setAssetsReady] = useState(flat)
+  const [sceneReady, setSceneReady] = useState(flat)
   const [pageReady, setPageReady] = useState(false)
   const [bootLeaving, setBootLeaving] = useState(false)
-  const [bootGone, setBootGone] = useState(skipIntro)
+  const [bootGone, setBootGone] = useState(skipIntro || flat)
   const booted = assetsReady && sceneReady
   const arriving = atKiosk && !entered
   const showBoot = arriving && !bootGone
@@ -186,11 +190,16 @@ function AppContent() {
       return false
     },
   }), [])
-  const wallPages = useMemo(() => ({
-    photo: <PhotoPage />,
-    video: <VideoPage />,
-    about: <AboutPage />,
-  }), [])
+  // Wall HTML (and its images) mounts only on that route.
+  const activeWall = !flat && onPage ? shotFromRoute : null
+  const wallPages = useMemo(() => {
+    if (!activeWall) return null
+    return {
+      photo: activeWall === 'photo' ? <PhotoPage /> : null,
+      video: activeWall === 'video' ? <VideoPage /> : null,
+      about: activeWall === 'about' ? <AboutPage /> : null,
+    }
+  }, [activeWall])
   const headerRef = useRef(null)
   const [headerH, setHeaderH] = useState(64)
   usePageMeta()
@@ -221,12 +230,27 @@ function AppContent() {
   }, [location.pathname, onPage])
 
   useEffect(() => {
+    if (flat) {
+      setAssetsReady(true)
+      setSceneReady(true)
+      return undefined
+    }
     let alive = true
     preloadStationAssets().then(() => {
       if (alive) setAssetsReady(true)
     })
-    return () => { alive = false }
-  }, [])
+    // ReadyPing lives inside the canvas. No WebGL, a lost context, or a
+    // stalled texture must not leave the boot screen up.
+    const timer = window.setTimeout(() => {
+      if (!alive) return
+      setAssetsReady(true)
+      setSceneReady(true)
+    }, BOOT_LIMIT_MS)
+    return () => {
+      alive = false
+      window.clearTimeout(timer)
+    }
+  }, [flat])
 
   // First visit: hold loading until scene + assets ready, then fade into the intro.
   // Replays skip the gate once the station is already warm.
@@ -260,7 +284,7 @@ function AppContent() {
       <HeaderArea ref={headerRef}>
         <Header />
       </HeaderArea>
-      {(!onBlog && (shotFromRoute || arriving || entered)) ? (
+      {(!flat && !onBlog && (shotFromRoute || arriving || entered)) ? (
         <StationStage $header={headerH} $front={arriving} $hit={!arriving && (entered || !!shotFromRoute)}>
           <Suspense fallback={null}>
             <StationScene
@@ -270,6 +294,11 @@ function AppContent() {
               introReady={booted && bootGone}
               onIntroComplete={() => setEntered(true)}
               onReady={() => setSceneReady(true)}
+              onFlat={() => {
+                setFlat(true)
+                setAssetsReady(true)
+                setSceneReady(true)
+              }}
               onArrive={handleArrive}
               leaveRef={leaveRef}
               wallPages={wallPages}
@@ -282,12 +311,12 @@ function AppContent() {
       {showBoot ? (
         <BootScreen leaving={bootLeaving} />
       ) : null}
-      <ContentArea id="content" tabIndex={-1} $header={headerH} $pass={atKiosk || onPage}>
+      <ContentArea id="content" tabIndex={-1} $header={headerH} $pass={!flat && (atKiosk || onPage)}>
         <Routes>
-          <Route path="/" element={null} />
-          <Route path="/photo" element={null} />
-          <Route path="/video" element={null} />
-          <Route path="/about" element={null} />
+          <Route path="/" element={flat ? <FlatHome /> : null} />
+          <Route path="/photo" element={flat ? <PhotoPage /> : null} />
+          <Route path="/video" element={flat ? <VideoPage /> : null} />
+          <Route path="/about" element={flat ? <AboutPage /> : null} />
           <Route path="/blog" element={<Blog />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

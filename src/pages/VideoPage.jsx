@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import styled, { keyframes, css } from 'styled-components'
 import FrostNote from '../components/FrostNote'
-import { getWallPageCache, whenStationPreloaded } from '../lib/preloadStation'
+import { loadVideoCatalog, youtubeThumb } from '../lib/videoCatalog'
 import { font, route } from '../styles/theme'
 
 const GREEN = route.video
-
-const THUMB_FALLBACKS = ['maxresdefault', 'sddefault', 'hqdefault']
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -429,14 +427,15 @@ function IconPause() {
 }
 
 function YtThumb({ videoId, alt = '', lazy = false }) {
-  const [tier, setTier] = useState(0)
-  const kind = THUMB_FALLBACKS[tier] || 'hqdefault'
+  const src = youtubeThumb(videoId)
+  if (!src) return null
   return (
     <Thumb
-      src={`https://i.ytimg.com/vi/${videoId}/${kind}.jpg`}
+      src={src}
       alt={alt}
+      width={480}
+      height={360}
       loading={lazy ? 'lazy' : 'eager'}
-      onError={() => setTier((t) => Math.min(t + 1, THUMB_FALLBACKS.length - 1))}
     />
   )
 }
@@ -453,63 +452,23 @@ function ThumbChrome({ videoId, duration, lazy = false, size = 40, showPlay = tr
 }
 
 export default function VideoPage() {
-  const seed = getWallPageCache('video')
   const scroller = useRef(null)
-  const [videos, setVideos] = useState(() => (seed.status === 'ready' ? seed.data : []))
-  const [status, setStatus] = useState(() => (seed.status === 'idle' ? 'loading' : seed.status))
-  const [statusDetail, setStatusDetail] = useState(() => seed.detail || '')
-  const [featuredId, setFeaturedId] = useState(() => (
-    seed.status === 'ready' && seed.data?.[0] ? seed.data[0].videoId : null
-  ))
+  const [videos, setVideos] = useState([])
+  const [status, setStatus] = useState('loading')
+  const [statusDetail, setStatusDetail] = useState('')
+  const [featuredId, setFeaturedId] = useState(null)
   const [playing, setPlaying] = useState(false)
 
   useEffect(() => {
     let alive = true
-    whenStationPreloaded().then(() => {
+    loadVideoCatalog().then((entry) => {
       if (!alive) return
-      const cached = getWallPageCache('video')
-      if (cached.status === 'ready' || cached.status === 'empty' || cached.status === 'error') {
-        setVideos(cached.data || [])
-        setStatus(cached.status)
-        setStatusDetail(cached.detail || '')
-        if (cached.status === 'ready' && cached.data?.[0]) {
-          setFeaturedId(cached.data[0].videoId)
-        }
-        return
+      setVideos(entry.data || [])
+      setStatus(entry.status === 'idle' ? 'loading' : entry.status)
+      setStatusDetail(entry.detail || '')
+      if (entry.status === 'ready' && entry.data?.[0]) {
+        setFeaturedId(entry.data[0].videoId)
       }
-
-      const fetchVideos = async () => {
-        setStatus('loading')
-        setStatusDetail('')
-        setPlaying(false)
-        try {
-          const response = await fetch('/api/videos')
-          const data = await response.json().catch(() => ({}))
-          if (!alive) return
-          if (!response.ok) {
-            setVideos([])
-            setStatus('error')
-            setStatusDetail(data.detail || `Could not load videos (${response.status}).`)
-            return
-          }
-          if (!data.videos?.length) {
-            setVideos([])
-            setStatus('empty')
-            setStatusDetail(data.detail || 'No videos to show.')
-            return
-          }
-          setVideos(data.videos)
-          setFeaturedId(data.videos[0].videoId)
-          setStatus('ready')
-        } catch (error) {
-          console.error('Error fetching videos:', error)
-          if (!alive) return
-          setVideos([])
-          setStatus('error')
-          setStatusDetail(error?.message || 'Could not load videos.')
-        }
-      }
-      fetchVideos()
     })
     return () => { alive = false }
   }, [])
