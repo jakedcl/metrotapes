@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
-import { ABOUT_QUERY, client, imageAlt, urlFor } from '../lib/sanity'
+import { fetchAbout } from '../lib/contentApi'
+import { imageAlt, urlFor } from '../lib/sanity'
 import { getWallPageCache, whenStationPreloaded } from '../lib/preloadStation'
 import { PortableText } from '@portabletext/react'
 import FrostNote from '../components/FrostNote'
@@ -163,7 +164,7 @@ export default function AboutPage() {
         setStatus(cached.status)
         return
       }
-      client.fetch(ABOUT_QUERY).then((data) => {
+      fetchAbout().then((data) => {
         if (!alive) return
         if (data) {
           setAboutContent(data)
