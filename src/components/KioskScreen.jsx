@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { font, route } from '../styles/theme'
 import MetroMachineFace from './MetroMachineFace'
 import { KIOSK_PANEL_W, KIOSK_PANEL_H, KIOSK_RADIUS_PX } from '../lib/kioskSize'
-import { useKioskLeave } from '../context/KioskLeaveContext'
+import { useKioskLeave } from '../context/useKioskLeave'
 import { loadVideoCatalog, youtubeThumb } from '../lib/videoCatalog'
 
 const Panel = styled.div`

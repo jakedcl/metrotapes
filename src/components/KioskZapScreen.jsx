@@ -131,5 +131,3 @@ export default function KioskZapScreen({
     </Root>
   )
 }
-
-export const KIOSK_ZAP_MS = ZAP_MS
