@@ -80,8 +80,8 @@ const ResetButton = styled.button`
   }
 
   @media (max-width: 767px) {
-    width: 42px;
-    height: 42px;
+    width: 48px;
+    height: 48px;
   }
 
   img {
@@ -134,10 +134,12 @@ const NavItem = styled(NavLink)`
   display: flex;
   align-items: center;
   text-decoration: none;
-  height: 32px;
+  min-width: 48px;
+  min-height: 48px;
+  height: 48px;
   position: relative;
   overflow: hidden;
-  border-radius: 19px;
+  border-radius: 24px;
 
   &:focus-visible {
     outline: 2px solid rgba(255, 255, 255, 0.9);
@@ -145,14 +147,14 @@ const NavItem = styled(NavLink)`
   }
 
   @media (min-width: 768px) {
-    height: 38px;
+    height: 48px;
   }
 `
 
 const Circle = styled.div`
-  width: 32px;
-  height: 32px;
-  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -170,7 +172,8 @@ const Circle = styled.div`
   }
 
   @media (max-width: 767px) {
-    width: 120px;
+    width: 132px;
+    height: 48px;
     padding: 0 1.5rem 0 1rem;
     justify-content: flex-start;
   }
@@ -196,7 +199,7 @@ const NavText = styled.span`
   font-weight: 500;
   opacity: 0;
   position: absolute;
-  left: 44px;
+  left: 56px;
   pointer-events: none;
   transition: opacity 0.2s ease;
 
@@ -221,8 +224,10 @@ const MenuButton = styled.button`
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.8);
+  min-width: 48px;
+  min-height: 48px;
   padding: 8px;
-  margin-right: 12px;
+  margin-right: 4px;
   transition: transform 0.2s ease, color 0.2s ease;
 
   &:hover {
@@ -251,21 +256,30 @@ const TitleSection = styled.div`
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [isMobile, setIsMobile] = useState(
+    () => window.matchMedia('(max-width: 767px)').matches,
+  )
   const navigate = useNavigate()
   const kioskLeave = useKioskLeave()
 
   useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 768
+    const mq = window.matchMedia('(max-width: 767px)')
+    const apply = () => {
+      const mobile = mq.matches
       setIsMobile(mobile)
-      if (!mobile) {
-        setIsOpen(false)
-      }
+      if (!mobile) setIsOpen(false)
     }
-
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    window.addEventListener('resize', apply)
+    window.addEventListener('orientationchange', apply)
+    mq.addEventListener('change', apply)
+    const vv = window.visualViewport
+    vv?.addEventListener('resize', apply)
+    return () => {
+      window.removeEventListener('resize', apply)
+      window.removeEventListener('orientationchange', apply)
+      mq.removeEventListener('change', apply)
+      vv?.removeEventListener('resize', apply)
+    }
   }, [])
 
   const handleTitleClick = (e) => {
@@ -334,7 +348,7 @@ export default function Header() {
                 <FontAwesomeIcon icon={faBars} size="lg" />
               </MenuButton>
             )}
-            <TitleWrapper type="button" onClick={handleTitleClick} aria-label="Home">
+            <TitleWrapper type="button" onClick={handleTitleClick} aria-label="metrotapes, home">
               <TitleGroup>
                 <Title>metrotapes</Title>
               </TitleGroup>
@@ -347,7 +361,7 @@ export default function Header() {
               </NavList>
             )}
             <ResetButton type="button" onClick={handleReset} aria-label="Reset to entrance">
-              <img src="/lamp.png" alt="" />
+              <img src="/lamp.png" alt="" width={160} height={267} />
             </ResetButton>
           </RightCluster>
         </TopSection>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
-import { ABOUT_QUERY, client, imageAlt, urlFor } from '../lib/sanity'
-import { getWallPageCache, whenStationPreloaded } from '../lib/preloadStation'
+import { ABOUT_QUERY, client, imageAlt } from '../lib/sanity'
+import { imageSrcSet, imageUrl } from '../lib/sanityImage'
 import { PortableText } from '@portabletext/react'
 import FrostNote from '../components/FrostNote'
 import { font, route } from '../styles/theme'
@@ -149,38 +149,28 @@ const portableTextComponents = {
 }
 
 export default function AboutPage() {
-  const seed = getWallPageCache('about')
-  const [aboutContent, setAboutContent] = useState(() => (seed.status === 'ready' ? seed.data : null))
-  const [status, setStatus] = useState(() => (seed.status === 'idle' ? 'loading' : seed.status))
+  const [aboutContent, setAboutContent] = useState(null)
+  const [status, setStatus] = useState('loading')
 
   useEffect(() => {
     let alive = true
-    whenStationPreloaded().then(() => {
+    client.fetch(ABOUT_QUERY).then((data) => {
       if (!alive) return
-      const cached = getWallPageCache('about')
-      if (cached.status === 'ready' || cached.status === 'empty' || cached.status === 'error') {
-        setAboutContent(cached.data)
-        setStatus(cached.status)
-        return
+      if (data) {
+        setAboutContent(data)
+        setStatus('ready')
+      } else {
+        setStatus('empty')
       }
-      client.fetch(ABOUT_QUERY).then((data) => {
-        if (!alive) return
-        if (data) {
-          setAboutContent(data)
-          setStatus('ready')
-        } else {
-          setStatus('empty')
-        }
-      }).catch((error) => {
-        console.error('Error fetching about content:', error)
-        if (alive) setStatus('error')
-      })
+    }).catch((error) => {
+      console.error('Error fetching about content:', error)
+      if (alive) setStatus('error')
     })
     return () => { alive = false }
   }, [])
 
-  const photo2 = aboutContent?.photo2 ? urlFor(aboutContent.photo2).width(800).url() : ''
-  const photo1 = aboutContent?.photo1 ? urlFor(aboutContent.photo1).width(1400).url() : ''
+  const photo2 = aboutContent?.photo2
+  const photo1 = aboutContent?.photo1
 
   return (
     <Container>
@@ -193,7 +183,14 @@ export default function AboutPage() {
           <Top>
             {photo2 ? (
               <Portrait>
-                <img src={photo2} alt={imageAlt(aboutContent.photo2, 'Portrait of Ronnie Foreman')} />
+                <img
+                  src={imageUrl(photo2, { width: 480 })}
+                  srcSet={imageSrcSet(photo2, [320, 480, 720])}
+                  sizes="(max-width: 640px) 280px, 240px"
+                  width={photo2.width || 480}
+                  height={photo2.height || 640}
+                  alt={imageAlt(photo2, 'Portrait of Ronnie Foreman')}
+                />
               </Portrait>
             ) : null}
             <Copy>
@@ -217,7 +214,14 @@ export default function AboutPage() {
           </Top>
           {photo1 ? (
             <Landscape>
-              <img src={photo1} alt={imageAlt(aboutContent.photo1, 'Photograph by Ronnie Foreman')} />
+              <img
+                src={imageUrl(photo1, { width: 960 })}
+                srcSet={imageSrcSet(photo1, [640, 960, 1400])}
+                sizes="(max-width: 780px) 92vw, 780px"
+                width={photo1.width || 1400}
+                height={photo1.height || 900}
+                alt={imageAlt(photo1, 'Photograph by Ronnie Foreman')}
+              />
             </Landscape>
           ) : null}
         </Shell>

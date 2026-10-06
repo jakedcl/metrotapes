@@ -1,10 +1,9 @@
 /* eslint-disable react/no-unknown-property */
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import { useLocation, useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { BloomEffect, EffectComposer, EffectPass, FXAAEffect, RenderPass } from 'postprocessing'
 import styled from 'styled-components'
 import KioskZapScreen from './KioskZapScreen'
 import { KIOSK_CAB_H, KIOSK_CAB_W, KIOSK_POST_H, KIOSK_BEZEL, KIOSK_PANEL_W, KIOSK_PANEL_H, KIOSK_SCREEN_W, KIOSK_SCREEN_H, KIOSK_RADIUS_PX, KIOSK_RADIUS_M } from '../lib/kioskSize'
@@ -12,10 +11,14 @@ import { WALL_BEZEL, layoutWallFace, getWallFace, setWallFace } from '../lib/wal
 import { useGfx } from '../lib/gfxTier'
 import { completeZapPhase, shouldOpenKiosk } from '../lib/kioskPhase'
 import {
-  composerBufferStale,
   css3dBoxChanged,
   preserveDrawingBuffer,
 } from '../lib/stationFrame'
+import { frameloopFor, idlePumpMs } from '../lib/renderLoop'
+import { pickKioskDestination } from '../lib/kioskHit'
+import { hasWebGL } from '../lib/webglSupport'
+
+const StationBloom = lazy(() => import('./StationBloom'))
 
 /**
  * 3D platform. Intro: one continuous MetroCard wind-flight onto litter, then kiosk home.
@@ -1214,10 +1217,12 @@ const Layer = styled.div`
 
   canvas {
     display: block;
-    position: relative;
+    position: absolute !important;
+    inset: 0;
     z-index: 0;
-    width: 100%;
-    height: 100%;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100%;
     /* Never fade the canvas itself. opacity + the film blend tears the
        drawing buffer, and the wall page already covers it when immersed. */
   }
@@ -1254,9 +1259,9 @@ const Overlay = styled.div`
     visibility: visible !important;
     perspective: none !important;
     right: 0;
-    bottom: 0;
+    bottom: 72px;
     width: 100% !important;
-    height: 100% !important;
+    height: auto !important;
   `}
 `
 
@@ -1431,24 +1436,12 @@ const StationFilm = styled.div`
   }
 `
 
-const NoWebGL = styled.div`
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.7);
-  font-family: Helvetica, "Helvetica Neue", Arial, sans-serif;
-  font-size: 0.95rem;
-  letter-spacing: -0.02em;
-`
-
 /**
  * Runtime budget guard.
  * Soften DPR first (fill rate), then drop tier (lights / extras / bloom).
  * Never promotes. Warm-up + cooldown so fly-ins / tab returns don't panic.
  */
-function GfxWatch({ busyRef }) {
+function GfxWatch({ busyRef, armed = true }) {
   const { soften, drop, canSoften, canDrop } = useGfx()
   const acc = useRef({
     warm: 0,
@@ -1459,6 +1452,8 @@ function GfxWatch({ busyRef }) {
   })
 
   useFrame((_, dt) => {
+    // Idle pumps run slower than 36fps on purpose. Don't read that as jank.
+    if (!armed) return
     if (!canSoften && !canDrop) return
     // A camera move is supposed to be heavy. Don't treat it as a reason
     // to drop DPR mid-flight — that resizes the buffer and jerks the shot.
@@ -1516,13 +1511,47 @@ function ToneMap() {
   return null
 }
 
-function hasWebGL() {
-  try {
-    const canvas = document.createElement('canvas')
-    return Boolean(canvas.getContext('webgl2') || canvas.getContext('webgl'))
-  } catch {
-    return false
-  }
+/** Keep the drawing buffer on the stage box, including while frameloop is never. */
+function StageFit() {
+  const gl = useThree((s) => s.gl)
+  const setSize = useThree((s) => s.setSize)
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => {
+    const el = gl.domElement?.parentElement
+    if (!el) return undefined
+    const apply = () => {
+      const w = el.clientWidth
+      const h = el.clientHeight
+      if (w < 2 || h < 2) return
+      setSize(w, h, false)
+      invalidate()
+    }
+    apply()
+    const ro = new ResizeObserver(apply)
+    ro.observe(el)
+    const vv = window.visualViewport
+    window.addEventListener('resize', apply)
+    window.addEventListener('orientationchange', apply)
+    vv?.addEventListener('resize', apply)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', apply)
+      window.removeEventListener('orientationchange', apply)
+      vv?.removeEventListener('resize', apply)
+    }
+  }, [gl, invalidate, setSize])
+  return null
+}
+
+/** Advances flicker and the rat without a full-rate loop. */
+function IdlePump({ ms }) {
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => {
+    if (!ms) return undefined
+    const id = window.setInterval(() => invalidate(), ms)
+    return () => window.clearInterval(id)
+  }, [invalidate, ms])
+  return null
 }
 
 function smootherstep(t) {
@@ -1704,6 +1733,17 @@ const ChromeBar = styled.div`
   align-items: center;
   gap: 0.15rem;
   pointer-events: auto;
+  ${(p) => p.$dock && `
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transform: none;
+    height: 72px;
+    justify-content: flex-end;
+    padding: 0 0.85rem max(0px, env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    background: #0a0908;
+  `}
 `
 
 /** Far left / right of the stage — look aside even when HTML screens eat canvas hits. */
@@ -2847,61 +2887,6 @@ function Fluorescents() {
       ))}
     </group>
   )
-}
-
-function StationBloom() {
-  const { gl, scene, camera } = useThree()
-  const drawingSize = useMemo(() => new THREE.Vector2(), [])
-  const cssSize = useMemo(() => new THREE.Vector2(), [])
-  const sized = useRef('')
-  const composer = useMemo(() => {
-    const next = new EffectComposer(gl, {
-      multisampling: 0,
-      frameBufferType: THREE.HalfFloatType,
-    })
-    next.addPass(new RenderPass(scene, camera))
-    next.addPass(new EffectPass(camera, new BloomEffect({
-      intensity: 1.35,
-      luminanceThreshold: 0.72,
-      luminanceSmoothing: 0.42,
-      mipmapBlur: true,
-    })))
-    next.addPass(new EffectPass(camera, new FXAAEffect()))
-    return next
-  }, [camera, gl, scene])
-
-  useEffect(() => () => {
-    composer.dispose()
-    // EffectComposer turns autoClear off and does not put it back.
-    // After a tier drop the default renderer would smear the last frame,
-    // including whatever was left in the lower half of a stale target.
-    gl.autoClear = true
-    gl.setRenderTarget(null)
-  }, [composer, gl])
-
-  useFrame((_, delta) => {
-    // Sync from the drawing buffer, not CSS size alone. A DPR soften keeps
-    // CSS pixels and leaves bloom targets at the previous height — the pass
-    // then paints the top of that target and the lower canvas stays stale.
-    // updateStyle false: do not fight R3F for the canvas CSS size.
-    const drawing = gl.getDrawingBufferSize(drawingSize)
-    const key = `${drawing.x}x${drawing.y}`
-    if (sized.current !== key) {
-      if (drawing.x > 0 && drawing.y > 0 && composerBufferStale(
-        composer.inputBuffer.width,
-        composer.inputBuffer.height,
-        drawing.x,
-        drawing.y,
-      )) {
-        const css = gl.getSize(cssSize)
-        composer.setSize(css.x, css.y, false)
-      }
-      sized.current = key
-    }
-    composer.render(delta)
-  }, 1)
-
-  return null
 }
 
 function Atmosphere() {
@@ -4791,6 +4776,7 @@ function StationWorld({
   onLookAside,
   busyRef,
   blockClicksRef,
+  watchArmed = true,
 }) {
   const landscapeInvite = isLandscapeZoom(kioskZoom) && !dimmed
   const { settings } = useGfx()
@@ -4860,7 +4846,7 @@ function StationWorld({
         />
       ) : null}
       <ReadyPing onReady={onReady} hud={hud} wallHud={wallHud} />
-      <GfxWatch busyRef={busyRef} />
+      <GfxWatch busyRef={busyRef} armed={watchArmed} />
       <ToneMap />
     </>
   )
@@ -4873,6 +4859,7 @@ export default function StationScene({
   introReady = false,
   onIntroComplete,
   onReady,
+  onFlat,
   onArrive,
   leaveRef,
   wallPages = null,
@@ -4914,6 +4901,8 @@ export default function StationScene({
   const [immersed, setImmersed] = useState(false)
   const [kioskZoom, setKioskZoom] = useState('close')
   const [camSettled, setCamSettled] = useState(true)
+  const [flying, setFlying] = useState(true)
+  const [interacting, setInteracting] = useState(false)
   const [navEpoch, setNavEpoch] = useState(0)
   const pendingNav = useRef(null)
   const suppressOpen = useRef(false)
@@ -4922,6 +4911,11 @@ export default function StationScene({
   const cameraBusyRef = useRef(false)
   const blockClicksRef = useRef(false)
   const immerseTimer = useRef(null)
+  const interactTimer = useRef(null)
+  const onFlatRef = useRef(onFlat)
+  const onReadyRef = useRef(onReady)
+  onFlatRef.current = onFlat
+  onReadyRef.current = onReady
   zapRef.current = zap
   const landscape = pov === 'kiosk' && isLandscapeZoom(kioskZoom)
   // Menu accepts clicks only after the close-up camera has settled.
@@ -4935,6 +4929,32 @@ export default function StationScene({
     const onVis = () => setTabHidden(document.hidden)
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
+  }, [])
+
+  useEffect(() => {
+    if (!use3d) {
+      onReadyRef.current?.()
+      onFlatRef.current?.()
+    }
+  }, [use3d])
+
+  // camSettled flips true the moment a wall route is chosen, while the
+  // camera is still in the air. `flying` stays up until CameraRig lands.
+  useLayoutEffect(() => {
+    setFlying(true)
+  }, [pov, kioskZoom])
+
+  useEffect(() => {
+    const start = () => setFlying(true)
+    window.addEventListener('resize', start)
+    window.addEventListener('orientationchange', start)
+    const vv = window.visualViewport
+    vv?.addEventListener('resize', start)
+    return () => {
+      window.removeEventListener('resize', start)
+      window.removeEventListener('orientationchange', start)
+      vv?.removeEventListener('resize', start)
+    }
   }, [])
 
   useEffect(() => {
@@ -5002,6 +5022,7 @@ export default function StationScene({
 
   const handleArrive = useCallback((next) => {
     onArrive?.(next)
+    setFlying(false)
     setCamSettled(true)
     setKioskArrived(next === 'kiosk')
     if (immerseTimer.current) {
@@ -5140,23 +5161,117 @@ export default function StationScene({
     }
   }, [leaveRef, pov, zap, kioskZoom, camSettled, navigate])
 
-  const loop = tabHidden || pageView ? 'never' : 'always'
+  const moving = dimmed || flying || zap === 'opening' || zap === 'closing'
+  const loop = frameloopFor({
+    hidden: tabHidden,
+    pageView,
+    moving,
+    interacting,
+  })
+  const pump = idlePumpMs({
+    hidden: tabHidden,
+    pageView,
+    moving,
+    interacting,
+    reducedMotion,
+    idleMotion: settings.idleMotion !== false,
+    extras: Boolean(settings.extras),
+  })
 
-  if (!use3d) {
-    return (
-      <Layer $hit={false} $page={false}>
-        <NoWebGL>This station needs WebGL.</NoWebGL>
-      </Layer>
-    )
-  }
+  const poke = useCallback((down) => {
+    if (interactTimer.current) window.clearTimeout(interactTimer.current)
+    if (down) {
+      setInteracting(true)
+      return
+    }
+    interactTimer.current = window.setTimeout(() => setInteracting(false), 1200)
+  }, [])
+
+  useEffect(() => () => {
+    if (interactTimer.current) window.clearTimeout(interactTimer.current)
+  }, [])
+
+  useEffect(() => {
+    if (!screenLive) return undefined
+    const onUp = (event) => {
+      if (event.button != null && event.button !== 0) return
+      const root = hud.current.root
+      if (!root) return
+      const boxes = []
+      root.querySelectorAll('[data-kiosk-to]').forEach((node) => {
+        const rect = node.getBoundingClientRect()
+        if (rect.width < 2 || rect.height < 2) return
+        boxes.push({
+          to: node.getAttribute('data-kiosk-to'),
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+        })
+      })
+      const to = pickKioskDestination(event.clientX, event.clientY, boxes)
+      if (!to) return
+      event.preventDefault()
+      event.stopPropagation()
+      if (leaveRef?.current?.tryLeave?.(to)) return
+      navigate(to)
+    }
+    window.addEventListener('pointerup', onUp, true)
+    return () => window.removeEventListener('pointerup', onUp, true)
+  }, [screenLive, leaveRef, navigate])
+
+  useLayoutEffect(() => {
+    if (!pageView) return undefined
+    const fit = () => {
+      const root = wallHud.current.root
+      const cam = wallHud.current.cam
+      if (!root) return
+      root.style.width = '100%'
+      root.style.height = 'auto'
+      root.style.right = '0px'
+      root.style.bottom = '72px'
+      root.style.left = '0px'
+      root.style.top = '0px'
+      if (cam) {
+        cam.style.width = '100%'
+        cam.style.height = '100%'
+        cam.style.transform = 'none'
+      }
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    window.addEventListener('orientationchange', fit)
+    const vv = window.visualViewport
+    vv?.addEventListener('resize', fit)
+    return () => {
+      window.removeEventListener('resize', fit)
+      window.removeEventListener('orientationchange', fit)
+      vv?.removeEventListener('resize', fit)
+    }
+  }, [pageView])
+
+  if (!use3d) return null
 
   return (
-    <Layer ref={layerRef} $hit={!dimmed} $page={pageView}>
+    <Layer
+      ref={layerRef}
+      $hit={!dimmed}
+      $page={pageView}
+      onPointerDown={() => poke(true)}
+      onPointerUp={() => poke(false)}
+      onPointerCancel={() => poke(false)}
+    >
       <SceneWrap $dim={dimmed}>
       <Suspense fallback={null}>
         <Canvas
-          style={{ isolation: 'isolate' }}
-          resize={{ scroll: false, offsetSize: true }}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            isolation: 'isolate',
+          }}
+          resize={{ scroll: false }}
           frameloop={loop}
             dpr={settings.dpr}
             gl={glConfig}
@@ -5175,10 +5290,13 @@ export default function StationScene({
             gl.domElement.addEventListener('webglcontextlost', (event) => {
               event.preventDefault()
               setUse3d(false)
+              onFlatRef.current?.()
             })
           }}
           onPointerMissed={lookAside}
         >
+            <StageFit />
+            <IdlePump ms={pump} />
             <StationWorld
               pov={pov}
               kioskZoom={kioskZoom}
@@ -5199,8 +5317,13 @@ export default function StationScene({
               onLookAside={lookAside}
               busyRef={cameraBusyRef}
               blockClicksRef={blockClicksRef}
+              watchArmed={loop === 'always'}
             />
-            {settings.bloom ? <StationBloom /> : null}
+            {settings.bloom ? (
+              <Suspense fallback={null}>
+                <StationBloom />
+              </Suspense>
+            ) : null}
         </Canvas>
       </Suspense>
         <Overlay ref={(n) => { hud.current.root = n }}>
@@ -5264,7 +5387,7 @@ export default function StationScene({
           aria-hidden
         />
       )}
-      {!dimmed && !(pov === 'kiosk' && isLandscapeZoom(kioskZoom)) ? (
+      {!dimmed && !pageView && !(pov === 'kiosk' && isLandscapeZoom(kioskZoom)) ? (
         <>
           <EdgeHit
             type="button"
@@ -5281,7 +5404,7 @@ export default function StationScene({
         </>
       ) : null}
       {!dimmed && (isWallPov(pov) || (kioskLive && pov === 'kiosk' && (landscape || (kioskZoom === 'close' && kioskArrived && zap === 'open')))) ? (
-        <ChromeBar>
+        <ChromeBar $dock={pageView}>
           {landscape ? (
             <ChromeBtn
               type="button"

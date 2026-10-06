@@ -4,8 +4,9 @@ import imageUrlBuilder from '@sanity/image-url'
 // Public read-only client: projectId + dataset are not secret (they appear in browser requests).
 // Use env for staging/prod split; fallbacks keep local/stock config working without .env.
 // Do not put a write-capable Sanity token in VITE_* — it would ship in the JS bundle.
-const projectId = import.meta.env.VITE_SANITY_PROJECT_ID || 'l3itmzli'
-const dataset = import.meta.env.VITE_SANITY_DATASET || 'production'
+const env = import.meta.env ?? {}
+const projectId = env.VITE_SANITY_PROJECT_ID || 'l3itmzli'
+const dataset = env.VITE_SANITY_DATASET || 'production'
 
 const config = {
   projectId,
@@ -30,15 +31,17 @@ export const urlFor = (source) => {
 /** Keep asset._ref so urlFor still works, and read alt when the studio has one. */
 export const PHOTOS_QUERY = `*[_type == "photos"][0].images[]{
   ...,
-  "alt": coalesce(alt, asset->altText)
+  "alt": coalesce(alt, asset->altText),
+  "width": asset->metadata.dimensions.width,
+  "height": asset->metadata.dimensions.height
 }`
 
 export const ABOUT_QUERY = `*[_type == "about"][0]{
   title,
   description,
   instagramUrl,
-  photo1{..., "alt": coalesce(alt, asset->altText)},
-  photo2{..., "alt": coalesce(alt, asset->altText)}
+  photo1{..., "alt": coalesce(alt, asset->altText), "width": asset->metadata.dimensions.width, "height": asset->metadata.dimensions.height},
+  photo2{..., "alt": coalesce(alt, asset->altText), "width": asset->metadata.dimensions.width, "height": asset->metadata.dimensions.height}
 }`
 
 export function imageAlt(image, fallback) {

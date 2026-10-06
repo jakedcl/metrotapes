@@ -10,6 +10,7 @@
     "build:site": "vite build",
     "build:studio": "npm ci --prefix studio && SANITY_STUDIO_BASEPATH=/studio npm run build --prefix studio",
     "lint": "eslint .",
+    "test": "node --test src/lib/bootGate.test.js src/lib/kioskHit.test.js src/lib/kioskPhase.test.js src/lib/renderLoop.test.js src/lib/sanityImage.test.js src/lib/stationFrame.test.js src/lib/videoCatalog.test.js server/videosGuard.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
