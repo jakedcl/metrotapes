@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { font, route } from '../styles/theme'
+import { hasWebGL } from '../lib/webglSupport'
 
 const Page = styled.article`
   max-width: 36rem;
@@ -58,6 +60,7 @@ const Bullet = styled.span`
 
 /** 2D way in when the station canvas cannot run. */
 export default function FlatHome() {
+  const [webgl] = useState(() => hasWebGL())
   return (
     <Page>
       <Title>metrotapes</Title>
@@ -65,7 +68,11 @@ export default function FlatHome() {
         Photography and video by Ronnie Foreman in the New York metropolitan area.
         Skate, snow, and other visual work.
       </Lead>
-      <Note>The station view needs WebGL, which is not available right now.</Note>
+      <Note>
+        {webgl
+          ? 'Flat view. Choose full in the header for the station.'
+          : 'The station view needs WebGL, which is not available right now.'}
+      </Note>
       <Nav aria-label="Site">
         <Item to="/photo"><Bullet $color={route.photo} />Photo</Item>
         <Item to="/video"><Bullet $color={route.video} />Video</Item>

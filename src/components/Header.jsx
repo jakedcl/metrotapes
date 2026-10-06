@@ -4,7 +4,8 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCamera, faVideo, faBook, faBars } from '@fortawesome/free-solid-svg-icons'
 import { route, station, cushy } from '../styles/theme'
-import { useKioskLeave } from '../context/KioskLeaveContext'
+import { useKioskLeave } from '../context/useKioskLeave'
+import { usePresentation } from '../lib/usePresentation'
 
 const HeaderContainer = styled.header`
   width: 100%;
@@ -254,6 +255,27 @@ const TitleSection = styled.div`
   align-items: center;
 `
 
+const QualityButton = styled.button`
+  ${cushy}
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0 0.7rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 2px;
+  color: white;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 3px;
+  }
+`
+
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(
@@ -261,6 +283,7 @@ export default function Header() {
   )
   const navigate = useNavigate()
   const kioskLeave = useKioskLeave()
+  const { mode, setMode } = usePresentation()
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)')
@@ -360,6 +383,13 @@ export default function Header() {
                 {renderNavItems()}
               </NavList>
             )}
+            <QualityButton
+              type="button"
+              aria-pressed={mode === 'full'}
+              onClick={() => setMode(mode === 'full' ? 'lite' : 'full')}
+            >
+              {mode === 'full' ? 'full' : 'lite'}
+            </QualityButton>
             <ResetButton type="button" onClick={handleReset} aria-label="Reset to entrance">
               <img src="/lamp.png" alt="" width={160} height={267} />
             </ResetButton>
