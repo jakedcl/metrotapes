@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { PHOTOS_QUERY, client, imageAlt, urlFor } from '../lib/sanity'
+import { fetchPhotos } from '../lib/contentApi'
+import { imageAlt, urlFor } from '../lib/sanity'
 import { getWallPageCache, whenStationPreloaded } from '../lib/preloadStation'
 import styled from 'styled-components'
 import ImageModal from '../components/ImageModal'
@@ -412,7 +413,7 @@ export default function PhotoPage() {
         setStatus(cached.status)
         return
       }
-      client.fetch(PHOTOS_QUERY).then((data) => {
+      fetchPhotos().then((data) => {
         if (!alive) return
         if (data?.length) {
           setPhotos(data)
